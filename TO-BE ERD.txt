@@ -1,0 +1,399 @@
+🔗 INTEGRATION ENTITIES
+Citizen_Account
+
+account_id (PK)
+person_id (FK)
+email
+password_hash
+verification_status
+registered_date
+registry_ref_no
+
+Digital_Payment
+
+payment_id (PK)
+document_id (FK)
+amount_paid
+payment_date
+payment_method
+transaction_ref_no
+digital_or_no
+payment_status
+
+Notification_Log
+
+notif_id (PK)
+account_id (FK)
+module_reference
+reference_id
+notif_type
+message
+sent_at
+
+🔷 CORE ENTITIES
+Person
+
+person_id (PK)
+full_name
+address
+contact_number
+valid_id_type
+valid_id_number
+account_id (FK)
+
+Government_Office
+
+office_id (PK)
+office_name
+office_type
+location
+
+Employee
+
+employee_id (PK)
+office_id (FK)
+full_name
+position_title
+department
+employee_no
+contact_number
+is_active
+
+Digital_Document
+
+document_id (PK)
+document_type
+reference_no
+date_created
+status
+created_by_office (FK)
+received_by_employee (FK)
+person_id (FK)
+file_url
+
+⚰ MODULE 1 — CEMETERY & BURIAL MANAGEMENT
+Deceased
+
+deceased_id (PK)
+full_name
+date_of_death
+place_of_death
+death_certificate_no
+
+Cemetery
+
+cemetery_id (PK)
+cemetery_name
+location
+administered_by (FK)
+
+Niche_Record
+
+niche_id (PK)
+cemetery_id (FK)
+niche_number
+status
+burial_schedule_date
+assigned_document (FK)
+
+Burial_Record
+
+burial_id (PK)
+deceased_id (FK)
+cemetery_id (FK)
+niche_id (FK)
+burial_date
+burial_permit_doc (FK)
+funeral_home_id (FK)
+indigent_assistance_id (FK)
+payment_id (FK)
+
+Funeral_Home
+
+funeral_home_id (PK)
+name
+accreditation_status
+contact_person
+system_registered
+
+Indigent_Assistance_Record
+
+assistance_id (PK)
+deceased_id (FK)
+issued_by_office (FK)
+digital_cert_of_guarantee_url
+social_worker_employee_id (FK)
+social_worker_eval_date
+status
+
+Online_Burial_Application
+
+application_id (PK)
+person_id (FK)
+deceased_id (FK)
+submission_date
+document_validation_status
+application_status
+payment_id (FK)
+received_by_employee (FK)
+approved_by_employee (FK)
+
+🌳 MODULE 2 — PARKS & RECREATION
+Park_Venue
+
+park_venue_id (PK)
+park_venue_name
+location
+venue_type
+admin_office_id (FK)
+availability_status
+
+Administration_Office
+
+admin_office_id (PK)
+office_name
+parent_department
+location
+
+Park_Reservation_Record
+
+reservation_id (PK)
+park_venue_id (FK)
+applicant_person_id (FK)
+letter_of_intent_doc (FK)
+application_form_doc (FK)
+reservation_date
+time_slot
+status
+processed_by_admin (FK)
+received_by_employee (FK)
+approved_by_employee (FK)
+payment_id (FK)
+digital_permit_url
+
+Site_Usage_Log
+
+usage_id (PK)
+reservation_id (FK)
+permit_document (FK)
+monitored_by_office (FK)
+remarks
+event_conducted_flag
+
+🏘 MODULE 3 — BARANGAY FACILITY RESERVATION
+Barangay
+
+barangay_id (PK)
+barangay_name
+office_id (FK)
+
+Barangay_Facility
+
+barangay_facility_id (PK)
+barangay_id (FK)
+facility_name
+facility_type
+rental_rate
+ordinance_reference
+availability_status
+
+Barangay_Reservation_Record
+
+reservation_id (PK)
+barangay_facility_id (FK)
+applicant_person_id (FK)
+request_slip_doc (FK)
+reservation_date
+time_slot
+status
+approved_by_office (FK)
+received_by_employee (FK)
+payment_id (FK)
+digital_permit_url
+
+Barangay_Reservation_Approval
+
+approval_id (PK)
+reservation_id (FK)
+approved_by_office (FK)
+approved_by_employee (FK)
+approval_date
+decision
+remarks
+
+💧 MODULE 4 & 5 — WATER SUPPLY & DRAINAGE
+Service_Ticket
+
+ticket_id (PK)
+person_id (FK)
+ticket_no
+service_type
+date_logged
+current_status
+handled_by_office (FK)
+logged_by_employee (FK)
+assigned_to_employee (FK)
+closure_date
+
+Water_Connection_Request
+
+water_request_id (PK)
+ticket_id (FK)
+person_id (FK)
+application_doc (FK)
+property_type
+status
+
+HCDRD_Clearance
+
+clearance_id (PK)
+water_request_id (FK)
+issued_by_office (FK)
+clearance_type
+issue_date
+digital_clearance_url
+
+Technical_Assessment
+
+assessment_id (PK)
+water_request_id (FK)
+findings
+meter_type
+feasibility_status
+quotation_amount
+assessed_by_employee (FK)
+
+Installation_Record
+
+installation_id (PK)
+water_request_id (FK)
+installation_date
+executed_by_office (FK)
+executed_by_employee (FK)
+payment_id (FK)
+activation_confirmed
+
+Leak_Report
+
+leak_report_id (PK)
+ticket_id (FK)
+person_id (FK)
+report_doc (FK)
+urgency_classification
+status
+
+Excavation_Clearance
+
+excav_clearance_id (PK)
+leak_report_id (FK)
+issued_by_office (FK)
+clearance_type
+issue_date
+digital_clearance_url
+
+Leak_Repair_Record
+
+repair_id (PK)
+leak_report_id (FK)
+completion_date
+executed_by_office (FK)
+executed_by_employee (FK)
+completion_status
+excavation_required
+
+Drainage_Request
+
+drainage_request_id (PK)
+ticket_id (FK)
+person_id (FK)
+request_doc (FK)
+issue_description
+date_reported
+status
+
+Drainage_Inspection_Report
+
+inspection_id (PK)
+drainage_request_id (FK)
+findings
+inspected_by_office (FK)
+inspected_by_employee (FK)
+
+Program_of_Works
+
+pow_id (PK)
+inspection_id (FK)
+description
+estimated_cost
+materials_available
+prepared_by_employee (FK)
+
+Drainage_Repair_Record
+
+repair_id (PK)
+drainage_request_id (FK)
+completion_date
+executed_by_office (FK)
+executed_by_employee (FK)
+completion_status
+
+🏢 MODULE 6 — ASSET INVENTORY TRACKER
+Property
+
+property_id (PK)
+property_type
+property_name
+location
+area_size
+managing_office (FK)
+registry_ref_no
+asset_condition
+
+Inventory_Request
+
+inventory_request_id (PK)
+requesting_office (FK)
+request_doc (FK)
+date_requested
+status
+inventory_scope
+cycle_type
+
+Ocular_Inspection
+
+inspection_id (PK)
+property_id (FK)
+inventory_request_id (FK)
+inspection_date
+conducted_by_office (FK)
+physical_condition_notes
+usage_verified
+boundary_verified
+
+Inventory_Report
+
+inventory_report_id (PK)
+inventory_request_id (FK)
+preparation_date
+approval_status
+prepared_by_office (FK)
+digital_report_url
+
+Approval_Record
+
+approval_id (PK)
+inventory_report_id (FK)
+approved_by_office (FK)
+approved_by_employee (FK)
+approval_date
+decision
+remarks
+
+Submission_Record
+
+submission_id (PK)
+inventory_report_id (FK)
+submitted_to
+submission_date
+submitted_by_employee (FK)
+notif_id (FK)
