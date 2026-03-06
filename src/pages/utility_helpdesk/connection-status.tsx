@@ -5,7 +5,7 @@ export default function ConnectionStatus() {
   return (
     <PlaceholderPage
       title="Connection Status"
-      description="Monitor status of water connections and related issues."
+      description="Monitor the status of water service tickets and confirm completion so requests can be closed and citizens notified."
     />
   )
 }

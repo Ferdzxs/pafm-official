@@ -5,7 +5,7 @@ export default function LeakReports() {
   return (
     <PlaceholderPage
       title="Leak Reports"
-      description="Manage and respond to reported leaks and water issues."
+      description="Inspect reported leak sites and record repair work performed by Utility Engineering teams."
     />
   )
 }

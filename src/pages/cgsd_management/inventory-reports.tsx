@@ -5,7 +5,7 @@ export default function InventoryReports() {
   return (
     <PlaceholderPage
       title="Inventory Reports"
-      description="Summary and detailed reports for asset inventory."
+      description="Summary and detailed reports for land and building inventory prepared by FAMCD."
     />
   )
 }

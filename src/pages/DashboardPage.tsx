@@ -94,13 +94,13 @@ const DASHBOARD_DATA: Record<UserRole, {
     },
     reservation_officer: {
         kpis: [
-            { label: 'Incoming Reservations', value: 2, change: 1, icon: Clock, color: '#fbbf24' },
+            { label: 'Incoming Park Requests', value: 2, change: 1, icon: Clock, color: '#fbbf24' },
             { label: 'Approved This Week', value: 7, change: 2, icon: CheckCircle, color: '#34d399' },
-            { label: 'Permits Issued', value: 18, change: 3, icon: FileText, color: '#60a5fa' },
-            { label: 'Facilities', value: 5, change: 0, icon: Package, color: '#fbbf24' },
+            { label: 'Event Permits Issued', value: 18, change: 3, icon: FileText, color: '#60a5fa' },
+            { label: 'Park Venues', value: 5, change: 0, icon: Package, color: '#fbbf24' },
         ],
         recentActivity: [
-            { id: 'BR-2024-019', action: 'New Barangay Reservation', subject: 'Multi-Purpose Hall A', time: '2 hrs ago', status: 'pending' },
+            { id: 'PR-2024-019', action: 'New Park Reservation', subject: 'Quezon Memorial Circle — Open Grounds', time: '2 hrs ago', status: 'pending' },
         ],
         chartData: [],
     },
@@ -373,6 +373,61 @@ export default function DashboardPage() {
                         </Card>
                     )}
 
+                    {/* My Inventory Requests / Reports for requesting offices */}
+                    {(user.role === 'punong_barangay' || user.role === 'cemetery_office' || user.role === 'parks_admin') && (
+                        <>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">My Inventory Requests</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {getInventoryItems(user.role).map(item => (
+                                            <div key={item.id} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg hover:bg-accent/70 transition-colors">
+                                                <span className="font-mono text-[11px] text-muted-foreground">{item.id}</span>
+                                                <span className="truncate flex-1 text-foreground">{item.asset}</span>
+                                                <Badge variant={item.status === 'completed' ? 'success' : item.status === 'in_progress' ? 'info' : 'secondary'} className="text-[10px] px-1.5 py-0.5">
+                                                    {item.status_label}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                        {getInventoryItems(user.role).length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                No inventory requests yet. Coordinate with FAMCD to initiate an inventory cycle for your facilities.
+                                            </p>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm">My Inventory Reports</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {getInventoryItems(user.role)
+                                            .filter(item => item.status === 'completed')
+                                            .map(item => (
+                                                <div key={item.id} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg hover:bg-accent/70 transition-colors">
+                                                    <span className="font-mono text-[11px] text-muted-foreground">{item.id}</span>
+                                                    <span className="truncate flex-1 text-foreground">{item.asset}</span>
+                                                    <Badge variant="success" className="text-[10px] px-1.5 py-0.5">
+                                                        Report Available
+                                                    </Badge>
+                                                </div>
+                                            ))}
+                                        {getInventoryItems(user.role).filter(item => item.status === 'completed').length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                No completed reports yet. Completed inventory cycles will appear here when FAMCD submits the final report.
+                                            </p>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </>
+                    )}
+
                     {/* Quick actions */}
                     <Card>
                         <CardHeader className="pb-2">
@@ -417,4 +472,26 @@ function getQuickActions(role: UserRole) {
         cgsd_management: [{ label: 'New Inspection', emoji: '🔍', path: '/assets/inspections' }, { label: 'View Reports', emoji: '📊', path: '/assets/reports' }],
     }
     return map[role] ?? [{ label: 'View Dashboard', emoji: '🏠', path: '/dashboard' }]
+}
+
+function getInventoryItems(role: UserRole): Array<{ id: string; asset: string; status: 'draft' | 'in_progress' | 'completed'; status_label: string }> {
+    if (role === 'punong_barangay') {
+        return [
+            { id: 'INV-BRGY-001', asset: 'Barangay Hall & Multi-purpose Complex', status: 'in_progress', status_label: 'For Inspection' },
+            { id: 'INV-BRGY-000', asset: 'Covered Court & Open Grounds', status: 'completed', status_label: 'Report Available' },
+        ]
+    }
+    if (role === 'cemetery_office') {
+        return [
+            { id: 'INV-CEM-004', asset: 'Public Cemetery — North Block Niches', status: 'draft', status_label: 'Draft Request' },
+            { id: 'INV-CEM-003', asset: 'Public Cemetery — Main Admin Building', status: 'completed', status_label: 'Report Available' },
+        ]
+    }
+    if (role === 'parks_admin') {
+        return [
+            { id: 'INV-PARK-007', asset: 'Central Park Grandstand & Stage', status: 'in_progress', status_label: 'Inspection Scheduled' },
+            { id: 'INV-PARK-006', asset: 'Playground & Fitness Equipment', status: 'completed', status_label: 'Report Available' },
+        ]
+    }
+    return []
 }

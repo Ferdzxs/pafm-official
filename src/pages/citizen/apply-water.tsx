@@ -5,7 +5,7 @@ export default function ApplyWater() {
   return (
     <PlaceholderPage
       title="Apply: Water Connection"
-      description="Submit an application for a new or updated water connection."
+      description="Submit a digital request for water services: new connection, drainage concern, or other supply-related assistance."
     />
   )
 }

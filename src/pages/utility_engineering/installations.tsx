@@ -5,7 +5,7 @@ export default function Installations() {
   return (
     <PlaceholderPage
       title="Installations"
-      description="Track ongoing and completed utility installation jobs."
+      description="Track site inspections and completed new water connection installations (meters and service pipes)."
     />
   )
 }

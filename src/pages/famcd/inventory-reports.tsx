@@ -5,7 +5,7 @@ export default function FamcdInventoryReports() {
   return (
     <PlaceholderPage
       title="Inventory Reports"
-      description="Reporting and analytics for FAMCD inventory."
+      description="Prepare and manage digital land and building inventory reports for management review and approval."
     />
   )
 }

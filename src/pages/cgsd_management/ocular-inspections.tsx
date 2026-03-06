@@ -5,7 +5,7 @@ export default function OcularInspections() {
   return (
     <PlaceholderPage
       title="Ocular Inspections"
-      description="Plan, record, and track inspections of public assets."
+      description="Monitor schedules and results of ocular inspections conducted on land and building assets."
     />
   )
 }

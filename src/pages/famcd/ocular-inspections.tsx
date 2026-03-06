@@ -5,7 +5,7 @@ export default function FamcdOcularInspections() {
   return (
     <PlaceholderPage
       title="Ocular Inspections"
-      description="FAMCD-managed inspections and site checks."
+      description="Schedule and record physical or ocular inspections of city-owned land and building assets for inventory purposes."
     />
   )
 }
