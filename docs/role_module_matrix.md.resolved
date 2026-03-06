@@ -1,0 +1,298 @@
+# BPM System — Role × Module Access Matrix
+
+> **Public Assets & Facilities Management (BPM)**
+> Quezon City Government | 14 Roles · 6 Modules + Admin
+
+---
+
+## 🏛️ Module Overview
+
+| # | Module | Description |
+|---|--------|-------------|
+| **M1** | ⚰️ Cemetery & Burial | Burial applications, niche management, indigent assistance, death records |
+| **M2** | 🌳 Parks & Recreation | Park venue reservations, usage logs, booking calendar |
+| **M3** | 🏘️ Barangay Facility | Facility reservations, approvals, ordinances, constituent records |
+| **M4/5** | 💧 Water & Drainage | Service tickets, leak reports, installations, connection requests |
+| **M6** | 📦 Asset Inventory | Property tracking, ocular inspections, inventory reports |
+| **💳** | Payments & Finance | Transaction reconciliation, official receipts, revenue reports |
+| **⚙️** | System Admin | User management, audit logs, office/employee master data |
+
+---
+
+## 👥 Role × Module Access Matrix
+
+| Role | M1 ⚰️ | M2 🌳 | M3 🏘️ | M4/5 💧 | M6 📦 | 💳 Finance | ⚙️ Admin |
+|------|:------:|:------:|:------:|:--------:|:------:|:----------:|:--------:|
+| ⚰️ **Cemetery Office** | ✅ Full | — | — | — | — | View only | — |
+| 💚 **SSDD** | Indigent only | — | — | — | — | — | — |
+| 🔴 **Death Registration** | Certs only | — | — | — | — | — | — |
+| 👤 **Citizen / Informant** | Apply only | Apply only | Apply only | Apply/Report | — | View own | — |
+| 🌿 **Parks Administrator** | — | ✅ Full | — | — | — | — | — |
+| 🟡 **Reservation Officer** | — | — | Reservations | — | — | — | — |
+| 🟠 **Punong Barangay** | — | — | Approvals | — | — | — | — |
+| 💜 **Barangay Secretary** | — | — | ✅ Full | — | — | — | — |
+| 🔵 **Utility Engineering** | — | — | — | ✅ Full | — | — | — |
+| 🩵 **Utility Helpdesk** | — | — | — | Triage/Assign | — | — | — |
+| 🩷 **CGSD Management** | — | — | — | — | ✅ Full | — | — |
+| 🟢 **FAMCD** | — | — | — | — | ✅ Full | — | — |
+| 🟨 **Treasurer** | — | — | — | — | — | ✅ Full | — |
+| ⚫ **System Admin** | — | — | — | — | — | — | ✅ Full |
+
+---
+
+## 📋 Detailed Role Access by Module
+
+### ⚰️ Module 1 — Cemetery & Burial
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     CEMETERY & BURIAL MODULE                            │
+├──────────────────────┬──────────────────────────────────────────────────┤
+│ ROLE                 │ ACCESS / PAGES                                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ ⚰️ Cemetery Office   │ ✅ Burial Applications (review/approve)          │
+│                      │ ✅ Deceased Registry                             │
+│                      │ ✅ Niche Management                              │
+│                      │ ✅ Burial Records                                │
+│                      │ ✅ Indigent Assistance (coordination)            │
+│                      │ ✅ Payments & Permits                            │
+│                      │ ✅ Reports                                        │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 💚 SSDD              │ 🔶 Indigent Assistance (own cases only)          │
+│                      │ 🔶 Death Registration coordination               │
+│                      │ 🔶 Citizen Records (welfare-linked)              │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🔴 Death Registration│ 🔶 Certificate Verification                     │
+│                      │ 🔶 Received Documents                            │
+│                      │ 🔶 Approvals & Signing                          │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 👤 Citizen           │ 📝 Submit Burial Application                    │
+│                      │ 📝 View own application status                   │
+│                      │ 📝 Upload required documents                     │
+└──────────────────────┴──────────────────────────────────────────────────┘
+```
+
+### 🌳 Module 2 — Parks & Recreation
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      PARKS & RECREATION MODULE                          │
+├──────────────────────┬──────────────────────────────────────────────────┤
+│ ROLE                 │ ACCESS / PAGES                                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🌿 Parks Admin       │ ✅ Park Venues (manage)                          │
+│                      │ ✅ Reservations (approve/reject)                 │
+│                      │ ✅ Site Usage Logs                               │
+│                      │ ✅ Booking Calendar                              │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 👤 Citizen           │ 📝 Apply for Park Reservation                   │
+│                      │ 📝 View own reservation status                   │
+└──────────────────────┴──────────────────────────────────────────────────┘
+```
+
+### 🏘️ Module 3 — Barangay Facility Reservation
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                  BARANGAY FACILITY RESERVATION MODULE                   │
+├──────────────────────┬──────────────────────────────────────────────────┤
+│ ROLE                 │ ACCESS / PAGES                                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 💜 Barangay Secretary│ ✅ Pending Approvals                             │
+│                      │ ✅ Reservation Records (all)                     │
+│                      │ ✅ Constituent Records                            │
+│                      │ ✅ Documents & Filing                            │
+│                      │ ✅ Ordinance References                          │
+│                      │ ✅ Reports                                        │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🟠 Punong Barangay   │ 🔶 Pending Approvals (sign-off)                  │
+│                      │ 🔶 Ordinance References (read)                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🟡 Reservation Desk  │ 🔶 Reservation Records (receive/process)        │
+│                      │ 🔶 Approvals (forward to PB)                    │
+│                      │ 🔶 Permits & Payments                            │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 👤 Citizen           │ 📝 Apply for Facility Reservation               │
+│                      │ 📝 View own reservation status                   │
+└──────────────────────┴──────────────────────────────────────────────────┘
+```
+
+### 💧 Module 4 & 5 — Water Supply & Drainage
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   WATER SUPPLY & DRAINAGE MODULE                        │
+├──────────────────────┬──────────────────────────────────────────────────┤
+│ ROLE                 │ ACCESS / PAGES                                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🔵 Utility Engineer  │ ✅ Service Tickets (assigned)                    │
+│                      │ ✅ Leak Reports (repair/resolve)                 │
+│                      │ ✅ Assigned Jobs (field work)                    │
+│                      │ ✅ Installations (water connections)             │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🩵 Utility Helpdesk  │ 🔶 Ticket Triage (receive & classify)           │
+│                      │ 🔶 Assign to Teams                              │
+│                      │ 🔶 Connection Status (monitor)                  │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 👤 Citizen           │ 📝 Apply for Water Connection                   │
+│                      │ 📝 Report a Leak                                │
+│                      │ 📝 Track ticket status                           │
+└──────────────────────┴──────────────────────────────────────────────────┘
+```
+
+### 📦 Module 6 — Asset Inventory Tracker
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     ASSET INVENTORY TRACKER MODULE                      │
+├──────────────────────┬──────────────────────────────────────────────────┤
+│ ROLE                 │ ACCESS / PAGES                                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🩷 CGSD Management   │ ✅ Inventory & Assets (review)                   │
+│                      │ ✅ Ocular Inspections (schedule/conduct)         │
+│                      │ ✅ Inventory Reports (prepare/submit)            │
+│                      │ ✅ Approval Records (approve reports)            │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🟢 FAMCD             │ ✅ Inventory & Assets (manage)                   │
+│                      │ ✅ Ocular Inspections (conduct)                  │
+│                      │ ✅ Inventory Reports (submit)                    │
+│                      │ ✅ Submission Records (file to office)           │
+└──────────────────────┴──────────────────────────────────────────────────┘
+```
+
+### 💳 Finance / Payments
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        FINANCE / PAYMENTS MODULE                        │
+├──────────────────────┬──────────────────────────────────────────────────┤
+│ ROLE                 │ ACCESS / PAGES                                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 🟨 Treasurer         │ ✅ Payment Transactions (reconcile)              │
+│                      │ ✅ Reconciliation Queue                          │
+│                      │ ✅ Official Receipts (issue/view)                │
+│                      │ ✅ Revenue Reports                               │
+│                      │ ✅ Audit Logs (financial)                        │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ ⚰️ Cemetery Office   │ 🔶 Payments & Permits (burial fees only)         │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ 👤 Citizen           │ 📝 Payment History (own transactions)            │
+└──────────────────────┴──────────────────────────────────────────────────┘
+```
+
+### ⚙️ System Administration
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       SYSTEM ADMINISTRATION                             │
+├──────────────────────┬──────────────────────────────────────────────────┤
+│ ROLE                 │ ACCESS / PAGES                                   │
+├──────────────────────┼──────────────────────────────────────────────────┤
+│ ⚫ System Admin      │ ✅ User & Role Management                        │
+│                      │ ✅ Audit Logs (system-wide)                      │
+│                      │ ✅ System Settings                               │
+│                      │ ✅ Office Management                             │
+│                      │ ✅ Employee Master Data                          │
+│                      │ ✅ Legacy Data Migration                         │
+└──────────────────────┴──────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔁 Role Interaction Flow
+
+```mermaid
+flowchart TD
+    C[👤 Citizen]:::citizen
+
+    subgraph M1["⚰️ Cemetery & Burial"]
+        CO[Cemetery Office]:::cem
+        SD[SSDD]:::ssdd
+        DR[Death Registration]:::death
+    end
+
+    subgraph M2["🌳 Parks & Recreation"]
+        PA[Parks Admin]:::parks
+    end
+
+    subgraph M3["🏘️ Barangay Module"]
+        BS[Barangay Secretary]:::bsec
+        PB[Punong Barangay]:::pb
+        RO[Reservation Desk]:::ro
+    end
+
+    subgraph M45["💧 Water & Drainage"]
+        UE[Utility Engineering]:::util
+        UH[Utility Helpdesk]:::helpdesk
+    end
+
+    subgraph M6["📦 Asset Inventory"]
+        CM[CGSD Management]:::cgsd
+        FA[FAMCD]:::famcd
+    end
+
+    TR[🟨 Treasurer]:::treas
+    SA[⚫ System Admin]:::admin
+
+    C -->|Apply/Report| M1
+    C -->|Apply| M2
+    C -->|Apply| M3
+    C -->|Apply/Report| M45
+
+    SD -->|Indigent coordination| CO
+    DR -->|Certificate submission| CO
+    RO -->|Forward for approval| PB
+    RO -->|Coordinate| BS
+    UH -->|Assign tickets| UE
+    CM -->|Approve reports| FA
+
+    TR -->|Reconcile payments| M1
+    TR -->|Reconcile payments| M2
+    TR -->|Reconcile payments| M3
+
+    SA -.->|Manage all roles| M1
+    SA -.->|Manage all roles| M2
+    SA -.->|Manage all roles| M3
+    SA -.->|Manage all roles| M45
+    SA -.->|Manage all roles| M6
+
+    classDef citizen fill:#dbeafe,stroke:#2563eb,color:#1e40af
+    classDef cem fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ssdd fill:#d1fae5,stroke:#059669,color:#064e3b
+    classDef death fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef parks fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bsec fill:#fae8ff,stroke:#a21caf,color:#701a75
+    classDef pb fill:#ffedd5,stroke:#ea580c,color:#7c2d12
+    classDef ro fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef util fill:#cffafe,stroke:#0891b2,color:#164e63
+    classDef helpdesk fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef cgsd fill:#fce7f3,stroke:#db2777,color:#831843
+    classDef famcd fill:#ecfccb,stroke:#65a30d,color:#365314
+    classDef treas fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef admin fill:#f1f5f9,stroke:#475569,color:#0f172a
+```
+
+---
+
+## 🎯 Access Level Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ Full | Complete read/write/approve access to entire module |
+| 🔶 Partial | Specific actions only (role-scoped) |
+| 📝 Apply only | Citizen self-service — submit & view own records |
+| — | No access |
+
+---
+
+## 📊 Role Count by Module
+
+| Module | Roles with Access |
+|--------|:-----------------:|
+| ⚰️ Cemetery & Burial | 4 (Cemetery Office, SSDD, Death Reg, Citizen) |
+| 🌳 Parks & Recreation | 2 (Parks Admin, Citizen) |
+| 🏘️ Barangay Facility | 4 (Secretary, Punong, Desk Officer, Citizen) |
+| 💧 Water & Drainage | 3 (Utility Eng, Helpdesk, Citizen) |
+| 📦 Asset Inventory | 2 (CGSD, FAMCD) |
+| 💳 Finance / Payments | 3 (Treasurer, Cemetery Office, Citizen) |
+| ⚙️ System Admin | 1 (System Admin only) |
