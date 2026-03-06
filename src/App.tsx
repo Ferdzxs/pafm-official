@@ -12,7 +12,6 @@ import LoginPage from '@/pages/auth/LoginPage'
 import SignupPage from '@/pages/auth/SignupPage'
 
 // ─── Core Pages ──────────────────────────────────────────────────────────────
-import DashboardPage from '@/pages/DashboardPage'
 import ProfilePage from '@/pages/ProfilePage'
 import SettingsPage from '@/pages/SettingsPage'
 import PlaceholderPage from '@/pages/PlaceholderPage'
@@ -27,6 +26,21 @@ import BarangayReservationsPage from '@/pages/barangay_secretary/reservation-rec
 import BarangayOrdinancesPage from '@/pages/barangay_secretary/ordinance-references'
 import BarangayDocumentsPage from '@/pages/barangay_secretary/documents-filing'
 import BarangayRecordsPage from '@/pages/barangay_secretary/constituent-records'
+
+// ─── Role Dashboards ─────────────────────────────────────────────────────────
+import CemeteryOfficeDashboard from '@/pages/cemetery_office/dashboard'
+import CitizenDashboard from '@/pages/citizen/dashboard'
+import SsddDashboard from '@/pages/ssdd/dashboard'
+import DeathRegistrationDashboard from '@/pages/death_registration/dashboard'
+import ParksAdminDashboard from '@/pages/parks_admin/dashboard'
+import ReservationOfficerDashboard from '@/pages/reservation_officer/dashboard'
+import PunongBarangayDashboard from '@/pages/punong_barangay/dashboard'
+import FamcdDashboard from '@/pages/famcd/dashboard'
+import CgsdManagementDashboard from '@/pages/cgsd_management/dashboard'
+import TreasurerDashboard from '@/pages/treasurer/dashboard'
+import SystemAdminDashboard from '@/pages/system_admin/dashboard'
+import UtilityEngineeringDashboard from '@/pages/utility_engineering/dashboard'
+import UtilityHelpdeskDashboard from '@/pages/utility_helpdesk/dashboard'
 
 // ─── Citizen Module ──────────────────────────────────────────────────────────
 import CitizenBurialApplicationPage from '@/pages/citizen/BurialApplicationPage'
@@ -53,11 +67,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-// ─── Role-aware dashboard: secretary gets its own dashboard ──────────────────
-function SmartDashboard() {
+function DashboardRedirect() {
   const { user } = useAuth()
-  if (user?.role === 'barangay_secretary') return <BarangaySecretaryDashboard />
-  return <DashboardPage />
+  if (!user) return null
+  return <Navigate to={`/${user.role}/dashboard`} replace />
 }
 
 function AppRoutes() {
@@ -70,9 +83,25 @@ function AppRoutes() {
       {/* Protected — wrapped in AppLayout */}
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<SmartDashboard />} />
+        <Route path="dashboard" element={<DashboardRedirect />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
+
+        {/* ── Role Dashboards ── */}
+        <Route path="cemetery_office/dashboard" element={<CemeteryOfficeDashboard />} />
+        <Route path="citizen/dashboard" element={<CitizenDashboard />} />
+        <Route path="ssdd/dashboard" element={<SsddDashboard />} />
+        <Route path="death_registration/dashboard" element={<DeathRegistrationDashboard />} />
+        <Route path="parks_admin/dashboard" element={<ParksAdminDashboard />} />
+        <Route path="reservation_officer/dashboard" element={<ReservationOfficerDashboard />} />
+        <Route path="punong_barangay/dashboard" element={<PunongBarangayDashboard />} />
+        <Route path="barangay_secretary/dashboard" element={<BarangaySecretaryDashboard />} />
+        <Route path="famcd/dashboard" element={<FamcdDashboard />} />
+        <Route path="cgsd_management/dashboard" element={<CgsdManagementDashboard />} />
+        <Route path="treasurer/dashboard" element={<TreasurerDashboard />} />
+        <Route path="system_admin/dashboard" element={<SystemAdminDashboard />} />
+        <Route path="utility_engineering/dashboard" element={<UtilityEngineeringDashboard />} />
+        <Route path="utility_helpdesk/dashboard" element={<UtilityHelpdeskDashboard />} />
 
         {/* ── Cemetery & Burial ── */}
         <Route path="burial/applications" element={<BurialApplicationsPage />} />
