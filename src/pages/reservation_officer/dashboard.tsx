@@ -17,8 +17,8 @@ const RECENT_ACTIVITY = [
 ]
 
 const QUICK_ACTIONS = [
-    { label: 'Validate Requests', emoji: '✅', path: '/parks/reservations' },
-    { label: 'Issue Permits', emoji: '📋', path: '/parks/reservations' },
+    { label: 'Validate Requests', emoji: '✅', path: '/parks/desk-reservations' },
+    { label: 'Issue Permits', emoji: '📋', path: '/parks/desk-permits' },
 ]
 
 const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'secondary'> = {
