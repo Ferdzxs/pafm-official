@@ -53,7 +53,6 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'apply-park', label: 'Apply: Park Reservation', icon: TreePine, path: '/citizen/apply/park' },
         { id: 'apply-barangay', label: 'Apply: Barangay Facility', icon: Home, path: '/citizen/apply/barangay' },
         { id: 'apply-water', label: 'Water Supply & Drainage', icon: Droplets, path: '/citizen/apply/water' },
-        { id: 'apply-leak', label: 'Water Leak Report', icon: AlertTriangle, path: '/citizen/apply/leak' },
         { id: 'payments', label: 'Payment History', icon: CreditCard, path: '/citizen/payments' },
         { id: 'my-docs', label: 'My Documents', icon: FolderOpen, path: '/citizen/documents' },
     ],

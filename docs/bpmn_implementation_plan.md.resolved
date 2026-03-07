@@ -71,8 +71,7 @@ Here is the exact action mapping for each page to guarantee they fulfill the pla
 
 ### Module 4: Water Supply & Drainage Requests
 **Citizen Flow:**
-*   **`citizen/apply-water.tsx`:** Form requiring request classification (New Connection vs Drainage).
-*   **`citizen/report-leak.tsx`:** Dedicated, expedited form directly targeting Path B workflow.
+*   **`citizen/apply-utility_request.tsx`:** Unified form combining New Water Connections (Path A), Drainage Requests, and Leak Reports (Path B). The form dynamically alters fields based on the selected utility service.
 
 **Utility Engineering & Helpdesk:**
 *   **`utility_engineering/service-tickets.tsx`:** Utilized to log requests, generate ticket numbers (Step 2), and classify the utility request type.

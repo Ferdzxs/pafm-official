@@ -47,8 +47,7 @@ import UtilityHelpdeskDashboard from '@/pages/utility_helpdesk/dashboard'
 
 // ─── Citizen Module ──────────────────────────────────────────────────────────
 import CitizenBurialApplicationPage from '@/pages/citizen/BurialApplicationPage'
-import ApplyWaterPage from '@/pages/citizen/apply-water'
-import ApplyLeakPage from '@/pages/citizen/apply-leak'
+import ApplyWaterPage from '@/pages/citizen/apply-utility_request'
 
 // ─── Utility Engineering & Helpdesk ─────────────────────────────────────────
 import ServiceTicketsPage from '@/pages/utility_engineering/service-tickets'
@@ -138,7 +137,7 @@ function AppRoutes() {
         <Route path="citizen/apply/park" element={<PlaceholderPage title="Apply: Park Reservation" />} />
         <Route path="citizen/apply/barangay" element={<PlaceholderPage title="Apply: Barangay Facility" />} />
         <Route path="citizen/apply/water" element={<ApplyWaterPage />} />
-        <Route path="citizen/apply/leak" element={<ApplyLeakPage />} />
+        <Route path="citizen/apply/leak" element={<Navigate to="/citizen/apply/water" replace />} />
         <Route path="citizen/payments" element={<PlaceholderPage title="Payment History" />} />
         <Route path="citizen/documents" element={<PlaceholderPage title="My Documents" />} />
 
