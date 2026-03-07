@@ -37,6 +37,9 @@ import DeathRegistrationDashboard from '@/pages/death_registration/dashboard'
 import ParksAdminDashboard from '@/pages/parks_admin/dashboard'
 import ParksAssetRequestsPage from '@/pages/parks_admin/asset-requests'
 import ReservationOfficerDashboard from '@/pages/reservation_officer/dashboard'
+import ReservationApprovalsPage from '@/pages/reservation_officer/approvals'
+import ReservationRecordsPage from '@/pages/reservation_officer/reservation-records'
+import PermitsPaymentsPage from '@/pages/reservation_officer/permits-payments'
 import PunongBarangayDashboard from '@/pages/punong_barangay/dashboard'
 import FamcdDashboard from '@/pages/famcd/dashboard'
 import CgsdManagementDashboard from '@/pages/cgsd_management/dashboard'
@@ -148,10 +151,12 @@ function AppRoutes() {
         <Route path="parks/calendar" element={<PlaceholderPage title="Booking Calendar" />} />
         <Route path="parks/asset-requests" element={<ParksAssetRequestsPage />} />
 
+        {/* ── Parks (Reservation Desk) ── */}
+        <Route path="parks/desk-reservations" element={<ReservationRecordsPage />} />
+        <Route path="parks/desk-approvals" element={<ReservationApprovalsPage />} />
+        <Route path="parks/desk-permits" element={<PermitsPaymentsPage />} />
+
         {/* ── Barangay (shared) ── */}
-        <Route path="barangay/reservations" element={<PlaceholderPage title="Barangay Reservation Records" />} />
-        <Route path="barangay/approvals" element={<PlaceholderPage title="Approvals" />} />
-        <Route path="barangay/permits" element={<PlaceholderPage title="Permits & Payments" />} />
         <Route path="barangay/pending" element={<PlaceholderPage title="Pending Approvals" description="Pending barangay requests forwarded for approval." />} />
         <Route path="barangay/ordinances" element={<PlaceholderPage title="Ordinance References" />} />
         <Route path="barangay/asset-requests" element={<PunongBarangayAssetRequestsPage />} />
