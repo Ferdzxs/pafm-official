@@ -1,6 +1,6 @@
 Project name: pafm
-Database password: YOUR_DATABASE_PASSWORD
-Project URL: YOUR_PROJECT_URL
-Publishable API Key: YOUR_PUBLISHABLE_API_KEY
-Secret keys: YOUR_SECRET_KEY
-anon public: YOUR_ANON_PUBLIC_KEY
+Database password: [YOUR_DATABASE_PASSWORD_HERE]
+Project URL: https://[YOUR_PROJECT_ID].supabase.co
+Publishable API Key: [YOUR_PUBLISHABLE_API_KEY]
+Secret keys: [YOUR_SUPER_SECRET_KEY]
+anon public: [YOUR_ANON_PUBLIC_KEY]

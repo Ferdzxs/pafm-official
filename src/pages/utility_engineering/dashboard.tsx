@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge'
 const KPI_DATA = [
     { label: 'Assigned Tickets', value: 9, change: 3, icon: Clock, color: '#fbbf24' },
     { label: 'In Progress', value: 4, change: 1, icon: AlertTriangle, color: '#fb923c' },
-    { label: 'Resolved Today', value: 5, change: 2, icon: CheckCircle, color: '#34d399' },
-    { label: 'Leak Reports', value: 3, change: -1, icon: FileText, color: '#22d3ee' },
+    { label: 'Resolutions', value: 5, change: 2, icon: CheckCircle, color: '#34d399' },
+    { label: 'Drainage & Leaks', value: 3, change: -1, icon: FileText, color: '#22d3ee' },
 ]
 
 const RECENT_ACTIVITY = [

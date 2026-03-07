@@ -12,7 +12,7 @@ const KPI_DATA = [
     { label: 'Open Tickets', value: 12, change: 4, icon: Clock, color: '#fbbf24' },
     { label: 'Triaged Today', value: 7, change: 2, icon: CheckCircle, color: '#34d399' },
     { label: 'Pending Assign', value: 5, change: 1, icon: AlertTriangle, color: '#fb923c' },
-    { label: 'Connections', value: 38, change: 5, icon: Package, color: '#38bdf8' },
+    { label: 'Utility Status', value: 38, change: 5, icon: Package, color: '#38bdf8' },
 ]
 
 const RECENT_ACTIVITY = [

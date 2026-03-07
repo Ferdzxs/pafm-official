@@ -31,6 +31,7 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'indigent', label: 'Indigent Assistance', icon: Heart, path: '/burial/indigent' },
         { id: 'payments', label: 'Payments & Permits', icon: CreditCard, path: '/payments' },
         { id: 'reports', label: 'Reports', icon: BarChart3, path: '/reports' },
+        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/burial/asset-requests' },
     ],
     ssdd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -51,8 +52,8 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'apply-burial', label: 'Apply: Burial', icon: Skull, path: '/citizen/apply/burial' },
         { id: 'apply-park', label: 'Apply: Park Reservation', icon: TreePine, path: '/citizen/apply/park' },
         { id: 'apply-barangay', label: 'Apply: Barangay Facility', icon: Home, path: '/citizen/apply/barangay' },
-        { id: 'apply-water', label: 'Apply: Water Connection', icon: Droplets, path: '/citizen/apply/water' },
-        { id: 'apply-leak', label: 'Report a Leak', icon: AlertTriangle, path: '/citizen/apply/leak' },
+        { id: 'apply-water', label: 'Water Supply & Drainage', icon: Droplets, path: '/citizen/apply/water' },
+        { id: 'apply-leak', label: 'Water Leak Report', icon: AlertTriangle, path: '/citizen/apply/leak' },
         { id: 'payments', label: 'Payment History', icon: CreditCard, path: '/citizen/payments' },
         { id: 'my-docs', label: 'My Documents', icon: FolderOpen, path: '/citizen/documents' },
     ],
@@ -62,6 +63,7 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/parks/reservations', badgeKey: 'pending_park_res' },
         { id: 'usage-logs', label: 'Site Usage Logs', icon: ClipboardList, path: '/parks/usage-logs' },
         { id: 'calendar', label: 'Booking Calendar', icon: Calendar, path: '/parks/calendar' },
+        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/parks/asset-requests' },
     ],
     reservation_officer: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -73,6 +75,7 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'pending-approvals', label: 'Pending Approvals', icon: CheckSquare, path: '/barangay/pending', badgeKey: 'pending_bar_res' },
         { id: 'ordinances', label: 'Ordinance References', icon: BookOpen, path: '/barangay/ordinances' },
+        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/barangay/asset-requests' },
     ],
     barangay_secretary: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },

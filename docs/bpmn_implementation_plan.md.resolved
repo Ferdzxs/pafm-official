@@ -1,0 +1,110 @@
+# BPMN-Aligned Implementation Guide Plan
+
+This guide provides a structured roadmap for consistently developing the functional, operational, usable, and accessible pages for all roles in the Government Service Management System. It ensures strict alignment with `BPMN TO-BE.md`, `TO-BE DOCUMENT.md`, and the [implementation_plan.md.resolved](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/docs/implementation_plan.md.resolved).
+
+---
+
+## 1. Universal Standards for All Pages
+
+To ensure pages are **Functionable, Operationable, Usable, and Accessible**, adhere to the following universal standards across **all** specified `.tsx` files:
+
+### A. Functional & Operational
+*   **RBAC Enforcement:** Wrap page content in authorization logic to ensure only the designated role can access it. If a user bypasses the UI, they should hit an "Access Denied" or redirect state.
+*   **State Management:** Always implement robust Loading, Error, Success, and Empty states for tables, forms, and data fetches.
+*   **Data Integrity:** Forms must validate input robustly (e.g., standardizing Zod + React Hook Form).
+
+### B. Usable & Accessible
+*   **Modern Aesthetics:** Use standard responsive layouts. The dashboard should have an operational sidebar tailored accurately to the module paths.
+*   **Accessibility (a11y):** Use descriptive `aria-labels`, ensure semantic HTML (e.g., `<main>`, `<section>`, `<header>`), and utilize accessible Shadcn UI components.
+*   **Feedback Mechanisms:** Incorporate Toast notifications for successful form submissions and specific inline error messages.
+
+---
+
+## 2. Module-By-Module BPMN Alignment
+
+Here is the exact action mapping for each page to guarantee they fulfill the planned To-Be process steps:
+
+### Core / Authentication
+*   **`auth/LoginPage.tsx` & `auth/SignupPage.tsx`:** Entry points. Ensure roles are properly assigned based on the user type (Citizen vs. LGU Staff).
+*   **Role-Specific Dashboards (`<role>/dashboard.tsx`)**: Each role has its own dedicated dashboard containing specific KPIs, quick actions, and data visualizations.
+*   **`DashboardPage.tsx`, `ProfilePage.tsx`, `SettingsPage.tsx`:** Provide contextual entry points. `DashboardPage.tsx` now serves exclusively as a secure router that redirects users to their specific `<role>/dashboard.tsx`.
+
+### Module 1: Cemetery & Burial Management
+**Citizen Flow (Paths A & B):**
+*   **`citizen/apply-burial.tsx` & `BurialApplicationPage.tsx`:** (Step 2) Form to submit the application and upload required documents. **Crucial feature:** A toggle/selection for "Regular Burial" vs "Indigent Burial Assistance" (Branches to Path B).
+*   **`citizen/my-applications.tsx` & `citizen/my-documents.tsx`:** Allow citizens to track status (e.g., "Incomplete Documents", "Awaiting Payment", "Permit Issued").
+
+**Death Registration Division (CCRD):**
+*   **`death_registration/received-documents.tsx` & `certificate-verification.tsx`:** (Step 3) Review requirements. MUST have an "Approve Completeness" or "Reject for Missing Docs" decision gateway.
+*   **`death_registration/approvals-signing.tsx`:** (Paths A1, A2, A5, B4) Register Certificate of Death, generate OOP, validate OR, and ultimately release the Burial Permit (either by waiving fees for indigents or validating payment).
+
+**SSDD (Path B - Indigent):**
+*   **`ssdd/indigent-assistance.tsx` & `ssdd/citizen-records.tsx`:** (Path B2, B3) View indigent requests, assess eligibility (Gateway), and Generate the Digital Certificate of Guarantee.
+
+**Cemetery Office (Common Flow C):**
+*   **`cemetery_office/niche-management.tsx`:** Verify plot availability (Step C1 gateway).
+*   **`cemetery_office/burial-applications.tsx` & `burial-records.tsx`:** Schedule burial date, assign plot, and log the actual burial performance.
+*   **`cemetery_office/payments-permits.tsx`:** STRICTLY **READ-ONLY** view to verify that payment has been cleared by the Treasurer and the permit has been issued by CCRD before proceeding with the burial.
+
+### Module 2: Parks & Recreation Scheduling
+**Citizen Flow:**
+*   **`citizen/apply-park.tsx`:** Form for submitting a digital letter of intent, selecting date/time/venue.
+
+**Reservation Desk Officer (Parks):**
+*   **`reservation_officer/reservation-records.tsx`:** Log request and auto/manual "Check Venue Availability".
+*   **`reservation_officer/approvals.tsx` & `permits-payments.tsx`:** Endorse request to Admin, validate full application (Step 9 gateway), and **Issue the Digital Event Permit** (but only after fees are paid).
+
+**Parks Administrator:**
+*   **`parks_admin/reservations.tsx`:** Gateway step - Review endorsed request details and Approve (triggering notifications) or Reject.
+*   **`parks_admin/usage-logs.tsx` & `park-venues.tsx`:** Event Monitoring functioning—monitor event compliance and maintain booking rules.
+
+### Module 3: Barangay Facility Reservation
+**Citizen Flow:**
+*   **`citizen/apply-barangay.tsx`:** Form submitting facility, date, purpose, and ID upload.
+
+**Barangay Secretary:**
+*   **`barangay_secretary/reservation-records.tsx` & `documents-filing.tsx`:** Log the request and validate its completeness.
+*   **`barangay_secretary/pending-approvals.tsx`:** Determine the Rental Fee requirement ( Gateway). Coordinate the issuance of the Digital Facility Reservation Permit and lock the schedule.
+
+**Punong Barangay:**
+*   **`punong_barangay/pending-approvals.tsx`:** Final review and approval of the reservation request (Step 8) before the Secretary issues the permit entirely.
+
+### Module 4: Water Supply & Drainage Requests
+**Citizen Flow:**
+*   **`citizen/apply-water.tsx`:** Form requiring request classification (New Connection vs Drainage).
+*   **`citizen/report-leak.tsx`:** Dedicated, expedited form directly targeting Path B workflow.
+
+**Utility Engineering & Helpdesk:**
+*   **`utility_engineering/service-tickets.tsx`:** Utilized to log requests, generate ticket numbers (Step 2), and classify the utility request type.
+*   **`utility_engineering/assigned-jobs.tsx` & `leak-reports.tsx` & `installations.tsx`:**
+    *   **Path A:** Conduct site inspection & feasibility (Step A3). Install (Step A7).
+    *   **Path B:** Inspect leak, log excavation clearances, Repair leak (Step B3).
+    *   **Path C:** Prepare program of works, and execute declogging.
+
+### Module 5: Asset Inventory Tracker
+**Requesting Roles (Punong Barangay, Cemetery, Parks):**
+*   Their respective `dashboard.tsx` pages MUST contain an embedded "My Inventory Requests" view/table to trigger annual or semi-annual inventory cycles.
+
+**FAMCD:**
+*   **`famcd/ocular-inspections.tsx` & `inventory-assets.tsx`:** Used to log physical condition, boundaries, and usage. Prepares the digital land and building inventory reports.
+*   **`famcd/submission-records.tsx`:** Final log for transmission to COA/City Accounting/Office of the Mayor.
+
+**CGSD Management:**
+*   **`cgsd_management/inventory-reports.tsx` & `approval-records.tsx`:** Review FAMCD's reports. Approve or return to the team.
+
+### Module 6: Finance & Revenue (Treasurer)
+*   **`treasurer/official-receipts.tsx` & `payment-transactions.tsx` & `reconciliation-queue.tsx`:**
+    *   Globally handles computing rental fees/burial fees (Step 10 / B4).
+    *   Processes payments and issues the actual Digital Official Receipt across **all modules** (Water fees, Park fees, Barangay fees).
+
+---
+
+## 3. Implementation Plan Sequence
+
+To develop this systematically and verify inter-page connectivity without breaking dependencies, follow this rollout phase sequence:
+
+1.  **Phase 1: Shell & Core Security:** Ensure all role-specific `<role>/dashboard.tsx` pages enforce the layout correctly, and ensure unauthorized users are cleanly bounced to `/auth`. Refactor the main `DashboardPage.tsx` to act purely as a smart redirection router.
+2.  **Phase 2: Master Finance/Treasurer Module:** Stand up the mock `treasurer` payments APIs and UI views first, as nearly every other module (Water, Parks, Cemetery, Barangay) relies on them for payment states.
+3.  **Phase 3: Cemetery & Burial (Module First Pass):** Because this touches the most interconnected roles (`citizen`, `ccrd`, `ssdd`, `treasurer`, `cemetery_office`), executing this module completely will solidify the architectural standard.
+4.  **Phase 4: Parks & Barangay Facilities:** Apply the patterns learned in Phase 3 to these reservation workflows.
+5.  **Phase 5: Water Supply & Asset Inventory:** Complete the remaining complex conditional branches and asset oversight.
