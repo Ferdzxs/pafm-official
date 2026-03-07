@@ -30,7 +30,7 @@ export const DEMO_USERS: Record<string, AuthUser & { password: string }> = {
     'reservation@bpm.gov': {
         id: 'u6', email: 'reservation@bpm.gov', password: 'admin123',
         role: 'reservation_officer', full_name: 'Carlos Ramos', is_citizen: false,
-        office: 'Barangay Reservation Desk'
+        office: 'Parks Reservation Desk'
     },
     'barangay@bpm.gov': {
         id: 'u7', email: 'barangay@bpm.gov', password: 'admin123',
