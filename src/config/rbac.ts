@@ -66,9 +66,9 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     reservation_officer: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'reservations', label: 'Reservation Records', icon: Building2, path: '/barangay/reservations', badgeKey: 'pending_bar_res' },
-        { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/barangay/approvals' },
-        { id: 'permits', label: 'Permits & Payments', icon: FileText, path: '/barangay/permits' },
+        { id: 'reservations', label: 'Reservation Records', icon: Building2, path: '/parks/desk-reservations', badgeKey: 'pending_park_res' },
+        { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/parks/desk-approvals' },
+        { id: 'permits', label: 'Permits & Payments', icon: FileText, path: '/parks/desk-permits' },
     ],
     punong_barangay: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
