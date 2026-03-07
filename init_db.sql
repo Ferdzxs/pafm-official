@@ -61,7 +61,8 @@ INSERT INTO system_users (full_name, email, role, department, contact_no) VALUES
 ('Parks Admin F. Reyes',   'parks@bpm.qc.gov.ph',      'parks_admin',        'CGSD Parks & Recreation Division, QC',  '09170000009'),
 ('Desk Officer A. Lim',    'desk@bpm.qc.gov.ph',       'reservation_desk',   'CGSD Reservation Office, QC',           '09170000010'),
 ('Death Reg. O. Santos',   'deathreg@bpm.qc.gov.ph',   'death_registration', 'Civil Registrar — QC',                  '09170000011'),
-('FAMCD Officer R. Cruz',  'famcd@bpm.qc.gov.ph',      'famcd',              'FAMCD — Quezon City Hall',              '09170000012');
+('FAMCD Officer R. Cruz',  'famcd@bpm.qc.gov.ph',      'famcd',              'FAMCD — Quezon City Hall',              '09170000012'),
+('Helpdesk Sarah',         'helpdesk@bpm.qc.gov.ph',   'utility_helpdesk',   'Utility Business Area',                 '09170000013');
 
 -- ══════════════════════════════════════════════════════════════════════
 -- 2. BURIAL APPLICATIONS
