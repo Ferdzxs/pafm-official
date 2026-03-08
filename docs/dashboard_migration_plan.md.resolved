@@ -1,0 +1,96 @@
+# Dashboard Migration & Refactoring Plan
+
+The current monolithic [src/pages/DashboardPage.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/DashboardPage.tsx) contains hardcoded data (`kpis`, `recentActivity`, `chartData`, [QuickActions](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/DashboardPage.tsx#464-476), [InventoryItems](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/DashboardPage.tsx#477-498)) and conditional logic for multiple roles.
+
+To align with the distributed architecture, we will extract the specific data and layout for each role and move them to their respective `src/pages/<role>/dashboard.tsx` files. Once migrated, the global `/dashboard` route can simply act as a router that redirects authenticated users to their specific role dashboard (e.g., `/{role}/dashboard`), or the shell can load the correct component directly.
+
+---
+
+## 1. Migration Strategy
+
+For each role dashboard, we will perform the following extractions:
+1.  **KPI Cards:** Extract the role's array from `DASHBOARD_DATA[role].kpis`.
+2.  **Recent Activity:** Extract the role's array from `DASHBOARD_DATA[role].recentActivity`.
+3.  **Charts:** Extract `chartData` and the specific Recharts implementation (e.g., AreaChart for `cemetery_office`, BarChart for `treasurer`, PieChart for `utility_helpdesk`).
+4.  **Quick Actions:** Extract the specific links from [getQuickActions(role)](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/DashboardPage.tsx#464-476).
+5.  **Inventory Modules:** Extract "My Inventory Requests" and "My Inventory Reports" components and [getInventoryItems(role)](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/DashboardPage.tsx#477-498) strictly for the specific roles that use it (`punong_barangay`, `cemetery_office`, `parks_admin`).
+6.  **Layout Maintenance:** Maintain the layout skeleton (Header, greeting, 4-column KPI grid, 3-column lower section for activity/charts).
+
+---
+
+## 2. Role-by-Role Extraction Blueprint
+
+### 🟢 `citizen` ([src/pages/citizen/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/citizen/dashboard.tsx))
+*   **KPIs:** "My Applications", "Pending Approvals", "Completed", "Payments Due".
+*   **Quick Actions:** Apply for Burial, Reserve a Park, Report a Leak.
+*   **Unique Features:** N/A (Standard tracking layout).
+
+### 🟢 `cemetery_office` ([src/pages/cemetery_office/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/cemetery_office/dashboard.tsx))
+*   **KPIs:** "Pending Applications", "Approved This Month", "Available Niches", "Indigent Cases".
+*   **Charts:** Area Chart showing "Burials vs. Applications".
+*   **Quick Actions:** Review Applications, Check Niche Availability.
+*   **Unique Features:** Requires the **"My Inventory Requests & Reports"** components for Cemetery Land/Building audits.
+
+### 🟢 `ssdd` ([src/pages/ssdd/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/ssdd/dashboard.tsx))
+*   **KPIs:** "Assigned Cases", "Pending Assistance", "Closed This Month", "Citizen Records".
+*   **Quick Actions:** Process Indigent Assistance.
+*   **Unique Features:** Heavy focus on lists over charts.
+
+### 🟢 `death_registration` ([src/pages/death_registration/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/death_registration/dashboard.tsx))
+*   **KPIs:** "Pending Certificates", "Verified Today", "Docs Received", "Approvals Pending".
+*   **Quick Actions:** Verify Certificates, Approve Permits.
+
+### 🟢 `parks_admin` ([src/pages/parks_admin/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/parks_admin/dashboard.tsx))
+*   **KPIs:** "Pending Reservations", "Approved This Month", "Active Venues", "Usage Log Entries".
+*   **Charts:** Bar/Area Chart mapping Daily Reservations.
+*   **Quick Actions:** View Calendar, Approve Reservations.
+*   **Unique Features:** Requires the **"My Inventory Requests & Reports"** components for Park Asset audits.
+
+### 🟢 `reservation_officer` ([src/pages/reservation_officer/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/reservation_officer/dashboard.tsx))
+*   **KPIs:** "Incoming Park Requests", "Approved This Week", "Event Permits Issued", "Park Venues".
+*   **Quick Actions:** Validate Requests, Issue Permits.
+
+### 🟢 `punong_barangay` ([src/pages/punong_barangay/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/punong_barangay/dashboard.tsx))
+*   **KPIs:** "Pending Approvals", "Approved This Month", "Ordinances", "Active Requests".
+*   **Quick Actions:** Dashboard approvals.
+*   **Unique Features:** Requires the **"My Inventory Requests & Reports"** components for Barangay Facility Asset audits.
+
+### 🟢 `barangay_secretary` ([src/pages/barangay_secretary/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/barangay_secretary/dashboard.tsx))
+*   **KPIs:** "Pending Approvals", "Approved This Month", "Ordinances on File", "Requests Filed".
+*   **Quick Actions:** File Documents, Prepare Permits.
+
+### 🟢 `utility_engineering` ([src/pages/utility_engineering/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/utility_engineering/dashboard.tsx))
+*   **KPIs:** "Assigned Tickets", "In Progress", "Resolved Today", "Leak Reports".
+*   **Quick Actions:** View Assigned Tickets, Log a Repair.
+
+### 🟢 `utility_helpdesk` (Not listed, but implicitly needs one based on data)
+*   **KPIs:** "Open Tickets", "Triaged Today", "Pending Assign", "Connections".
+*   **Charts:** Pie Chart displaying "Tickets by Type".
+
+### 🟢 `famcd` ([src/pages/famcd/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/famcd/dashboard.tsx))
+*   **KPIs:** "Total Properties", "Inventory Requests", "Reports Submitted", "Submissions Done".
+*   **Quick Actions:** Schedule Inspections, Track Assets.
+
+### 🟢 `cgsd_management` ([src/pages/cgsd_management/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/cgsd_management/dashboard.tsx))
+*   **KPIs:** "Total Properties", "Pending Inspections", "Reports Submitted", "Approved Reports".
+*   **Quick Actions:** New Inspection, View Reports.
+
+### 🟢 `treasurer` ([src/pages/treasurer/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/treasurer/dashboard.tsx))
+*   **KPIs:** "Total Collections Today", "Pending Reconciliation", "Failed Transactions", "Settled Today".
+*   **Charts:** Bar Chart tracking "Collections" over 6 days.
+*   **Quick Actions:** Reconciliation Queue, Issue Official Receipt.
+
+### 🟢 `system_admin` ([src/pages/system_admin/dashboard.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/system_admin/dashboard.tsx))
+*   **KPIs:** "Total Users", "Active Sessions", "Audit Entries", "System Alerts".
+*   **Quick Actions:** Manage Users, View Audit Logs, Legacy Migration.
+
+---
+
+## 3. Implementation Steps
+
+For each file listed above:
+1.  **Copy the core layout** structure from the monolithic [DashboardPage.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/DashboardPage.tsx) (`<div className="px-4 py-4...">`).
+2.  **Hardcode the specific role context** statically into the page. E.g., Move the specific `DASHBOARD_DATA[role]` objects to be static `const KPI_DATA = [...]` inside that file.
+3.  **Import only required components.** E.g., Only import `PieChart` into the helpdesk dashboard, and `AreaChart` into the cemetery dashboard.
+4.  **Remove conditional logic.** Since each file belongs to a specific role, checks like `if (user.role === 'treasurer')` will be removed.
+5.  **Remove monolithic DashboardPage.** After migrating all dashboards, [src/pages/DashboardPage.tsx](file:///c:/Users/Windows%2010%20Lite/Downloads/MUNJOR/BPM/SYSTEM/SYSTEM%20OFFICIAL/BPM.2.0/src/pages/DashboardPage.tsx) will be refactored to simply act as a conditional `Navigate` redirect (e.g., `if (user.role === 'cemetery') return <Navigate to="/cemetery/dashboard" />`).

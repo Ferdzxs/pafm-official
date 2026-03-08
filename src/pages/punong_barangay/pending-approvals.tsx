@@ -5,7 +5,7 @@ export default function PunongBarangayPendingApprovals() {
   return (
     <PlaceholderPage
       title="Pending Approvals"
-      description="Review barangay requests awaiting approval by the Punong Barangay."
+      description="Review and approve barangay facility reservation requests and other barangay approvals assigned to the Punong Barangay."
     />
   )
 }

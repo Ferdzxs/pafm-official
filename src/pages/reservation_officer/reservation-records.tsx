@@ -5,7 +5,7 @@ export default function ReservationRecords() {
   return (
     <PlaceholderPage
       title="Reservation Records"
-      description="View and manage barangay reservation records."
+      description="Log and manage park reservation requests before endorsement to the Parks Administrator."
     />
   )
 }

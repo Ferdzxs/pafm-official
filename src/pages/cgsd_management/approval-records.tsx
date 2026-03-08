@@ -5,7 +5,7 @@ export default function ApprovalRecords() {
   return (
     <PlaceholderPage
       title="Approval Records"
-      description="Records of approvals for asset-related requests and actions."
+      description="Records of approvals for land and building inventory reports and related asset actions issued by CGSD Management."
     />
   )
 }

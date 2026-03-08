@@ -36,7 +36,7 @@ export default function ServiceTickets() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <div>
                     <h1 className="font-display text-2xl font-bold text-white">Service Tickets</h1>
-                    <p className="text-slate-400 text-sm mt-0.5">Service_Ticket — Water, Leak & Drainage requests</p>
+                    <p className="text-slate-400 text-sm mt-0.5">Service_Ticket — Water connection, leak, and drainage requests managed by the Utility Helpdesk and Engineering teams.</p>
                 </div>
                 <button className="btn-primary self-start sm:self-auto"><Plus size={15} /> New Ticket</button>
             </div>

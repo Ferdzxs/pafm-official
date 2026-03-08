@@ -5,7 +5,7 @@ export default function ReservationApprovals() {
   return (
     <PlaceholderPage
       title="Approvals"
-      description="Approve or reject barangay reservation requests."
+      description="Mark park reservation applications as complete or return them for correction before forwarding to the Parks Administrator for final decision."
     />
   )
 }

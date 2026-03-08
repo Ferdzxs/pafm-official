@@ -5,7 +5,7 @@ export default function SubmissionRecords() {
   return (
     <PlaceholderPage
       title="Submission Records"
-      description="Track inventory and asset submissions handled by FAMCD."
+      description="Track submission of finalized land and building inventory reports to COA, City Accounting, and the Office of the City Mayor."
     />
   )
 }

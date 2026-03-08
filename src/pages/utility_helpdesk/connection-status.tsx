@@ -4,8 +4,8 @@ import PlaceholderPage from '@/pages/PlaceholderPage'
 export default function ConnectionStatus() {
   return (
     <PlaceholderPage
-      title="Connection Status"
-      description="Monitor status of water connections and related issues."
+      title="Utility Service Status"
+      description="Monitor the status of water supply, leak repairs, and drainage service tickets. Confirm completion so requests can be closed and citizens notified."
     />
   )
 }

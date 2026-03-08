@@ -5,7 +5,7 @@ export default function AssignTeams() {
   return (
     <PlaceholderPage
       title="Assign to Teams"
-      description="Assign incoming tickets to appropriate utility engineering teams."
+      description="Assign classified utility service tickets (new connection, leak, or drainage) to the appropriate Utility Engineering teams."
     />
   )
 }
