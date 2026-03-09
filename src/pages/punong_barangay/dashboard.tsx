@@ -1,177 +1,533 @@
-import React from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { ROLE_META } from '@/config/rbac'
-import { TrendingUp, TrendingDown, Clock, CheckCircle, FileText, AlertTriangle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { ROLE_META } from "@/config/rbac";
+import {
+  ClipboardList,
+  CheckSquare,
+  BookOpen,
+  FileText,
+  Users,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import { Link } from "react-router-dom";
 
-const KPI_DATA = [
-    { label: 'Pending Approvals', value: 2, change: 1, icon: Clock, color: '#fbbf24' },
-    { label: 'Approved This Month', value: 14, change: 3, icon: CheckCircle, color: '#34d399' },
-    { label: 'Ordinances', value: 32, change: 0, icon: FileText, color: '#60a5fa' },
-    { label: 'Active Requests', value: 5, change: 2, icon: AlertTriangle, color: '#fb923c' },
-]
+const PIE_COLORS = ["#e879f9", "#a78bfa", "#60a5fa", "#34d399"];
 
-const RECENT_ACTIVITY = [
-    { id: 'BR-2024-019', action: 'Reservation Awaiting Approval', subject: 'Multi-Purpose Hall', time: '2 hrs ago', status: 'pending' },
-]
-
-const INVENTORY_ITEMS = [
-    { id: 'INV-BRGY-001', asset: 'Barangay Hall & Multi-purpose Complex', status: 'in_progress', status_label: 'For Inspection' },
-    { id: 'INV-BRGY-000', asset: 'Covered Court & Open Grounds', status: 'completed', status_label: 'Report Available' },
-]
-
-const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'info' | 'secondary'> = {
-    pending: 'warning',
-    approved: 'success',
-    completed: 'success',
-}
+const STATUS_CLASS: Record<string, string> = {
+  pending: "badge-pending",
+  approved: "badge-approved",
+  completed: "badge-completed",
+  rejected: "badge-rejected",
+};
 
 function getGreeting() {
-    const h = new Date().getHours()
-    if (h < 12) return 'morning'
-    if (h < 17) return 'afternoon'
-    return 'evening'
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-export default function PunongBarangayDashboard() {
-    const { user } = useAuth()
-    if (!user) return null
+export default function PunongBarangayDashboardPage() {
+  const { user } = useAuth();
 
-    const meta = ROLE_META[user.role]
+  const [KPI_DATA, setKpiData] = useState([
+    {
+      label: "Pending Approvals",
+      value: 0,
+      change: 0,
+      icon: Clock,
+      color: "#fbbf24",
+      path: "/barangay/pending",
+    },
+    {
+      label: "Approved This Month",
+      value: 0,
+      change: 0,
+      icon: CheckSquare,
+      color: "#34d399",
+      path: "/barangay/records",
+    },
+    {
+      label: "Ordinances on File",
+      value: 0,
+      change: 0,
+      icon: BookOpen,
+      color: "#e879f9",
+      path: "/barangay/ordinances",
+    },
+    {
+      label: "Documents Filed",
+      value: 0,
+      change: 0,
+      icon: FileText,
+      color: "#60a5fa",
+      path: "/barangay/documents",
+    },
+    {
+      label: "Requests This Month",
+      value: 0,
+      change: 0,
+      icon: ClipboardList,
+      color: "#fb923c",
+      path: "/barangay/requests",
+    },
+    {
+      label: "Constituents Served",
+      value: 0,
+      change: 0,
+      icon: Users,
+      color: "#a78bfa",
+      path: "/barangay/records",
+    },
+  ]);
 
-    return (
-        <div className="px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto animate-fade-in">
-            <div className="mb-8">
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2.5 py-1 rounded-md text-xs font-semibold" style={{ background: meta.bgColor, color: meta.color }}>
-                        {meta.label}
-                    </span>
-                </div>
-                <h1 className="font-display text-2xl font-bold text-foreground">
-                    Good {getGreeting()}, {user.full_name.split(' ')[0]}! 👋
-                </h1>
-                <p className="text-muted-foreground text-sm mt-1">
-                    {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    {user.office && ` · ${user.office}`}
-                </p>
-            </div>
+  const [RECENT_ACTIVITY, setRecentActivity] = useState([]);
+  const [MONTHLY_DATA, setMonthlyData] = useState([]);
+  const [REQUEST_TYPES, setRequestTypes] = useState([]);
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-                {KPI_DATA.map((kpi, i) => {
-                    const Icon = kpi.icon
-                    const isPositive = kpi.change >= 0
-                    return (
-                        <Card key={i} className="card-hover">
-                            <CardContent className="pt-5">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${kpi.color}18` }}>
-                                        <Icon size={18} style={{ color: kpi.color }} />
-                                    </div>
-                                    {kpi.change !== 0 && (
-                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                                            {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                            {Math.abs(kpi.change)}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="text-2xl font-bold text-foreground mb-1">{kpi.value}</div>
-                                <div className="text-xs text-muted-foreground">{kpi.label}</div>
-                            </CardContent>
-                        </Card>
-                    )
-                })}
-            </div>
+  // Fetch KPI data
+  useEffect(() => {
+    async function fetchKpi() {
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card className="lg:col-span-2">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Recent Activity</CardTitle>
-                            <span className="text-xs text-muted-foreground">Live updates</span>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-1">
-                            {RECENT_ACTIVITY.map(item => (
-                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                                    <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                        {item.id.slice(0, 2)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium text-foreground truncate">{item.action}</div>
-                                        <div className="text-xs text-muted-foreground truncate">{item.subject}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <Badge variant={STATUS_BADGE[item.status] ?? 'secondary'} className="text-[10px] px-1.5 py-0.5">{item.status}</Badge>
-                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+      const pending = await supabase
+        .from("reservations")
+        .select("id")
+        .eq("status", "pending");
+      const approvedThisMonth = await supabase
+        .from("reservations")
+        .select("id")
+        .eq("status", "approved")
+        .gte(
+          "created_at",
+          `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`,
+        );
+      const ordinances = await supabase.from("ordinances").select("id");
+      const documents = await supabase.from("documents").select("id");
+      const requests = await supabase.from("requests").select("id");
+      const constituents = await supabase.from("constituents").select("id");
 
-                <div className="space-y-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">My Inventory Requests</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {INVENTORY_ITEMS.map(item => (
-                                    <div key={item.id} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg hover:bg-accent/70 transition-colors">
-                                        <span className="font-mono text-[11px] text-muted-foreground">{item.id}</span>
-                                        <span className="truncate flex-1 text-foreground">{item.asset}</span>
-                                        <Badge variant={item.status === 'completed' ? 'success' : item.status === 'in_progress' ? 'info' : 'secondary'} className="text-[10px] px-1.5 py-0.5">
-                                            {item.status_label}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+      setKpiData([
+        { ...KPI_DATA[0], value: pending.data?.length || 0 },
+        { ...KPI_DATA[1], value: approvedThisMonth.data?.length || 0 },
+        { ...KPI_DATA[2], value: ordinances.data?.length || 0 },
+        { ...KPI_DATA[3], value: documents.data?.length || 0 },
+        { ...KPI_DATA[4], value: requests.data?.length || 0 },
+        { ...KPI_DATA[5], value: constituents.data?.length || 0 },
+      ]);
+    }
+    fetchKpi();
+  }, []);
 
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">My Inventory Reports</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {INVENTORY_ITEMS.filter(item => item.status === 'completed').map(item => (
-                                    <div key={item.id} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg hover:bg-accent/70 transition-colors">
-                                        <span className="font-mono text-[11px] text-muted-foreground">{item.id}</span>
-                                        <span className="truncate flex-1 text-foreground">{item.asset}</span>
-                                        <Badge variant="success" className="text-[10px] px-1.5 py-0.5">Report Available</Badge>
-                                    </div>
-                                ))}
-                                {INVENTORY_ITEMS.filter(item => item.status === 'completed').length === 0 && (
-                                    <p className="text-xs text-muted-foreground">No completed reports yet.</p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+  // Fetch recent activity
+  useEffect(() => {
+    async function fetchActivity() {
+      const reservations = await supabase
+        .from("reservations")
+        .select("id, facility_name, status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5);
 
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-1.5">
-                                {[
-                                    { label: 'Pending Approvals', emoji: '✅', path: '/barangay/pending' },
-                                    { label: 'View Reservations', emoji: '📋', path: '/barangay/reservations' },
-                                ].map(qa => (
-                                    <a key={qa.label} href={qa.path} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-all border border-transparent hover:border-border">
-                                        <span>{qa.emoji}</span>
-                                        <span>{qa.label}</span>
-                                    </a>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+      const documents = await supabase
+        .from("documents")
+        .select("id, title, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      const activity = [
+        ...(reservations.data?.map((r) => ({
+          id: r.id,
+          action: "Reservation Request Filed",
+          subject: r.facility_name,
+          status: r.status,
+          time: new Date(r.created_at).toLocaleString("en-PH", {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+        })) || []),
+        ...(documents.data?.map((d) => ({
+          id: d.id,
+          action: "Document Filed",
+          subject: d.title,
+          status: "completed",
+          time: new Date(d.created_at).toLocaleString("en-PH", {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+        })) || []),
+      ];
+
+      setRecentActivity(
+        activity.sort(
+          (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
+        ),
+      );
+    }
+    fetchActivity();
+  }, []);
+
+  // Fetch Monthly chart data
+  useEffect(() => {
+    async function fetchMonthlyData() {
+      const { data } = await supabase
+        .from("reservations")
+        .select("id, status, created_at");
+
+      const monthMap = {};
+
+      data?.forEach((r) => {
+        const month = new Date(r.created_at).toLocaleString("en-US", {
+          month: "short",
+        });
+        if (!monthMap[month])
+          monthMap[month] = { month, reservations: 0, approved: 0 };
+        monthMap[month].reservations++;
+        if (r.status === "approved") monthMap[month].approved++;
+      });
+
+      const sortedMonths = Object.values(monthMap).sort((a, b) => {
+        const monthOrder = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
+      });
+
+      setMonthlyData(sortedMonths);
+    }
+    fetchMonthlyData();
+  }, []);
+
+  // Fetch Request Type breakdown for Pie chart
+  useEffect(() => {
+    async function fetchRequestTypes() {
+      const facility = await supabase
+        .from("requests")
+        .select("id")
+        .eq("type", "Facility Reservation");
+      const documents = await supabase
+        .from("requests")
+        .select("id")
+        .eq("type", "Document Request");
+      const certificate = await supabase
+        .from("requests")
+        .select("id")
+        .eq("type", "Certificate Issuance");
+      const other = await supabase
+        .from("requests")
+        .select("id")
+        .eq("type", "Other");
+
+      setRequestTypes([
+        { name: "Facility Reservations", value: facility.data?.length || 0 },
+        { name: "Document Requests", value: documents.data?.length || 0 },
+        { name: "Certificate Issuance", value: certificate.data?.length || 0 },
+        { name: "Other Requests", value: other.data?.length || 0 },
+      ]);
+    }
+    fetchRequestTypes();
+  }, []);
+
+  if (!user) return null;
+
+  return (
+    <div className="px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto animate-fade-in">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-1">
+          <span
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold"
+            style={{
+              background: ROLE_META[user.role].bgColor,
+              color: ROLE_META[user.role].color,
+            }}
+          >
+            {ROLE_META[user.role].label}
+          </span>
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            {new Date().toLocaleDateString("en-PH", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </span>
         </div>
-    )
+        <h1
+          className="font-display text-2xl font-bold"
+          style={{ color: "var(--color-text-primary)" }}
+        >
+          {getGreeting()}, {user.full_name.split(" ").slice(-1)[0]}! 👋
+        </h1>
+        <p
+          style={{ color: "var(--color-text-muted)" }}
+          className="text-sm mt-1"
+        >
+          {user.office} · Barangay Records & Affairs
+        </p>
+      </div>
+
+      {/* KPI Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+        {KPI_DATA.map((kpi, i) => {
+          const Icon = kpi.icon;
+          const isUp = kpi.change >= 0;
+          return (
+            <Link
+              key={i}
+              to={kpi.path}
+              className="rounded-2xl p-5 card-hover block transition-all"
+              style={{
+                background: "var(--color-card)",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: `${kpi.color}18` }}
+                >
+                  <Icon size={18} style={{ color: kpi.color }} />
+                </div>
+                {kpi.change !== 0 && (
+                  <div
+                    className={`flex items-center gap-1 text-xs font-semibold ${isUp ? "text-emerald-400" : "text-red-400"}`}
+                  >
+                    {isUp ? (
+                      <TrendingUp size={11} />
+                    ) : (
+                      <TrendingDown size={11} />
+                    )}
+                    {Math.abs(kpi.change)}
+                  </div>
+                )}
+              </div>
+              <div
+                className="text-2xl font-bold mb-1"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                {kpi.value}
+              </div>
+              <div
+                className="text-xs"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                {kpi.label}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div
+          className="lg:col-span-2 rounded-2xl p-5"
+          style={{
+            background: "var(--color-card)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <h2
+            className="font-semibold mb-4 text-sm"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Monthly Requests vs. Approvals
+          </h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={MONTHLY_DATA} barGap={4}>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="var(--color-border)"
+              />
+              <XAxis
+                dataKey="month"
+                tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
+              />
+              <YAxis tick={{ fill: "var(--color-text-muted)", fontSize: 11 }} />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--color-card)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  color: "var(--color-text-primary)",
+                }}
+              />
+              <Bar
+                dataKey="reservations"
+                name="Requests"
+                fill="#e879f9"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="approved"
+                name="Approved"
+                fill="#34d399"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div
+          className="rounded-2xl p-5"
+          style={{
+            background: "var(--color-card)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <h2
+            className="font-semibold mb-4 text-sm"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Request Breakdown
+          </h2>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={REQUEST_TYPES}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={60}
+                label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                labelLine={false}
+                fontSize={10}
+              >
+                {REQUEST_TYPES.map((_, idx) => (
+                  <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  background: "var(--color-card)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-1.5 mt-3">
+            {REQUEST_TYPES.map((t, i) => (
+              <div key={t.name} className="flex items-center gap-2">
+                <div
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ background: PIE_COLORS[i] }}
+                />
+                <span
+                  className="text-xs truncate"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {t.name}
+                </span>
+                <span
+                  className="text-xs font-semibold ml-auto"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  {t.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div
+          className="lg:col-span-2 rounded-2xl p-5"
+          style={{
+            background: "var(--color-card)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2
+              className="font-semibold"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Recent Activity
+            </h2>
+            <span
+              className="text-xs"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              Live updates
+            </span>
+          </div>
+          <div className="space-y-1">
+            {RECENT_ACTIVITY.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors cursor-pointer hover:opacity-80"
+                style={{ background: "var(--color-bg-hover)" }}
+              >
+                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                  {item.id.slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="text-sm font-medium truncate"
+                    style={{ color: "var(--color-text-primary)" }}
+                  >
+                    {item.action}
+                  </div>
+                  <div
+                    className="text-xs truncate"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    {item.subject}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_CLASS[item.status]}`}
+                  >
+                    {item.status}
+                  </span>
+                  <span
+                    className="text-[10px] whitespace-nowrap"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    {item.time}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

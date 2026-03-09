@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import {
     ClipboardList, CheckSquare, BookOpen, FileText, Users,
-    TrendingUp, TrendingDown, Clock, AlertTriangle, BarChart3
+    TrendingUp, TrendingDown, Clock, AlertTriangle
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -142,7 +142,7 @@ export default function BarangaySecretaryDashboardPage() {
                     <div className="space-y-1.5 mt-3">
                         {REQUEST_TYPES.map((t, i) => (
                             <div key={t.name} className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i] }} />
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i] }} />
                                 <span className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{t.name}</span>
                                 <span className="text-xs font-semibold ml-auto" style={{ color: 'var(--color-text-primary)' }}>{t.value}</span>
                             </div>
@@ -161,14 +161,14 @@ export default function BarangaySecretaryDashboardPage() {
                     <div className="space-y-1">
                         {RECENT_ACTIVITY.map(item => (
                             <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors cursor-pointer hover:opacity-80" style={{ background: 'var(--color-bg-hover)' }}>
-                                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
                                     {item.id.slice(0, 2)}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{item.action}</div>
                                     <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{item.subject}</div>
                                 </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
+                                <div className="flex items-center gap-2 shrink-0">
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_CLASS[item.status]}`}>{item.status}</span>
                                     <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{item.time}</span>
                                 </div>
