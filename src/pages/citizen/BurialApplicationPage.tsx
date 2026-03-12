@@ -1,15 +1,22 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Upload, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
+import toast from 'react-hot-toast'
 
 type Step = 1 | 2 | 3
 
 export default function CitizenBurialApplicationPage() {
+    const { user } = useAuth()
     const [step, setStep] = useState<Step>(1)
     const [submitting, setSubmitting] = useState(false)
     const [submitted, setSubmitted] = useState(false)
+    const [personId, setPersonId] = useState<string | null>(null)
+    const [appId, setAppId] = useState('')
+    
     const [form, setForm] = useState({
         // Applicant
-        applicant_name: '', applicant_contact: '', relationship: '',
+        applicant_name: user?.full_name || '', applicant_contact: '', relationship: '',
         // Deceased
         deceased_name: '', date_of_death: '', place_of_death: '', cause_of_death: '',
         death_cert_no: '',
@@ -19,11 +26,90 @@ export default function CitizenBurialApplicationPage() {
         is_indigent: false,
     })
 
+    useEffect(() => {
+        if (user && user.is_citizen) {
+            fetchPersonId()
+        }
+    }, [user])
+
+    async function fetchPersonId() {
+        try {
+            const { data, error } = await supabase
+                .from('citizen_account')
+                .select('person_id')
+                .eq('account_id', user?.id)
+                .single()
+            
+            if (data) setPersonId(data.person_id)
+            if (error) console.error('Error fetching person_id:', error)
+        } catch (err) {
+            console.error(err)
+        }
+    }
+
     const update = (k: string, v: string | boolean) => setForm(prev => ({ ...prev, [k]: v }))
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
+        if (!personId) {
+            toast.error('Identity not verified. Please contact support.')
+            return
+        }
+
         setSubmitting(true)
-        setTimeout(() => { setSubmitting(false); setSubmitted(true) }, 2000)
+        try {
+            const deceasedId = 'DEC-' + Math.floor(Math.random() * 1000000)
+            const applicationId = 'OBA-' + Math.floor(Math.random() * 1000000)
+
+            // 1. Create Deceased Record
+            const { error: decError } = await supabase.from('deceased').insert({
+                deceased_id: deceasedId,
+                full_name: form.deceased_name,
+                date_of_death: form.date_of_death,
+                place_of_death: form.place_of_death,
+                death_certificate_no: form.death_cert_no
+            })
+
+            if (decError) throw decError
+
+            // 2. Create Online Burial Application
+            const { error: appError } = await supabase.from('online_burial_application').insert({
+                application_id: applicationId,
+                person_id: personId,
+                deceased_id: deceasedId,
+                submission_date: new Date().toISOString().split('T')[0],
+                application_status: 'pending'
+            })
+
+            if (appError) throw appError
+
+            // 3. Create Indigent Record if applicable
+            if (form.is_indigent) {
+                const assistanceId = 'IAR-' + Math.floor(Math.random() * 1000000)
+                await supabase.from('indigent_assistance_record').insert({
+                    assistance_id: assistanceId,
+                    deceased_id: deceasedId,
+                    status: 'pending'
+                })
+            }
+
+            // 4. Log Notification
+            await supabase.from('notification_log').insert({
+                notif_id: 'NLOG-' + Math.floor(Math.random() * 1000000),
+                account_id: user?.id,
+                module_reference: 'burial',
+                reference_id: applicationId,
+                notif_type: 'application_received',
+                message: `Your burial application ${applicationId} has been received and is pending review.`
+            })
+
+            setAppId(applicationId)
+            setSubmitted(true)
+            toast.success('Application submitted successfully!')
+        } catch (error: any) {
+            toast.error('Submission failed: ' + error.message)
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     if (submitted) return (
@@ -36,9 +122,9 @@ export default function CitizenBurialApplicationPage() {
                 <p className="text-slate-400 mb-2">Your burial application has been submitted successfully.</p>
                 <div className="glass rounded-xl p-4 mb-6" style={{ border: '1px solid rgba(52,211,153,0.2)' }}>
                     <div className="text-xs text-slate-400 mb-1">Application ID</div>
-                    <div className="font-mono font-bold text-white text-lg">BA-2024-046</div>
+                    <div className="font-mono font-bold text-white text-lg">{appId}</div>
                 </div>
-                <p className="text-slate-500 text-sm mb-6">You will receive an email confirmation. The Cemetery Office will review your application within 2-3 business days.</p>
+                <p className="text-slate-500 text-sm mb-6">You will receive notifications on your dashboard. The Cemetery Office will review your application within 2-3 business days.</p>
                 <button className="btn-primary mx-auto" onClick={() => setSubmitted(false)}>Submit Another</button>
             </div>
         </div>
@@ -48,7 +134,7 @@ export default function CitizenBurialApplicationPage() {
         <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in max-w-2xl mx-auto">
             <div className="mb-6">
                 <h1 className="font-display text-2xl font-bold text-white">Burial Application</h1>
-                <p className="text-slate-400 text-sm mt-0.5">Online_Burial_Application — Fill in all required fields</p>
+                <p className="text-slate-400 text-sm mt-0.5">Online Burial Application — Follow the BPM Process</p>
             </div>
 
             {/* Step indicator */}
@@ -97,7 +183,7 @@ export default function CitizenBurialApplicationPage() {
                         {/* Indigent flag */}
                         <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.15)' }}>
                             <input type="checkbox" id="indigent" checked={form.is_indigent} onChange={e => update('is_indigent', e.target.checked)} className="w-4 h-4 accent-violet-500" />
-                            <label htmlFor="indigent" className="text-sm text-slate-300 cursor-pointer">Applying for <strong className="text-violet-400">Indigent Assistance</strong> (social worker coordination required)</label>
+                            <label htmlFor="indigent" className="text-sm text-slate-300 cursor-pointer">Applying for <strong className="text-violet-400">Indigent Burial Assistance</strong> (coordinated via SSDD)</label>
                         </div>
 
                         <button className="btn-primary" onClick={() => setStep(2)} disabled={!form.applicant_name || !form.relationship}>
@@ -123,16 +209,6 @@ export default function CitizenBurialApplicationPage() {
                             </div>
                         ))}
 
-                        {/* Upload */}
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Upload Death Certificate *</label>
-                            <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center hover:border-blue-500/50 transition-colors cursor-pointer">
-                                <Upload size={20} className="mx-auto mb-2 text-slate-500" />
-                                <p className="text-sm text-slate-400">Click to upload or drag & drop</p>
-                                <p className="text-xs text-slate-600 mt-1">PDF, JPG, PNG — Max 10MB</p>
-                            </div>
-                        </div>
-
                         <div className="flex gap-3">
                             <button className="btn-secondary" onClick={() => setStep(1)}>← Back</button>
                             <button className="btn-primary" onClick={() => setStep(3)} disabled={!form.deceased_name || !form.date_of_death}>
@@ -157,6 +233,7 @@ export default function CitizenBurialApplicationPage() {
                                     <button
                                         key={opt.value}
                                         onClick={() => update('burial_type', opt.value)}
+                                        type="button"
                                         className="px-3 py-3 rounded-xl text-sm text-left transition-all"
                                         style={{
                                             background: form.burial_type === opt.value ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
@@ -186,12 +263,12 @@ export default function CitizenBurialApplicationPage() {
 
                         <div className="px-4 py-3 rounded-xl text-sm text-slate-400" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.1)' }}>
                             <AlertCircle size={14} className="inline mr-2 text-yellow-400" />
-                            By submitting, you certify that all information provided is accurate. False declarations may result in rejection.
+                            By submitting, you certify that all information provided is accurate.
                         </div>
 
                         <div className="flex gap-3">
                             <button className="btn-secondary" onClick={() => setStep(2)}>← Back</button>
-                            <button className="btn-primary flex-1 justify-center" onClick={handleSubmit} disabled={submitting}>
+                            <button className="btn-primary flex-1 justify-center" onClick={handleSubmit} disabled={submitting || !personId}>
                                 {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : '✓ Submit Application'}
                             </button>
                         </div>

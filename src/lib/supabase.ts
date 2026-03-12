@@ -49,6 +49,38 @@ export type Database = {
                     contact: string | null
                 }
             }
+            niche_record: {
+                Row: {
+                    niche_id: string
+                    cemetery_id: string
+                    niche_number: string
+                    status: string
+                    burial_schedule_date: string | null
+                    assigned_document: string | null
+                }
+            }
+            deceased: {
+                Row: {
+                    deceased_id: string
+                    full_name: string
+                    date_of_death: string
+                    place_of_death: string | null
+                    death_certificate_no: string | null
+                }
+            }
+            online_burial_application: {
+                Row: {
+                    application_id: string
+                    person_id: string
+                    deceased_id: string
+                    submission_date: string
+                    document_validation_status: string
+                    application_status: string
+                    payment_id: string | null
+                    received_by_employee: string | null
+                    approved_by_employee: string | null
+                }
+            }
         }
     }
 }

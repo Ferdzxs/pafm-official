@@ -20,6 +20,10 @@ import PlaceholderPage from '@/pages/PlaceholderPage'
 import BurialApplicationsPage from '@/pages/cemetery_office/burial-applications'
 import NicheManagementPage from '@/pages/cemetery_office/niche-management'
 import CemeteryAssetRequestsPage from '@/pages/cemetery_office/asset-requests'
+import DeceasedRegistryPage from '@/pages/cemetery_office/deceased-registry'
+import BurialRecordsPage from '@/pages/cemetery_office/burial-records'
+import CemeteryIndigentAssistancePage from '@/pages/cemetery_office/indigent-assistance'
+import CemeteryReportsPage from '@/pages/cemetery_office/reports'
 
 // ─── Barangay Secretary ──────────────────────────────────────────────────────
 import BarangaySecretaryDashboard from '@/pages/barangay_secretary/dashboard'
@@ -28,6 +32,17 @@ import BarangayOrdinancesPage from '@/pages/barangay_secretary/ordinance-referen
 import BarangayDocumentsPage from '@/pages/barangay_secretary/documents-filing'
 import BarangayRecordsPage from '@/pages/barangay_secretary/constituent-records'
 import PunongBarangayAssetRequestsPage from '@/pages/punong_barangay/asset-requests'
+
+// ─── SSDD Module ─────────────────────────────────────────────────────────────
+import SsddCitizenRecordsPage from '@/pages/ssdd/citizen-records'
+import SsddIndigentAssistancePage from '@/pages/ssdd/indigent-assistance'
+import SsddDeathRegistrationPage from '@/pages/ssdd/death-registration'
+import SsddReportsPage from '@/pages/ssdd/reports-analytics'
+
+// ─── Death Registration (CCRD) ──────────────────────────────────────────────
+import CertificateVerificationPage from '@/pages/death_registration/certificate-verification'
+import ReceivedDocumentsPage from '@/pages/death_registration/received-documents'
+import ApprovalsSigningPage from '@/pages/death_registration/approvals-signing'
 
 // ─── Role Dashboards ─────────────────────────────────────────────────────────
 import CemeteryOfficeDashboard from '@/pages/cemetery_office/dashboard'
@@ -50,6 +65,7 @@ import UtilityHelpdeskDashboard from '@/pages/utility_helpdesk/dashboard'
 
 // ─── Citizen Module ──────────────────────────────────────────────────────────
 import CitizenBurialApplicationPage from '@/pages/citizen/BurialApplicationPage'
+import MyApplicationsPage from '@/pages/citizen/my-applications'
 import ApplyWaterPage from '@/pages/citizen/apply-utility_request'
 
 // ─── Utility Engineering & Helpdesk ─────────────────────────────────────────
@@ -118,24 +134,26 @@ function AppRoutes() {
 
         {/* ── Cemetery & Burial ── */}
         <Route path="burial/applications" element={<BurialApplicationsPage />} />
-        <Route path="burial/deceased" element={<PlaceholderPage title="Deceased Registry" description="Full deceased registry with search across all records." />} />
+        <Route path="burial/deceased" element={<DeceasedRegistryPage />} />
         <Route path="burial/niches" element={<NicheManagementPage />} />
-        <Route path="burial/records" element={<PlaceholderPage title="Burial Records" description="Complete burial record ledger with filtering and export." />} />
-        <Route path="burial/indigent" element={<PlaceholderPage title="Indigent Assistance" description="Indigent assistance case management portal." />} />
+        <Route path="burial/records" element={<BurialRecordsPage />} />
+        <Route path="burial/indigent" element={<CemeteryIndigentAssistancePage />} />
+        <Route path="burial/reports" element={<CemeteryReportsPage />} />
         <Route path="burial/asset-requests" element={<CemeteryAssetRequestsPage />} />
 
         {/* ── SSDD ── */}
-        <Route path="ssdd/indigent" element={<PlaceholderPage title="Indigent Assistance Cases" />} />
-        <Route path="ssdd/citizens" element={<PlaceholderPage title="Citizen Records" />} />
-        <Route path="ssdd/coordination" element={<PlaceholderPage title="Death Registration Coordination" />} />
+        <Route path="ssdd/indigent" element={<SsddIndigentAssistancePage />} />
+        <Route path="ssdd/citizens" element={<SsddCitizenRecordsPage />} />
+        <Route path="ssdd/coordination" element={<SsddDeathRegistrationPage />} />
+        <Route path="ssdd/reports" element={<SsddReportsPage />} />
 
         {/* ── Death Registration ── */}
-        <Route path="death/verify" element={<PlaceholderPage title="Certificate Verification" />} />
-        <Route path="death/documents" element={<PlaceholderPage title="Received Documents" />} />
-        <Route path="death/approvals" element={<PlaceholderPage title="Approvals & Signing" />} />
+        <Route path="death/verify" element={<CertificateVerificationPage />} />
+        <Route path="death/documents" element={<ReceivedDocumentsPage />} />
+        <Route path="death/approvals" element={<ApprovalsSigningPage />} />
 
         {/* ── Citizen ── */}
-        <Route path="citizen/applications" element={<PlaceholderPage title="My Applications" description="Track all your submitted applications and their status." />} />
+        <Route path="citizen/applications" element={<MyApplicationsPage />} />
         <Route path="citizen/apply/burial" element={<CitizenBurialApplicationPage />} />
         <Route path="citizen/apply/park" element={<PlaceholderPage title="Apply: Park Reservation" />} />
         <Route path="citizen/apply/barangay" element={<PlaceholderPage title="Apply: Barangay Facility" />} />
@@ -198,7 +216,7 @@ function AppRoutes() {
         <Route path="treasurer/audit" element={<PlaceholderPage title="Audit Logs" />} />
 
         {/* ── Reports ── */}
-        <Route path="reports" element={<PlaceholderPage title="Reports & Analytics" description="Aggregate reporting across all modules." />} />
+        <Route path="reports" element={<CemeteryReportsPage />} />
 
         {/* ── Admin ── */}
         <Route path="admin/users" element={<UserManagementPage />} />

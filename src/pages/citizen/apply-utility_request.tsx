@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Upload, CheckCircle, Loader2, AlertCircle, Droplets, AlertTriangle, MapPin } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 type ServiceType = 'water_connection' | 'drainage' | 'leak_report'
 
@@ -10,6 +11,7 @@ export default function ApplyUtilityRequestPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [serviceType, setServiceType] = useState<ServiceType>('water_connection')
+  const [ticketId, setTicketId] = useState('')
 
   // Unified form state
   const [form, setForm] = useState({
@@ -27,12 +29,30 @@ export default function ApplyUtilityRequestPage() {
     if (!user) return
     setSubmitting(true)
 
-    // Mock API call delay
-    setTimeout(() => {
+    try {
+      const tid = 'ST-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 100000).toString().padStart(5, '0')
+      
+      const { error } = await supabase.from('service_tickets').insert({
+        ticket_id: tid,
+        ticket_type: serviceType,
+        requester_name: user.full_name,
+        requester_contact: form.contact_number,
+        description: `${form.property_type ? '[' + form.property_type + '] ' : ''}${form.description}`,
+        location: form.address,
+        priority: serviceType === 'leak_report' ? (form.severity === 'high' ? 'critical' : form.severity === 'medium' ? 'high' : 'medium') : 'medium',
+        status: 'open'
+      })
+
+      if (error) throw error
+
+      setTicketId(tid)
       setSubmitted(true)
       toast.success('Request submitted successfully.')
+    } catch (err: any) {
+      toast.error('Failed to submit: ' + err.message)
+    } finally {
       setSubmitting(false)
-    }, 1500)
+    }
   }
 
   if (submitted) return (
@@ -42,7 +62,11 @@ export default function ApplyUtilityRequestPage() {
           <CheckCircle size={28} className="text-emerald-400" />
         </div>
         <h2 className="font-display font-bold text-2xl text-white mb-2">Request Submitted!</h2>
-        <p className="text-slate-400 mb-6">Your utility request has been routed to the Utility Engineering team.</p>
+        <p className="text-slate-400 mb-2">Your utility request has been routed to the Utility Engineering team.</p>
+        <div className="glass rounded-xl p-4 mb-6" style={{ border: '1px solid rgba(52,211,153,0.2)' }}>
+          <div className="text-xs text-slate-400 mb-1">Ticket ID</div>
+          <div className="font-mono font-bold text-white text-lg">{ticketId}</div>
+        </div>
         <button className="btn-primary mx-auto" onClick={() => { setSubmitted(false); setForm({ ...form, description: '' }) }}>Submit Another</button>
       </div>
     </div>
@@ -125,14 +149,6 @@ export default function ApplyUtilityRequestPage() {
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Additional Details / Description</label>
             <textarea className="input-field" rows={3} placeholder={serviceType === 'leak_report' ? "Describe the leak specifically..." : "Any other requests..."} value={form.description} onChange={e => update('description', e.target.value)} />
-          </div>
-
-          <div className="pt-2">
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Supporting Photo (Optional)</label>
-            <div className="border border-dashed border-slate-700/60 rounded-xl p-4 text-center hover:border-slate-500 transition-colors cursor-pointer bg-black/10">
-              <Upload size={18} className="mx-auto mb-1 text-slate-500" />
-              <p className="text-xs text-slate-400">Upload Image / PDF</p>
-            </div>
           </div>
 
           <div className="px-4 py-3 mt-4 rounded-xl text-xs text-slate-400" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(148,163,184,0.1)' }}>

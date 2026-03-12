@@ -20,7 +20,8 @@ const RECENT_ACTIVITY = [
 const QUICK_ACTIONS = [
     { label: 'Apply for Burial', emoji: '⚰️', path: '/citizen/apply/burial' },
     { label: 'Reserve a Park', emoji: '🌳', path: '/citizen/apply/park' },
-    { label: 'Report a Leak', emoji: '💧', path: '/citizen/apply/leak' },
+    { label: 'Barangay Facility', emoji: '🏛️', path: '/citizen/apply/barangay' },
+    { label: 'Utility Request', emoji: '💧', path: '/citizen/apply/water' },
 ]
 
 const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'secondary'> = {
@@ -50,6 +51,7 @@ export default function CitizenDashboard() {
                     <span className="px-2.5 py-1 rounded-md text-xs font-semibold" style={{ background: meta.bgColor, color: meta.color }}>
                         {meta.label}
                     </span>
+                    <a href="/citizen/applications" className="text-xs text-blue-400 hover:text-blue-300 font-semibold ml-auto underline-offset-4 hover:underline">View All Applications →</a>
                 </div>
                 <h1 className="font-display text-2xl font-bold text-foreground">
                     Good {getGreeting()}, {user.full_name.split(' ')[0]}! 👋

@@ -1,11 +1,346 @@
-import React from 'react'
-import PlaceholderPage from '@/pages/PlaceholderPage'
+import React, { useState, useEffect } from 'react'
+import {
+  Loader2, PenTool, CheckCircle2, FileCheck, ShieldCheck,
+  Eye, Stamp, X, Download, Building2, Calendar
+} from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import toast from 'react-hot-toast'
+import { Pagination } from '@/components/ui/pagination'
+
+interface SigningApp {
+  application_id: string
+  application_status: string
+  submission_date: string
+  person: { full_name: string; person_id: string }
+  deceased: { full_name: string; date_of_death: string; death_certificate_no: string | null }
+}
+
+interface IssuedPermit {
+  document_id: string
+  reference_no: string
+  date_created: string
+  status: string
+}
 
 export default function ApprovalsSigning() {
+  const [queue, setQueue] = useState<SigningApp[]>([])
+  const [issued, setIssued] = useState<IssuedPermit[]>([])
+  const [loading, setLoading] = useState(true)
+  const [signing, setSigning] = useState<string | null>(null)
+  const [selected, setSelected] = useState<SigningApp | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [issuedPage, setIssuedPage] = useState(1)
+  const itemsPerPage = 8
+
+  useEffect(() => { fetchData() }, [])
+
+  async function fetchData() {
+    setLoading(true)
+    try {
+      const [{ data: queueData, error: qErr }, { data: issuedData }] = await Promise.all([
+        supabase
+          .from('online_burial_application')
+          .select(`
+            application_id, application_status, submission_date,
+            person:person_id(full_name, person_id),
+            deceased:deceased_id(full_name, date_of_death, death_certificate_no)
+          `)
+          .eq('application_status', 'verified')
+          .order('submission_date', { ascending: true }),
+        supabase
+          .from('digital_document')
+          .select('document_id, reference_no, date_created, status')
+          .eq('document_type', 'burial_permit')
+          .order('date_created', { ascending: false }),
+      ])
+      if (qErr) throw qErr
+      setQueue((queueData as any) || [])
+      setIssued(issuedData || [])
+    } catch (err: any) {
+      toast.error('Failed to load signing queue: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSign(app: SigningApp) {
+    setSigning(app.application_id)
+    try {
+      // 1. Approve the application
+      const { error: appError } = await supabase
+        .from('online_burial_application')
+        .update({ application_status: 'approved' })
+        .eq('application_id', app.application_id)
+      if (appError) throw appError
+
+      // 2. Generate and record the digital burial permit
+      const serial = app.application_id.split('-')[1] ?? Math.random().toString(36).substr(2, 6).toUpperCase()
+      const permitId = `DDOC-${serial}-${Date.now().toString().substr(-4)}`
+      const permitRefNo = `BP-${new Date().getFullYear()}-${serial}`
+
+      const { error: docError } = await supabase
+        .from('digital_document')
+        .insert([{
+          document_id: permitId,
+          document_type: 'burial_permit',
+          reference_no: permitRefNo,
+          date_created: new Date().toISOString().split('T')[0],
+          person_id: app.person?.person_id,
+          status: 'active',
+          file_url: `https://storage.bpm.qcgov.ph/permits/${permitRefNo}.pdf`,
+        }])
+      if (docError) throw docError
+
+      toast.success(`✅ Burial Permit ${permitRefNo} digitally signed and issued.`)
+      setSelected(null)
+      fetchData()
+    } catch (err: any) {
+      toast.error('Signing failed: ' + err.message)
+    } finally {
+      setSigning(null)
+    }
+  }
+
+  const totalQueuePages = Math.ceil(queue.length / itemsPerPage)
+  const queueItems = queue.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  const totalIssuedPages = Math.ceil(issued.length / itemsPerPage)
+  const issuedItems = issued.slice((issuedPage - 1) * itemsPerPage, issuedPage * itemsPerPage)
+
   return (
-    <PlaceholderPage
-      title="Approvals & Signing (CCRD)"
-      description="Route and approve death registration cases for signing, validate Order of Payment and Official Receipts, and issue the final digital burial permit (regular and indigent)."
-    />
+    <div className="px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto animate-fade-in text-white">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-white uppercase tracking-tight flex items-center gap-2">
+            <PenTool size={22} className="text-purple-400" /> Final Approval & Signing
+          </h1>
+          <p className="text-slate-400 text-sm mt-0.5">Authorized digital sign-off and burial permit issuance</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-purple-500/10 border-purple-500/20 text-purple-400 border font-bold text-xs self-start sm:self-auto">
+            <ShieldCheck size={12} className="mr-1" /> CCRD Authorized Officer
+          </Badge>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {[
+          { label: 'Awaiting Signature', value: queue.length, color: 'text-amber-400' },
+          { label: 'Permits Issued (All Time)', value: issued.length, color: 'text-emerald-400' },
+          { label: 'Issued Today', value: issued.filter(p => p.date_created === new Date().toISOString().split('T')[0]).length, color: 'text-blue-400' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="glass rounded-xl p-4 border border-white/5">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+            <p className={`text-2xl font-bold ${color}`}>{loading ? '—' : value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Signing Queue */}
+      <div className="mb-8">
+        <h2 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <Stamp size={14} className="text-amber-400" /> Pending Signatures ({queue.length})
+        </h2>
+
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="animate-spin text-purple-500" size={32} />
+          </div>
+        ) : queue.length === 0 ? (
+          <div className="text-center py-16 glass rounded-2xl border border-dashed border-slate-800">
+            <CheckCircle2 className="mx-auto mb-4 text-emerald-500/20" size={64} />
+            <h3 className="text-base font-bold text-white">All Clear</h3>
+            <p className="text-slate-500 mt-2 text-sm">No applications currently awaiting final signature.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-4">
+              {queueItems.map(app => (
+                <Card key={app.application_id} className="bg-slate-900/40 border-slate-800/50 overflow-hidden card-hover">
+                  <CardContent className="p-0">
+                    <div className="flex flex-col md:flex-row">
+                      {/* Info */}
+                      <div className="flex-1 p-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="outline" className="text-[10px] font-mono border-slate-700 text-slate-400">
+                            {app.application_id}
+                          </Badge>
+                          {/* Indigent status checked via SSDD — no is_indigent column in DB */}
+
+                          <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 border text-[9px]">
+                            <FileCheck size={9} className="mr-1" /> Verified
+                          </Badge>
+                        </div>
+
+                        <h3 className="text-lg font-bold text-white uppercase tracking-tight mb-1">{app.deceased?.full_name}</h3>
+                        <p className="text-sm text-slate-500 mb-4">Applicant: <span className="text-slate-300">{app.person?.full_name}</span></p>
+
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <Calendar size={13} className="text-slate-600" />
+                            DOD: {app.deceased?.date_of_death ? new Date(app.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—'}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <Building2 size={13} className="text-slate-600" />
+                            Cert: <span className="font-mono text-blue-400 ml-0.5">{app.deceased?.death_certificate_no ?? 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <FileCheck size={13} className="text-emerald-500" /> Docs Validated
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <Stamp size={13} className="text-indigo-500" /> Data Verified
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="w-full md:w-56 bg-purple-500/5 border-t md:border-t-0 md:border-l border-slate-800/50 p-6 flex flex-col items-center justify-center gap-3">
+                        <button
+                          className="w-full btn-secondary text-xs py-2"
+                          onClick={() => setSelected(app)}
+                        >
+                          <Eye size={14} className="mr-2" /> Review
+                        </button>
+                        <button
+                          onClick={() => handleSign(app)}
+                          disabled={signing === app.application_id}
+                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all disabled:opacity-60"
+                        >
+                          {signing === app.application_id ? (
+                            <Loader2 size={14} className="animate-spin mx-auto" />
+                          ) : (
+                            '✍ Sign & Issue Permit'
+                          )}
+                        </button>
+                        <p className="text-[9px] text-slate-600 text-center italic">Digital sig appended to OR & permit.</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Pagination currentPage={currentPage} totalPages={totalQueuePages} onPageChange={setCurrentPage} />
+          </>
+        )}
+      </div>
+
+      {/* Issued Permits Log */}
+      <div>
+        <h2 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <CheckCircle2 size={14} className="text-emerald-400" /> Issued Burial Permits ({issued.length})
+        </h2>
+        <div className="glass rounded-2xl overflow-hidden border border-white/5">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px]">
+              <thead>
+                <tr className="border-b border-white/5 bg-white/3">
+                  {['Document ID', 'Permit / OR #', 'Date Issued', 'Status', 'Download'].map(h => (
+                    <th key={h} className="px-4 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {issuedItems.map(doc => (
+                  <tr key={doc.document_id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
+                    <td className="px-4 py-3 text-xs font-mono text-slate-500">{doc.document_id}</td>
+                    <td className="px-4 py-3 text-xs font-mono text-blue-400 font-bold">{doc.reference_no}</td>
+                    <td className="px-4 py-3 text-sm text-slate-400">
+                      {doc.date_created ? new Date(doc.date_created).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[9px]">{doc.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
+                        <Download size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {issued.length === 0 && !loading && (
+              <div className="py-12 text-center">
+                <p className="text-slate-600 text-sm">No permits issued yet.</p>
+              </div>
+            )}
+          </div>
+        </div>
+        {issued.length > itemsPerPage && (
+          <Pagination currentPage={issuedPage} totalPages={totalIssuedPages} onPageChange={setIssuedPage} />
+        )}
+      </div>
+
+      {/* Review Modal */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="glass rounded-2xl w-full max-w-lg animate-fade-in border border-white/10 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                  <PenTool size={24} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Final Review</h2>
+                  <p className="text-xs font-mono text-slate-500">{selected.application_id}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelected(null)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"><X size={18} /></button>
+            </div>
+            <div className="p-6 space-y-3">
+              {[
+                ['Deceased', selected.deceased?.full_name ?? '—'],
+                ['Date of Death', selected.deceased?.date_of_death ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'long' }) : '—'],
+                ['Death Certificate #', selected.deceased?.death_certificate_no ?? 'Not on file'],
+                ['Applicant / Relative', selected.person?.full_name ?? '—'],
+                ['Submitted', new Date(selected.submission_date).toLocaleDateString('en-PH', { dateStyle: 'long' })],
+                ['Case Type', 'Burial Application'],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between py-2 border-b border-white/5">
+                  <span className="text-xs text-slate-500 uppercase font-bold tracking-wide">{label}</span>
+                  <span className="text-sm text-white font-medium text-right max-w-[55%]">{value}</span>
+                </div>
+              ))}
+
+              {/* Completed Milestones */}
+              <div className="pt-2">
+                {[
+                  { icon: FileCheck, label: 'Documents Validated', done: true },
+                  { icon: Stamp, label: 'Data Verified', done: true },
+                  { icon: PenTool, label: 'Awaiting Signature', done: false },
+                ].map(({ icon: Icon, label, done }) => (
+                  <div key={label} className="flex items-center gap-2 py-1.5">
+                    <Icon size={14} className={done ? 'text-emerald-400' : 'text-purple-400'} />
+                    <span className={`text-xs font-medium ${done ? 'text-emerald-400 line-through decoration-emerald-400/50' : 'text-purple-300 font-bold'}`}>{label}</span>
+                    {done && <CheckCircle2 size={12} className="text-emerald-400 ml-auto" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 pt-0 flex gap-2">
+              <button onClick={() => setSelected(null)} className="btn-secondary flex-1 justify-center">Close</button>
+              <button
+                onClick={() => handleSign(selected)}
+                disabled={signing === selected.application_id}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all"
+              >
+                {signing === selected.application_id ? <Loader2 size={14} className="animate-spin mx-auto" /> : '✍ Sign & Issue Permit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
