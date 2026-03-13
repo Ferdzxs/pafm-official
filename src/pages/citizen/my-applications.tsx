@@ -14,82 +14,92 @@ export default function MyApplications() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let ignore = false;
+
+    async function loadApplications() {
+      const all: Application[] = [];
+
+      /* ───────── FACILITY RESERVATIONS ───────── */
+
+      const { data: reservations, error: resErr } = await supabase
+        .from("barangay_reservation_record")
+        .select("reservation_id, status, created_at");
+
+      if (resErr) {
+        console.error("Error fetching reservations:", resErr);
+      } else {
+        reservations?.forEach((r: any) => {
+          all.push({
+            id: r.reservation_id,
+            type: "Facility Reservation",
+            status: r.status || "pending",
+            created_at: r.created_at,
+          });
+        });
+      }
+
+      /* ───────── BURIAL APPLICATIONS ───────── */
+
+      const { data: burial } = await supabase
+        .from("burial_applications")
+        .select("application_id, status, created_at");
+
+      burial?.forEach((b: any) => {
+        all.push({
+          id: b.application_id,
+          type: "Burial Application",
+          status: b.status || "pending",
+          created_at: b.created_at,
+        });
+      });
+
+      /* ───────── UTILITY TICKETS ───────── */
+
+      const { data: tickets } = await supabase
+        .from("service_tickets")
+        .select("ticket_id, service_type, status, created_at");
+
+      tickets?.forEach((t: any) => {
+        all.push({
+          id: t.ticket_id,
+          type: `Utility: ${t.service_type}`,
+          status: t.status || "submitted",
+          created_at: t.created_at,
+        });
+      });
+
+      /* ───────── BARANGAY DOCUMENTS ───────── */
+
+      const { data: docs } = await supabase
+        .from("barangay_documents")
+        .select("document_id, document_type, status, created_at");
+
+      docs?.forEach((d: any) => {
+        all.push({
+          id: d.document_id,
+          type: `Document: ${d.document_type}`,
+          status: d.status || "processing",
+          created_at: d.created_at,
+        });
+      });
+
+  
+      all.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+
+      if (!ignore) {
+        setApps(all);
+        setLoading(false);
+      }
+    }
+
     loadApplications();
+    return () => {
+      ignore = true;
+    };
   }, []);
-
-  const loadApplications = async () => {
-    let all: Application[] = [];
-
-    /* ───────── FACILITY RESERVATIONS ───────── */
-
-    const { data: reservations } = await supabase
-      .from("barangay_reservation_record")
-      .select("reservation_id, status, created_at");
-
-    reservations?.forEach((r: any) => {
-      all.push({
-        id: r.reservation_id,
-        type: "Facility Reservation",
-        status: r.status || "pending",
-        created_at: r.created_at,
-      });
-    });
-
-    /* ───────── BURIAL APPLICATIONS ───────── */
-
-    const { data: burial } = await supabase
-      .from("burial_applications")
-      .select("application_id, status, created_at");
-
-    burial?.forEach((b: any) => {
-      all.push({
-        id: b.application_id,
-        type: "Burial Application",
-        status: b.status || "pending",
-        created_at: b.created_at,
-      });
-    });
-
-    /* ───────── UTILITY TICKETS ───────── */
-
-    const { data: tickets } = await supabase
-      .from("service_tickets")
-      .select("ticket_id, service_type, status, created_at");
-
-    tickets?.forEach((t: any) => {
-      all.push({
-        id: t.ticket_id,
-        type: `Utility: ${t.service_type}`,
-        status: t.status || "submitted",
-        created_at: t.created_at,
-      });
-    });
-
-    /* ───────── BARANGAY DOCUMENTS ───────── */
-
-    const { data: docs } = await supabase
-      .from("barangay_documents")
-      .select("document_id, document_type, status, created_at");
-
-    docs?.forEach((d: any) => {
-      all.push({
-        id: d.document_id,
-        type: `Document: ${d.document_type}`,
-        status: d.status || "processing",
-        created_at: d.created_at,
-      });
-    });
-
-    /* SORT NEWEST FIRST */
-
-    all.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
-
-    setApps(all);
-    setLoading(false);
-  };
 
   if (loading) {
     return (

@@ -795,7 +795,8 @@ CREATE TABLE barangay_reservation_record (
     approved_by_office      TEXT REFERENCES government_office(office_id),
     received_by_employee    TEXT REFERENCES employee(employee_id),
     payment_id              TEXT REFERENCES digital_payment(payment_id),
-    digital_permit_url      TEXT
+    digital_permit_url      TEXT,
+    created_at              TIMESTAMPTZ DEFAULT NOW()
 );
 
 INSERT INTO barangay_reservation_record VALUES

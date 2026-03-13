@@ -1,15 +1,22 @@
+import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import React, { useState } from "react";
-import { Upload, CheckCircle, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 type Step = 1 | 2 | 3;
+
+const TIME_SLOTS = [
+  { id: "slot1", label: "08:00 AM - 10:00 AM", value: "08:00-10:00" },
+  { id: "slot2", label: "10:00 AM - 12:00 PM", value: "10:00-12:00" },
+  { id: "slot3", label: "01:00 PM - 03:00 PM", value: "13:00-15:00" },
+  { id: "slot4", label: "03:00 PM - 05:00 PM", value: "15:00-17:00" },
+  { id: "slot5", label: "06:00 PM - 08:00 PM", value: "18:00-20:00" },
+];
 
 export default function ApplyBarangayFacility() {
   const [step, setStep] = useState<Step>(1);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [reservationId, setReservationId] = useState("");
-  const [availability, setAvailability] = useState<boolean | null>(null);
 
   const [form, setForm] = useState({
     applicant_name: "",
@@ -25,24 +32,6 @@ export default function ApplyBarangayFacility() {
 
   const generateId = () => {
     return "BRR-" + Date.now();
-  };
-
-  const checkAvailability = async () => {
-    if (!form.facility_id || !form.reservation_date || !form.time_slot) return;
-
-    const { data } = await supabase
-      .from("barangay_reservation_record")
-      .select("*")
-      .eq("barangay_facility_id", form.facility_id)
-      .eq("reservation_date", form.reservation_date)
-      .eq("time_slot", form.time_slot)
-      .in("status", ["pending", "approved"]);
-
-    if (data && data.length > 0) {
-      setAvailability(false);
-    } else {
-      setAvailability(true);
-    }
   };
 
   const handleSubmit = async () => {
@@ -127,6 +116,8 @@ export default function ApplyBarangayFacility() {
       </div>
     );
 
+  console.log("form", form);
+
   return (
     <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in max-w-2xl mx-auto">
       <div className="mb-6">
@@ -199,7 +190,6 @@ export default function ApplyBarangayFacility() {
               value={form.facility_id}
               onChange={(e) => {
                 update("facility_id", e.target.value);
-                checkAvailability();
               }}
             >
               <option value="">Select Facility</option>
@@ -214,7 +204,6 @@ export default function ApplyBarangayFacility() {
               value={form.reservation_date}
               onChange={(e) => {
                 update("reservation_date", e.target.value);
-                checkAvailability();
               }}
             />
 
@@ -223,28 +212,15 @@ export default function ApplyBarangayFacility() {
               value={form.time_slot}
               onChange={(e) => {
                 update("time_slot", e.target.value);
-                checkAvailability();
               }}
             >
               <option value="">Select Time Slot</option>
-              <option value="08:00 AM - 10:00 AM">08:00 AM - 10:00 AM</option>
-              <option value="10:00 AM - 12:00 PM">10:00 AM - 12:00 PM</option>
-              <option value="01:00 PM - 03:00 PM">01:00 PM - 03:00 PM</option>
-              <option value="03:00 PM - 05:00 PM">03:00 PM - 05:00 PM</option>
-              <option value="06:00 PM - 08:00 PM">06:00 PM - 08:00 PM</option>
+              {TIME_SLOTS.map((slot) => (
+                <option key={slot.id} value={slot.value}>
+                  {slot.label}
+                </option>
+              ))}
             </select>
-
-            {availability === true && (
-              <div className="text-emerald-400 text-xs mt-2">
-                ✔ Facility available
-              </div>
-            )}
-
-            {availability === false && (
-              <div className="text-red-400 text-xs mt-2">
-                ✖ Facility already reserved for this time
-              </div>
-            )}
 
             <textarea
               className="input-field"
@@ -280,7 +256,9 @@ export default function ApplyBarangayFacility() {
                 <b>Date:</b> {form.reservation_date}
               </p>
               <p>
-                <b>Time:</b> {form.time_slot}
+                <b>Time:</b>{" "}
+                {TIME_SLOTS.find((s) => s.value === form.time_slot)?.label ||
+                  form.time_slot}
               </p>
             </div>
 
