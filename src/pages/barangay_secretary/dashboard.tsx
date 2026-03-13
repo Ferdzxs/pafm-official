@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
+import { supabase } from '@/lib/supabase'
 import {
     ClipboardList, CheckSquare, BookOpen, FileText, Users,
     TrendingUp, TrendingDown, Clock, AlertTriangle
@@ -11,43 +12,31 @@ import {
 } from 'recharts'
 import { Link } from 'react-router-dom'
 
-const KPI_DATA = [
-    { label: 'Pending Approvals', value: 3, change: +1, icon: Clock, color: '#fbbf24', path: '/barangay/pending' },
-    { label: 'Approved This Month', value: 18, change: +4, icon: CheckSquare, color: '#34d399', path: '/barangay/records' },
-    { label: 'Ordinances on File', value: 34, change: 0, icon: BookOpen, color: '#e879f9', path: '/barangay/ordinances' },
-    { label: 'Documents Filed', value: 152, change: +9, icon: FileText, color: '#60a5fa', path: '/barangay/documents' },
-    { label: 'Requests This Month', value: 22, change: +3, icon: ClipboardList, color: '#fb923c', path: '/barangay/requests' },
-    { label: 'Constituents Served', value: 87, change: +12, icon: Users, color: '#a78bfa', path: '/barangay/records' },
-]
+interface ActivityItem {
+    id: string
+    action: string
+    subject: string
+    status: string
+    time: string
+}
 
-const MONTHLY_DATA = [
-    { month: 'Sep', reservations: 14, approved: 12 },
-    { month: 'Oct', reservations: 18, approved: 15 },
-    { month: 'Nov', reservations: 11, approved: 10 },
-    { month: 'Dec', reservations: 23, approved: 20 },
-    { month: 'Jan', reservations: 16, approved: 14 },
-    { month: 'Feb', reservations: 22, approved: 18 },
-]
+interface RequestType {
+    name: string
+    value: number
+}
 
-const REQUEST_TYPES = [
-    { name: 'Facility Reservations', value: 38 },
-    { name: 'Document Requests', value: 27 },
-    { name: 'Certificate Issuance', value: 21 },
-    { name: 'Other Requests', value: 14 },
-]
+interface MonthlyData {
+    month: string
+    reservations: number
+    approved: number
+}
+
 const PIE_COLORS = ['#e879f9', '#a78bfa', '#60a5fa', '#34d399']
 
-const RECENT_ACTIVITY = [
-    { id: 'REC-2024-028', action: 'Reservation Request Filed', subject: 'Multi-Purpose Hall — Community Meeting', time: '20 min ago', status: 'pending' },
-    { id: 'REC-2024-027', action: 'Approved & Permit Issued', subject: 'Covered Court — Graduation Practice', time: '2 hrs ago', status: 'approved' },
-    { id: 'DOC-2024-041', action: 'Document Filed', subject: 'Ordinance #34 — Noise Ordinance', time: '4 hrs ago', status: 'completed' },
-    { id: 'REC-2024-026', action: 'Forwarded for Approval', subject: 'Basketball Court — Tournament', time: '1 day ago', status: 'pending' },
-    { id: 'CERT-2024-015', action: 'Certificate Issued', subject: 'Brgy. Clearance — Juan Santos', time: '1 day ago', status: 'completed' },
-]
-
 const STATUS_CLASS: Record<string, string> = {
-    pending: 'badge-pending', approved: 'badge-approved',
+    pending: 'badge-pending', approved: 'badge-confirmed',
     completed: 'badge-completed', rejected: 'badge-rejected',
+    confirmed: 'badge-confirmed',
 }
 
 function getGreeting() {
@@ -57,6 +46,114 @@ function getGreeting() {
 
 export default function BarangaySecretaryDashboardPage() {
     const { user } = useAuth()
+    
+    const [KPI_DATA, setKpiData] = useState([
+        { label: 'Pending Approvals', value: 0, change: 0, icon: Clock, color: '#fbbf24', path: '/barangay/pending' },
+        { label: 'Approved This Month', value: 0, change: 0, icon: CheckSquare, color: '#34d399', path: '/barangay/records' },
+        { label: 'Ordinances on File', value: 0, change: 0, icon: BookOpen, color: '#e879f9', path: '/barangay/ordinances' },
+        { label: 'Documents Filed', value: 0, change: 0, icon: FileText, color: '#60a5fa', path: '/barangay/documents' },
+        { label: 'Requests This Month', value: 0, change: 0, icon: ClipboardList, color: '#fb923c', path: '/barangay/requests' },
+        { label: 'Constituents Served', value: 0, change: 0, icon: Users, color: '#a78bfa', path: '/barangay/records' },
+    ])
+
+    const [MONTHLY_DATA, setMonthlyData] = useState<MonthlyData[]>([])
+    const [REQUEST_TYPES, setRequestTypes] = useState<RequestType[]>([])
+    const [RECENT_ACTIVITY, setRecentActivity] = useState<ActivityItem[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        async function fetchDashboardData() {
+            setLoading(true)
+            try {
+                const currentMonth = new Date().getMonth() + 1
+                const currentYear = new Date().getFullYear()
+                const firstDayOfMonth = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
+
+                // 1. Fetch KPIs
+                const [
+                    pendingRes, 
+                    approvedThisMonth, 
+                    ordinances, 
+                    documents, 
+                    requestsThisMonth, 
+                    constituents
+                ] = await Promise.all([
+                    supabase.from('barangay_reservation_record').select('reservation_id', { count: 'exact', head: true }).eq('status', 'pending'),
+                    supabase.from('barangay_reservation_record').select('reservation_id', { count: 'exact', head: true }).eq('status', 'confirmed').gte('created_at', firstDayOfMonth),
+                    supabase.from('barangay_ordinances').select('ordinance_id', { count: 'exact', head: true }),
+                    supabase.from('barangay_documents').select('document_id', { count: 'exact', head: true }),
+                    supabase.from('barangay_reservation_record').select('reservation_id', { count: 'exact', head: true }).gte('created_at', firstDayOfMonth),
+                    supabase.from('constituent_records').select('record_id', { count: 'exact', head: true })
+                ])
+
+                setKpiData(prev => [
+                    { ...prev[0], value: pendingRes.count || 0 },
+                    { ...prev[1], value: approvedThisMonth.count || 0 },
+                    { ...prev[2], value: ordinances.count || 0 },
+                    { ...prev[3], value: documents.count || 0 },
+                    { ...prev[4], value: requestsThisMonth.count || 0 },
+                    { ...prev[5], value: constituents.count || 0 },
+                ])
+
+                // 2. Fetch Monthly Data
+                const { data: monthlyRes } = await supabase.from('barangay_reservation_record').select('created_at, status')
+                const monthMap: Record<string, MonthlyData> = {}
+                const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                
+                monthlyRes?.forEach(r => {
+                    const m = new Date(r.created_at).toLocaleString('en-US', { month: 'short' })
+                    if (!monthMap[m]) monthMap[m] = { month: m, reservations: 0, approved: 0 }
+                    monthMap[m].reservations++
+                    if (r.status === 'confirmed') monthMap[m].approved++
+                })
+                
+                setMonthlyData(Object.values(monthMap).sort((a,b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month)))
+
+                // 3. Fetch Request Types (Breakdown)
+                const { data: docTypes } = await supabase.from('barangay_documents').select('document_type')
+                const breakdown = [
+                    { name: 'Facility Reservations', value: (await supabase.from('barangay_reservation_record').select('reservation_id', { count: 'exact', head: true })).count || 0 },
+                    { name: 'Document Requests', value: docTypes?.filter(d => ['clearance', 'permit'].includes(d.document_type)).length || 0 },
+                    { name: 'Certificate Issuance', value: docTypes?.filter(d => d.document_type === 'certificate').length || 0 },
+                    { name: 'Other Requests', value: docTypes?.filter(d => !['clearance', 'permit', 'certificate'].includes(d.document_type)).length || 0 },
+                ]
+                setRequestTypes(breakdown)
+
+                // 4. Fetch Recent Activity
+                const [resActivity, docActivity] = await Promise.all([
+                    supabase.from('barangay_reservation_record').select('reservation_id, status, created_at').order('created_at', { ascending: false }).limit(5),
+                    supabase.from('barangay_documents').select('document_id, title, created_at').order('created_at', { ascending: false }).limit(5)
+                ])
+
+                const combined = [
+                    ...(resActivity.data?.map(r => ({
+                        id: r.reservation_id,
+                        action: 'Reservation Request Filed',
+                        subject: 'Barangay Facility',
+                        status: r.status,
+                        time: new Date(r.created_at).toLocaleString('en-PH', { dateStyle: 'short', timeStyle: 'short' })
+                    })) || []),
+                    ...(docActivity.data?.map(d => ({
+                        id: d.document_id,
+                        action: 'Document Filed',
+                        subject: d.title,
+                        status: 'completed',
+                        time: new Date(d.created_at).toLocaleString('en-PH', { dateStyle: 'short', timeStyle: 'short' })
+                    })) || [])
+                ].sort((a,b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 5)
+
+                setRecentActivity(combined)
+
+            } catch (error) {
+                console.error("Dashboard error:", error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchDashboardData()
+    }, [])
+
     if (!user) return null
     const meta = ROLE_META[user.role]
 
@@ -103,7 +200,7 @@ export default function BarangaySecretaryDashboardPage() {
                                     </div>
                                 )}
                             </div>
-                            <div className="text-2xl font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>{kpi.value}</div>
+                            <div className="text-2xl font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>{loading ? '...' : kpi.value}</div>
                             <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{kpi.label}</div>
                         </Link>
                     )
@@ -156,11 +253,12 @@ export default function BarangaySecretaryDashboardPage() {
                 <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Recent Activity</h2>
-                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Live updates</span>
+                        {loading && <Clock size={14} className="animate-spin text-blue-400" />}
+                        {!loading && <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Live updates</span>}
                     </div>
                     <div className="space-y-1">
-                        {RECENT_ACTIVITY.map(item => (
-                            <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors cursor-pointer hover:opacity-80" style={{ background: 'var(--color-bg-hover)' }}>
+                        {RECENT_ACTIVITY.length > 0 ? RECENT_ACTIVITY.map(item => (
+                            <div key={item.id + item.time} className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors cursor-pointer hover:opacity-80" style={{ background: 'var(--color-bg-hover)' }}>
                                 <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
                                     {item.id.slice(0, 2)}
                                 </div>
@@ -169,11 +267,13 @@ export default function BarangaySecretaryDashboardPage() {
                                     <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{item.subject}</div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_CLASS[item.status]}`}>{item.status}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_CLASS[item.status] || 'badge-pending'}`}>{item.status}</span>
                                     <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{item.time}</span>
                                 </div>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="text-center py-10 text-slate-500 text-sm">No recent activity</div>
+                        )}
                     </div>
                 </div>
 
@@ -204,7 +304,7 @@ export default function BarangaySecretaryDashboardPage() {
                     <div className="mt-4 px-3 py-3 rounded-xl" style={{ background: 'rgba(232,121,249,0.08)', border: '1px solid rgba(232,121,249,0.2)' }}>
                         <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: '#e879f9' }}>
                             <AlertTriangle size={14} />
-                            3 requests need your attention
+                            {KPI_DATA[0].value} requests need your attention
                         </div>
                         <Link to="/barangay/pending" className="text-xs underline mt-1 block" style={{ color: '#e879f9' }}>
                             View pending approvals →

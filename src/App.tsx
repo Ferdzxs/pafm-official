@@ -27,6 +27,7 @@ import BarangayReservationsPage from "@/pages/barangay_secretary/reservation-rec
 import BarangayOrdinancesPage from "@/pages/barangay_secretary/ordinance-references";
 import BarangayDocumentsPage from "@/pages/barangay_secretary/documents-filing";
 import BarangayRecordsPage from "@/pages/barangay_secretary/constituent-records";
+import BarangaySecretaryReports from "@/pages/barangay_secretary/reports";
 import PunongBarangayAssetRequestsPage from "@/pages/punong_barangay/asset-requests";
 
 // ─── Punong Barangay ─────────────────────────────────────────────────────────
@@ -318,12 +319,7 @@ function AppRoutes() {
         />
         <Route
           path="barangay/secretary/reports"
-          element={
-            <PlaceholderPage
-              title="Barangay Reports"
-              description="Monthly and annual reports for the barangay secretariat."
-            />
-          }
+          element={<BarangaySecretaryReports />}
         />
         <Route path="barangay/records" element={<BarangayRecordsPage />} />
         <Route path="barangay/documents" element={<BarangayDocumentsPage />} />
