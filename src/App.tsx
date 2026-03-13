@@ -31,6 +31,7 @@ import PunongBarangayAssetRequestsPage from "@/pages/punong_barangay/asset-reque
 
 // ─── Punong Barangay ─────────────────────────────────────────────────────────
 import PunongBarangayPendingApprovals from "@/pages/punong_barangay/pending-approvals";
+import PBOrdinanceReferences from "@/pages/punong_barangay/ordinance-references";
 
 // ─── Role Dashboards ─────────────────────────────────────────────────────────
 import CemeteryOfficeDashboard from "@/pages/cemetery_office/dashboard";
@@ -286,12 +287,12 @@ function AppRoutes() {
 
         {/* ── Barangay (shared) ── */}
         <Route
-          path="punong_barangay/pending"
+          path="barangay/pending"
           element={<PunongBarangayPendingApprovals />}
         />
         <Route
           path="barangay/ordinances"
-          element={<PlaceholderPage title="Ordinance References" />}
+          element={<PBOrdinanceReferences />}
         />
         <Route
           path="barangay/asset-requests"

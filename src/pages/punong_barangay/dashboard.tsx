@@ -1,31 +1,30 @@
-import React, { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/contexts/AuthContext";
 import { ROLE_META } from "@/config/rbac";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import {
-  ClipboardList,
-  CheckSquare,
   BookOpen,
-  FileText,
-  Users,
-  TrendingUp,
-  TrendingDown,
+  CheckSquare,
+  ClipboardList,
   Clock,
-  AlertTriangle,
+  FileText,
+  TrendingDown,
+  TrendingUp,
+  Users,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
-import { Link } from "react-router-dom";
 
 const PIE_COLORS = ["#e879f9", "#a78bfa", "#60a5fa", "#34d399"];
 
@@ -35,6 +34,25 @@ const STATUS_CLASS: Record<string, string> = {
   completed: "badge-completed",
   rejected: "badge-rejected",
 };
+
+interface ActivityItem {
+  id: string;
+  action: string;
+  subject: string;
+  status: string;
+  time: string;
+}
+
+interface RequestType {
+  name: string;
+  value: number;
+}
+
+interface MonthlyData {
+  month: string;
+  reservations: number;
+  approved: number;
+}
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -95,9 +113,9 @@ export default function PunongBarangayDashboardPage() {
     },
   ]);
 
-  const [RECENT_ACTIVITY, setRecentActivity] = useState([]);
-  const [MONTHLY_DATA, setMonthlyData] = useState([]);
-  const [REQUEST_TYPES, setRequestTypes] = useState([]);
+  const [RECENT_ACTIVITY, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [MONTHLY_DATA, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [REQUEST_TYPES, setRequestTypes] = useState<RequestType[]>([]);
 
   // Fetch KPI data
   useEffect(() => {
@@ -106,29 +124,55 @@ export default function PunongBarangayDashboardPage() {
       const currentYear = new Date().getFullYear();
 
       const pending = await supabase
-        .from("reservations")
-        .select("id")
+        .from("barangay_reservation_record")
+        .select("reservation_id", { count: "exact", head: true })
         .eq("status", "pending");
+
       const approvedThisMonth = await supabase
-        .from("reservations")
-        .select("id")
-        .eq("status", "approved")
+        .from("barangay_reservation_record")
+        .select("reservation_id", { count: "exact", head: true })
+        .eq("status", "confirmed")
         .gte(
           "created_at",
           `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`,
         );
-      const ordinances = await supabase.from("ordinances").select("id");
-      const documents = await supabase.from("documents").select("id");
-      const requests = await supabase.from("requests").select("id");
-      const constituents = await supabase.from("constituents").select("id");
 
-      setKpiData([
-        { ...KPI_DATA[0], value: pending.data?.length || 0 },
-        { ...KPI_DATA[1], value: approvedThisMonth.data?.length || 0 },
-        { ...KPI_DATA[2], value: ordinances.data?.length || 0 },
-        { ...KPI_DATA[3], value: documents.data?.length || 0 },
-        { ...KPI_DATA[4], value: requests.data?.length || 0 },
-        { ...KPI_DATA[5], value: constituents.data?.length || 0 },
+      const ordinances = await supabase
+        .from("barangay_ordinances")
+        .select("ordinance_id", { count: "exact", head: true });
+
+      const documents = await supabase
+        .from("barangay_documents")
+        .select("document_id", { count: "exact", head: true });
+
+      const requests = await supabase
+        .from("barangay_reservation_record")
+        .select("reservation_id", { count: "exact", head: true })
+        .gte(
+          "created_at",
+          `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`,
+        );
+
+      const constituents = await supabase
+        .from("constituent_records")
+        .select("record_id", { count: "exact", head: true });
+
+      console.log("Dashboard KPIs:", {
+        pending: pending.count,
+        approved: approvedThisMonth.count,
+        ordinances: ordinances.count,
+        documents: documents.count,
+        requests: requests.count,
+        constituents: constituents.count,
+      });
+
+      setKpiData((prev) => [
+        { ...prev[0], value: pending.count || 0 },
+        { ...prev[1], value: approvedThisMonth.count || 0 },
+        { ...prev[2], value: ordinances.count || 0 },
+        { ...prev[3], value: documents.count || 0 },
+        { ...prev[4], value: requests.count || 0 },
+        { ...prev[5], value: constituents.count || 0 },
       ]);
     }
     fetchKpi();
@@ -138,30 +182,30 @@ export default function PunongBarangayDashboardPage() {
   useEffect(() => {
     async function fetchActivity() {
       const reservations = await supabase
-        .from("reservations")
-        .select("id, facility_name, status, created_at")
+        .from("barangay_reservation_record")
+        .select("reservation_id, status, created_at")
         .order("created_at", { ascending: false })
         .limit(5);
 
-      const documents = await supabase
-        .from("documents")
-        .select("id, title, created_at")
+      const docs = await supabase
+        .from("barangay_documents")
+        .select("document_id, title, created_at")
         .order("created_at", { ascending: false })
         .limit(5);
 
       const activity = [
         ...(reservations.data?.map((r) => ({
-          id: r.id,
+          id: r.reservation_id,
           action: "Reservation Request Filed",
-          subject: r.facility_name,
+          subject: "Barangay Facility",
           status: r.status,
           time: new Date(r.created_at).toLocaleString("en-PH", {
             dateStyle: "short",
             timeStyle: "short",
           }),
         })) || []),
-        ...(documents.data?.map((d) => ({
-          id: d.id,
+        ...(docs.data?.map((d) => ({
+          id: d.document_id,
           action: "Document Filed",
           subject: d.title,
           status: "completed",
@@ -171,6 +215,8 @@ export default function PunongBarangayDashboardPage() {
           }),
         })) || []),
       ];
+
+      console.log("Recent Activity:", activity);
 
       setRecentActivity(
         activity.sort(
@@ -185,10 +231,10 @@ export default function PunongBarangayDashboardPage() {
   useEffect(() => {
     async function fetchMonthlyData() {
       const { data } = await supabase
-        .from("reservations")
-        .select("id, status, created_at");
+        .from("barangay_reservation_record")
+        .select("reservation_id, status, created_at");
 
-      const monthMap = {};
+      const monthMap: Record<string, MonthlyData> = {};
 
       data?.forEach((r) => {
         const month = new Date(r.created_at).toLocaleString("en-US", {
@@ -197,7 +243,7 @@ export default function PunongBarangayDashboardPage() {
         if (!monthMap[month])
           monthMap[month] = { month, reservations: 0, approved: 0 };
         monthMap[month].reservations++;
-        if (r.status === "approved") monthMap[month].approved++;
+        if (r.status === "confirmed") monthMap[month].approved++;
       });
 
       const sortedMonths = Object.values(monthMap).sort((a, b) => {
@@ -218,7 +264,9 @@ export default function PunongBarangayDashboardPage() {
         return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
       });
 
-      setMonthlyData(sortedMonths);
+      console.log("Monthly Data:", sortedMonths);
+
+      setMonthlyData(sortedMonths as MonthlyData[]);
     }
     fetchMonthlyData();
   }, []);
@@ -227,28 +275,35 @@ export default function PunongBarangayDashboardPage() {
   useEffect(() => {
     async function fetchRequestTypes() {
       const facility = await supabase
-        .from("requests")
-        .select("id")
-        .eq("type", "Facility Reservation");
-      const documents = await supabase
-        .from("requests")
-        .select("id")
-        .eq("type", "Document Request");
-      const certificate = await supabase
-        .from("requests")
-        .select("id")
-        .eq("type", "Certificate Issuance");
-      const other = await supabase
-        .from("requests")
-        .select("id")
-        .eq("type", "Other");
+        .from("barangay_reservation_record")
+        .select("reservation_id", { count: "exact", head: true });
 
-      setRequestTypes([
-        { name: "Facility Reservations", value: facility.data?.length || 0 },
-        { name: "Document Requests", value: documents.data?.length || 0 },
-        { name: "Certificate Issuance", value: certificate.data?.length || 0 },
-        { name: "Other Requests", value: other.data?.length || 0 },
-      ]);
+      const docs = await supabase
+        .from("barangay_documents")
+        .select("document_id, document_type");
+
+      const docRequests =
+        docs.data?.filter((d) =>
+          ["clearance", "permit"].includes(d.document_type),
+        ).length || 0;
+      const certificates =
+        docs.data?.filter((d) => d.document_type === "certificate").length || 0;
+      const other =
+        docs.data?.filter(
+          (d) =>
+            !["clearance", "permit", "certificate"].includes(d.document_type),
+        ).length || 0;
+
+      const reqTypes = [
+        { name: "Facility Reservations", value: facility.count || 0 },
+        { name: "Document Requests", value: docRequests },
+        { name: "Certificate Issuance", value: certificates },
+        { name: "Other Requests", value: other },
+      ];
+
+      console.log("Request Breakdown:", reqTypes);
+
+      setRequestTypes(reqTypes);
     }
     fetchRequestTypes();
   }, []);
@@ -442,7 +497,7 @@ export default function PunongBarangayDashboardPage() {
             {REQUEST_TYPES.map((t, i) => (
               <div key={t.name} className="flex items-center gap-2">
                 <div
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ background: PIE_COLORS[i] }}
                 />
                 <span
@@ -493,7 +548,7 @@ export default function PunongBarangayDashboardPage() {
                 className="flex items-center gap-3 px-3 py-3 rounded-xl transition-colors cursor-pointer hover:opacity-80"
                 style={{ background: "var(--color-bg-hover)" }}
               >
-                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
                   {item.id.slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -510,7 +565,7 @@ export default function PunongBarangayDashboardPage() {
                     {item.subject}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_CLASS[item.status]}`}
                   >
