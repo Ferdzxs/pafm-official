@@ -12,10 +12,7 @@ import LoginPage from '@/pages/auth/LoginPage'
 import SignupPage from '@/pages/auth/SignupPage'
 
 // ─── Core Pages ──────────────────────────────────────────────────────────────
-<<<<<<< HEAD
-=======
 import DashboardPage from '@/pages/DashboardPage'
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 import ProfilePage from '@/pages/ProfilePage'
 import SettingsPage from '@/pages/SettingsPage'
 import PlaceholderPage from '@/pages/PlaceholderPage'
@@ -23,10 +20,7 @@ import PlaceholderPage from '@/pages/PlaceholderPage'
 // ─── Cemetery Office (Burial) ────────────────────────────────────────────────
 import BurialApplicationsPage from '@/pages/cemetery_office/burial-applications'
 import NicheManagementPage from '@/pages/cemetery_office/niche-management'
-<<<<<<< HEAD
 import CemeteryAssetRequestsPage from '@/pages/cemetery_office/asset-requests'
-=======
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 
 // ─── Barangay Secretary ──────────────────────────────────────────────────────
 import BarangaySecretaryDashboard from '@/pages/barangay_secretary/dashboard'
@@ -34,7 +28,6 @@ import BarangayReservationsPage from '@/pages/barangay_secretary/reservation-rec
 import BarangayOrdinancesPage from '@/pages/barangay_secretary/ordinance-references'
 import BarangayDocumentsPage from '@/pages/barangay_secretary/documents-filing'
 import BarangayRecordsPage from '@/pages/barangay_secretary/constituent-records'
-<<<<<<< HEAD
 import PunongBarangayAssetRequestsPage from '@/pages/punong_barangay/asset-requests'
 
 // ─── Role Dashboards ─────────────────────────────────────────────────────────
@@ -75,14 +68,12 @@ import LeakReportsPage from '@/pages/utility_engineering/leak-reports'
 import AssignTeamsPage from '@/pages/utility_helpdesk/assign-teams'
 import ConnectionStatusPage from '@/pages/utility_helpdesk/connection-status'
 import TicketTriagePage from '@/pages/utility_helpdesk/ticket-triage'
-=======
 
 // ─── Citizen Module ──────────────────────────────────────────────────────────
 import CitizenBurialApplicationPage from '@/pages/citizen/BurialApplicationPage'
 
 // ─── Utility Engineering ────────────────────────────────────────────────────
 import ServiceTicketsPage from '@/pages/utility_engineering/service-tickets'
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 
 // ─── Treasurer Module ────────────────────────────────────────────────────────
 import TreasurerTransactionsPage from '@/pages/treasurer/TransactionsPage'
@@ -103,18 +94,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-<<<<<<< HEAD
 function DashboardRedirect() {
   const { user } = useAuth()
   if (!user) return null
   return <Navigate to={`/${user.role}/dashboard`} replace />
-=======
 // ─── Role-aware dashboard: secretary gets its own dashboard ──────────────────
 function SmartDashboard() {
   const { user } = useAuth()
   if (user?.role === 'barangay_secretary') return <BarangaySecretaryDashboard />
   return <DashboardPage />
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 }
 
 function AppRoutes() {
@@ -127,7 +115,6 @@ function AppRoutes() {
       {/* Protected — wrapped in AppLayout */}
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-<<<<<<< HEAD
         <Route path="dashboard" element={<DashboardRedirect />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
@@ -149,22 +136,17 @@ function AppRoutes() {
         <Route path="utility_engineering/dashboard" element={<UtilityEngineeringDashboard />} />
         <Route path="utility_helpdesk/dashboard" element={<UtilityHelpdeskDashboard />} />
 
-=======
         <Route path="dashboard" element={<SmartDashboard />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
 
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
         {/* ── Cemetery & Burial ── */}
         <Route path="burial/applications" element={<BurialApplicationsPage />} />
         <Route path="burial/deceased" element={<PlaceholderPage title="Deceased Registry" description="Full deceased registry with search across all records." />} />
         <Route path="burial/niches" element={<NicheManagementPage />} />
         <Route path="burial/records" element={<PlaceholderPage title="Burial Records" description="Complete burial record ledger with filtering and export." />} />
         <Route path="burial/indigent" element={<PlaceholderPage title="Indigent Assistance" description="Indigent assistance case management portal." />} />
-<<<<<<< HEAD
         <Route path="burial/asset-requests" element={<CemeteryAssetRequestsPage />} />
-=======
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 
         {/* ── SSDD ── */}
         <Route path="ssdd/indigent" element={<PlaceholderPage title="Indigent Assistance Cases" />} />
@@ -181,13 +163,10 @@ function AppRoutes() {
         <Route path="citizen/apply/burial" element={<CitizenBurialApplicationPage />} />
         <Route path="citizen/apply/park" element={<PlaceholderPage title="Apply: Park Reservation" />} />
         <Route path="citizen/apply/barangay" element={<PlaceholderPage title="Apply: Barangay Facility" />} />
-<<<<<<< HEAD
         <Route path="citizen/apply/water" element={<ApplyWaterPage />} />
         <Route path="citizen/apply/leak" element={<Navigate to="/citizen/apply/water" replace />} />
-=======
         <Route path="citizen/apply/water" element={<PlaceholderPage title="Apply: Water Connection" />} />
         <Route path="citizen/apply/leak" element={<PlaceholderPage title="Report a Leak" />} />
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
         <Route path="citizen/payments" element={<PlaceholderPage title="Payment History" />} />
         <Route path="citizen/documents" element={<PlaceholderPage title="My Documents" />} />
 
@@ -196,7 +175,6 @@ function AppRoutes() {
         <Route path="parks/reservations" element={<PlaceholderPage title="Park Reservation Applications" />} />
         <Route path="parks/usage-logs" element={<PlaceholderPage title="Site Usage Logs" />} />
         <Route path="parks/calendar" element={<PlaceholderPage title="Booking Calendar" />} />
-<<<<<<< HEAD
         <Route path="parks/asset-requests" element={<ParksAssetRequestsPage />} />
 
         {/* ── Parks (Reservation Desk) ── */}
@@ -208,7 +186,6 @@ function AppRoutes() {
         <Route path="barangay/pending" element={<PlaceholderPage title="Pending Approvals" description="Pending barangay requests forwarded for approval." />} />
         <Route path="barangay/ordinances" element={<PlaceholderPage title="Ordinance References" />} />
         <Route path="barangay/asset-requests" element={<PunongBarangayAssetRequestsPage />} />
-=======
 
         {/* ── Barangay (shared) ── */}
         <Route path="barangay/reservations" element={<PlaceholderPage title="Barangay Reservation Records" />} />
@@ -216,7 +193,6 @@ function AppRoutes() {
         <Route path="barangay/permits" element={<PlaceholderPage title="Permits & Payments" />} />
         <Route path="barangay/pending" element={<PlaceholderPage title="Pending Approvals" description="Pending barangay requests forwarded for approval." />} />
         <Route path="barangay/ordinances" element={<PlaceholderPage title="Ordinance References" />} />
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 
         {/* ── Barangay Secretary ── */}
         <Route path="barangay/secretary/reservations" element={<BarangayReservationsPage />} />
@@ -231,7 +207,6 @@ function AppRoutes() {
 
         {/* ── Utility ── */}
         <Route path="utility/tickets" element={<ServiceTicketsPage />} />
-<<<<<<< HEAD
         <Route path="utility/triage" element={<TicketTriagePage />} />
         <Route path="utility/leaks" element={<LeakReportsPage />} />
         <Route path="utility/jobs" element={<AssignedJobsPage />} />
@@ -250,7 +225,6 @@ function AppRoutes() {
         {/* ── RMCD ── */}
         <Route path="rmcd/routing" element={<PlaceholderPage title="Request Routing" />} />
         <Route path="rmcd/releases" element={<PlaceholderPage title="Document Releases" />} />
-=======
         <Route path="utility/triage" element={<ServiceTicketsPage />} />
         <Route path="utility/leaks" element={<PlaceholderPage title="Leak Reports" />} />
         <Route path="utility/jobs" element={<PlaceholderPage title="Assigned Jobs" />} />
@@ -264,7 +238,6 @@ function AppRoutes() {
         <Route path="assets/reports" element={<PlaceholderPage title="Inventory Reports" />} />
         <Route path="assets/approvals" element={<PlaceholderPage title="Approval Records" />} />
         <Route path="assets/submissions" element={<PlaceholderPage title="Submission Records" />} />
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 
         {/* ── Payments / Treasurer ── */}
         <Route path="payments" element={<TreasurerTransactionsPage />} />
