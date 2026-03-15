@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
@@ -209,4 +210,11 @@ export default function CgsdManagementDashboard() {
             </div>
         </div>
     )
+=======
+import React from 'react'
+import DashboardPage from '@/pages/DashboardPage'
+
+export default function CgsdManagementDashboard() {
+  return <DashboardPage />
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 }

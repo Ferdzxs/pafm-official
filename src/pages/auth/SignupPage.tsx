@@ -4,7 +4,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react'
 
 export default function SignupPage() {
+<<<<<<< HEAD
     const { signup } = useAuth()
+=======
+    const { login } = useAuth()
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     const navigate = useNavigate()
     const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' })
     const [showPw, setShowPw] = useState(false)
@@ -13,6 +17,7 @@ export default function SignupPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+<<<<<<< HEAD
         setError('')
         if (form.password !== form.confirm) { setError('Passwords do not match.'); return }
         if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return }
@@ -22,6 +27,14 @@ export default function SignupPage() {
         setLoading(false)
         if (err) { setError(err); return }
 
+=======
+        if (form.password !== form.confirm) { setError('Passwords do not match.'); return }
+        if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return }
+        setLoading(true)
+        // In a real app this would call supabase.auth.signUp
+        // For demo: auto-login as citizen
+        await login('citizen@gmail.com', 'citizen123')
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
         navigate('/dashboard')
     }
 

@@ -753,7 +753,10 @@ CREATE TABLE ocular_inspection (
     inventory_request_id    TEXT REFERENCES inventory_request(inventory_request_id),
     inspection_date         DATE,
     conducted_by_office     TEXT REFERENCES government_office(office_id),
+<<<<<<< HEAD
     conducted_by_employee   TEXT REFERENCES employee(employee_id),
+=======
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     physical_condition_notes TEXT,
     usage_verified          BOOLEAN DEFAULT FALSE,
     boundary_verified       BOOLEAN DEFAULT FALSE

@@ -1,4 +1,5 @@
 import React from 'react'
+<<<<<<< HEAD
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { TrendingUp, TrendingDown, Clock, CheckCircle, FileText, Package } from 'lucide-react'
@@ -131,4 +132,10 @@ export default function ReservationOfficerDashboard() {
             </div>
         </div>
     )
+=======
+import DashboardPage from '@/pages/DashboardPage'
+
+export default function ReservationOfficerDashboard() {
+  return <DashboardPage />
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 }

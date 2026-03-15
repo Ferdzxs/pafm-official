@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -159,4 +160,16 @@ export default function InventoryReportsPage() {
             </Card>
         </div>
     )
+=======
+import React from 'react'
+import PlaceholderPage from '@/pages/PlaceholderPage'
+
+export default function InventoryReports() {
+  return (
+    <PlaceholderPage
+      title="Inventory Reports"
+      description="Summary and detailed reports for land and building inventory prepared by FAMCD."
+    />
+  )
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 }

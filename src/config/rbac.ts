@@ -24,7 +24,10 @@ export interface NavItem {
 export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     cemetery_office: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+<<<<<<< HEAD
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
+=======
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
         { id: 'burial-apps', label: 'Burial Applications', icon: ClipboardList, path: '/burial/applications', badgeKey: 'pending_burials' },
         { id: 'deceased', label: 'Deceased Registry', icon: Skull, path: '/burial/deceased' },
         { id: 'niches', label: 'Niche Management', icon: MapPin, path: '/burial/niches' },
@@ -32,7 +35,10 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'indigent', label: 'Indigent Assistance', icon: Heart, path: '/burial/indigent' },
         { id: 'payments', label: 'Payments & Permits', icon: CreditCard, path: '/payments' },
         { id: 'reports', label: 'Reports', icon: BarChart3, path: '/reports' },
+<<<<<<< HEAD
         { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/burial/asset-requests' },
+=======
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     ],
     ssdd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -53,17 +59,26 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'apply-burial', label: 'Apply: Burial', icon: Skull, path: '/citizen/apply/burial' },
         { id: 'apply-park', label: 'Apply: Park Reservation', icon: TreePine, path: '/citizen/apply/park' },
         { id: 'apply-barangay', label: 'Apply: Barangay Facility', icon: Home, path: '/citizen/apply/barangay' },
+<<<<<<< HEAD
         { id: 'apply-water', label: 'Water Supply & Drainage', icon: Droplets, path: '/citizen/apply/water' },
+=======
+        { id: 'apply-water', label: 'Apply: Water Connection', icon: Droplets, path: '/citizen/apply/water' },
+        { id: 'apply-leak', label: 'Report a Leak', icon: AlertTriangle, path: '/citizen/apply/leak' },
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
         { id: 'payments', label: 'Payment History', icon: CreditCard, path: '/citizen/payments' },
         { id: 'my-docs', label: 'My Documents', icon: FolderOpen, path: '/citizen/documents' },
     ],
     parks_admin: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+<<<<<<< HEAD
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
+=======
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
         { id: 'venues', label: 'Park Venues', icon: TreePine, path: '/parks/venues' },
         { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/parks/reservations', badgeKey: 'pending_park_res' },
         { id: 'usage-logs', label: 'Site Usage Logs', icon: ClipboardList, path: '/parks/usage-logs' },
         { id: 'calendar', label: 'Booking Calendar', icon: Calendar, path: '/parks/calendar' },
+<<<<<<< HEAD
         { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/parks/asset-requests' },
     ],
     reservation_officer: [
@@ -78,6 +93,19 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'pending-approvals', label: 'Pending Approvals', icon: CheckSquare, path: '/barangay/pending', badgeKey: 'pending_bar_res' },
         { id: 'ordinances', label: 'Ordinance References', icon: BookOpen, path: '/barangay/ordinances' },
         { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/barangay/asset-requests' },
+=======
+    ],
+    reservation_officer: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+        { id: 'reservations', label: 'Reservation Records', icon: Building2, path: '/barangay/reservations', badgeKey: 'pending_bar_res' },
+        { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/barangay/approvals' },
+        { id: 'permits', label: 'Permits & Payments', icon: FileText, path: '/barangay/permits' },
+    ],
+    punong_barangay: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+        { id: 'pending-approvals', label: 'Pending Approvals', icon: CheckSquare, path: '/barangay/pending', badgeKey: 'pending_bar_res' },
+        { id: 'ordinances', label: 'Ordinance References', icon: BookOpen, path: '/barangay/ordinances' },
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     ],
     barangay_secretary: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -104,15 +132,23 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     cgsd_management: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+<<<<<<< HEAD
         { id: 'requests', label: 'Asset Requests', icon: Package, path: '/assets/requests' },
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
         { id: 'inspections', label: 'Inspection Findings', icon: Microscope, path: '/assets/inspections' },
         { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
         { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/assets/approvals' },
+=======
+        { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
+        { id: 'inspections', label: 'Ocular Inspections', icon: Microscope, path: '/assets/inspections' },
+        { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
+        { id: 'approvals', label: 'Approval Records', icon: CheckSquare, path: '/assets/approvals' },
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     ],
     famcd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
+<<<<<<< HEAD
         { id: 'inspections', label: 'Inspection Findings', icon: Microscope, path: '/assets/inspections' },
         { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
         { id: 'submissions', label: 'Submissions', icon: Send, path: '/assets/submissions' },
@@ -121,6 +157,11 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'routing', label: 'Request Routing', icon: Send, path: '/rmcd/routing', badgeKey: 'pending_routes' },
         { id: 'releases', label: 'Document Releases', icon: FileCheck, path: '/rmcd/releases' },
+=======
+        { id: 'inspections', label: 'Ocular Inspections', icon: Microscope, path: '/assets/inspections' },
+        { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
+        { id: 'submissions', label: 'Submission Records', icon: Send, path: '/assets/submissions' },
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     ],
     treasurer: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -155,7 +196,10 @@ export const ROLE_META: Record<UserRole, { label: string; color: string; bgColor
     utility_helpdesk: { label: 'Utility Helpdesk', color: '#38bdf8', bgColor: 'rgba(56,189,248,0.12)' },
     cgsd_management: { label: 'CGSD Management', color: '#f472b6', bgColor: 'rgba(244,114,182,0.12)' },
     famcd: { label: 'FAMCD', color: '#a3e635', bgColor: 'rgba(163,230,53,0.12)' },
+<<<<<<< HEAD
     rmcd: { label: 'RMCD', color: '#14b8a6', bgColor: 'rgba(20,184,166,0.12)' },
+=======
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     treasurer: { label: 'Treasurer Officer', color: '#fcd34d', bgColor: 'rgba(252,211,77,0.12)' },
     system_admin: { label: 'System Administrator', color: '#94a3b8', bgColor: 'rgba(148,163,184,0.12)' },
 }

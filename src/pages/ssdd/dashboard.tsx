@@ -1,4 +1,5 @@
 import React from 'react'
+<<<<<<< HEAD
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { TrendingUp, TrendingDown, Clock, CheckCircle, Users, FileText } from 'lucide-react'
@@ -134,4 +135,10 @@ export default function SsddDashboard() {
             </div>
         </div>
     )
+=======
+import DashboardPage from '@/pages/DashboardPage'
+
+export default function SsddDashboard() {
+  return <DashboardPage />
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 }

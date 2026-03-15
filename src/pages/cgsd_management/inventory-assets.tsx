@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -263,4 +264,16 @@ export default function InventoryAssetsPage() {
             )}
         </div>
     )
+=======
+import React from 'react'
+import PlaceholderPage from '@/pages/PlaceholderPage'
+
+export default function InventoryAssets() {
+  return (
+    <PlaceholderPage
+      title="Inventory & Assets"
+      description="Manage the master list of city-owned land and building assets for oversight and management."
+    />
+  )
+>>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
 }
