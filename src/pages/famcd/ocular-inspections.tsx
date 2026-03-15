@@ -31,6 +31,7 @@ export default function OcularInspectionsPage() {
             .from('inventory_request')
             .select(`
                 inventory_request_id,
+                inventory_scope,
                 property_id,
                 property (
                     property_name,
@@ -39,7 +40,7 @@ export default function OcularInspectionsPage() {
                     acquisition_date
                 )
             `)
-            .eq('status', 'pending')
+            .in('status', ['pending', 'approved', 'in_progress'])
             .order('date_requested', { ascending: false })
 
         if (error) {
@@ -52,7 +53,7 @@ export default function OcularInspectionsPage() {
     }
 
     const filtered = inspections.filter(a =>
-        a.request_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.inventory_request_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.inventory_scope?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.property?.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -74,7 +75,7 @@ export default function OcularInspectionsPage() {
             .insert({
                 inspection_id: inspectionId,
                 property_id: selectedItem.property_id,
-                inventory_request_id: selectedItem.request_id,
+                inventory_request_id: selectedItem.inventory_request_id,
                 inspection_date: new Date().toISOString().split('T')[0],
                 conducted_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 conducted_by_employee: user.id || 'EMP-004',
@@ -87,7 +88,7 @@ export default function OcularInspectionsPage() {
             .from('inventory_report')
             .insert({
                 inventory_report_id: reportId,
-                inventory_request_id: selectedItem.request_id,
+                inventory_request_id: selectedItem.inventory_request_id,
                 preparation_date: new Date().toISOString().split('T')[0],
                 prepared_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 prepared_by_employee: user.id || 'EMP-004',
@@ -98,7 +99,7 @@ export default function OcularInspectionsPage() {
         const { error: reqError } = await supabase
             .from('inventory_request')
             .update({ status: 'completed' }) // or 'in-review'
-            .eq('request_id', selectedItem.request_id)
+            .eq('inventory_request_id', selectedItem.inventory_request_id)
 
         if (inspError || repError || reqError) {
             console.error(inspError, repError, reqError)
@@ -106,7 +107,7 @@ export default function OcularInspectionsPage() {
             return
         }
 
-        toast.success(`Inspection Report for ${selectedItem.request_id} submitted to CGSD Approvals queue!`, { id: toastId })
+        toast.success(`Inspection Report for ${selectedItem.inventory_request_id} submitted to CGSD Approvals queue!`, { id: toastId })
         setSelectedItem(null)
         setFindings('')
         fetchPendingInspections()
@@ -124,7 +125,7 @@ export default function OcularInspectionsPage() {
                             <h1 className="font-display text-2xl font-bold text-foreground">Conduct Inspection</h1>
                         </div>
                         <p className="text-muted-foreground text-sm mt-1 ml-16">
-                            {selectedItem.request_id} — {selectedItem.inventory_scope}
+                            {selectedItem.inventory_request_id} — {selectedItem.inventory_scope}
                         </p>
                     </div>
                 </div>
@@ -302,14 +303,14 @@ export default function OcularInspectionsPage() {
                                     </td>
                                 </tr>
                             ) : filtered.map((item) => (
-                                <tr key={item.request_id} className="hover:bg-accent/50 transition-colors">
+                                <tr key={item.inventory_request_id} className="hover:bg-accent/50 transition-colors">
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
                                                 <Search size={18} />
                                             </div>
                                             <div>
-                                                <div className="font-semibold text-sm text-foreground">{item.request_id}</div>
+                                                <div className="font-semibold text-sm text-foreground">{item.inventory_request_id}</div>
                                                 <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={item.inventory_scope}>
                                                     {item.inventory_scope}
                                                 </div>

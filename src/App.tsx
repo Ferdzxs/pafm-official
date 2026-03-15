@@ -48,6 +48,7 @@ import CgsdManagementDashboard from '@/pages/cgsd_management/dashboard'
 import ApprovalsPage from '@/pages/cgsd_management/approvals'
 import InventoryAssetsPage from '@/pages/cgsd_management/inventory-assets'
 import InventoryReportsPage from '@/pages/cgsd_management/inventory-reports'
+import CgsdOcularInspectionsPage from '@/pages/cgsd_management/ocular-inspections'
 import OcularInspectionsPage from '@/pages/famcd/ocular-inspections'
 import SubmissionsPage from '@/pages/famcd/submissions'
 import RmcdDashboard from '@/pages/rmcd/dashboard'
@@ -100,6 +101,12 @@ function SmartDashboard() {
   const { user } = useAuth()
   if (user?.role === 'barangay_secretary') return <BarangaySecretaryDashboard />
   return <DashboardPage />
+}
+
+function SmartOcularInspections() {
+  const { user } = useAuth()
+  if (user?.role === 'famcd') return <OcularInspectionsPage />
+  return <CgsdOcularInspectionsPage />
 }
 
 function AppRoutes() {
@@ -214,7 +221,7 @@ function AppRoutes() {
         {/* ── Assets ── */}
         <Route path="assets/requests" element={<AssetsRequestsPage />} />
         <Route path="assets/inventory" element={<InventoryAssetsPage />} />
-        <Route path="assets/inspections" element={<OcularInspectionsPage />} />
+        <Route path="assets/inspections" element={<SmartOcularInspections />} />
         <Route path="assets/reports" element={<InventoryReportsPage />} />
         <Route path="assets/approvals" element={<ApprovalsPage />} />
         <Route path="assets/submissions" element={<SubmissionsPage />} />
@@ -229,12 +236,7 @@ function AppRoutes() {
         <Route path="utility/assign" element={<PlaceholderPage title="Assign to Teams" />} />
         <Route path="utility/connections" element={<PlaceholderPage title="Connection Status" />} />
 
-        {/* ── Assets ── */}
-        <Route path="assets/inventory" element={<PlaceholderPage title="Inventory & Assets" />} />
-        <Route path="assets/inspections" element={<PlaceholderPage title="Ocular Inspections" />} />
-        <Route path="assets/reports" element={<PlaceholderPage title="Inventory Reports" />} />
-        <Route path="assets/approvals" element={<PlaceholderPage title="Approval Records" />} />
-        <Route path="assets/submissions" element={<PlaceholderPage title="Submission Records" />} />
+
 
         {/* ── Payments / Treasurer ── */}
         <Route path="payments" element={<TreasurerTransactionsPage />} />
