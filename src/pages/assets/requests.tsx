@@ -37,11 +37,13 @@ export default function AssetsRequestsPage() {
       .from('inventory_request')
       .select(`
         inventory_request_id,
-        inventory_scope,
-        status,
-        date_requested,
-        cycle_type,
-        government_office ( office_name )
+        property_id,
+        property (
+          property_name,
+          location,
+          asset_condition,
+          acquisition_date
+        )
       `)
       .order('date_requested', { ascending: false })
 

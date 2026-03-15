@@ -40,6 +40,7 @@ export default function ApprovalsPage() {
                     office_name
                 )
             `)
+            .eq('approval_status', 'pending') // Only fetch pending reports
             .order('preparation_date', { ascending: false })
 
         if (error) {
@@ -68,22 +69,61 @@ export default function ApprovalsPage() {
             .eq('inventory_report_id', selectedItem.inventory_report_id)
 
         // 2. Create approval record
+        console.log('User ID:', user.id); // Log the user ID for debugging
+
+        if (!user.id) {
+            toast.error('User ID is missing or invalid. Cannot proceed with the action.');
+            return;
+        }
+
+        let employeeId = user.id; // Ensure this matches an existing employee_id in the database
+
+        // Log the employee ID being used for the approval record
+        console.log('Employee ID being used for approval:', employeeId);
+
         const { error: recordError } = await supabase
             .from('approval_record')
             .insert({
                 approval_id: `APR-${Date.now()}`,
                 inventory_report_id: selectedItem.inventory_report_id,
                 approved_by_office: user.role === 'cgsd_management' ? 'OFF-007' : null, // Mapped to CGSD logic
-                approved_by_employee: user.id || 'EMP-007', // Use real employee ID if available
+                approved_by_employee: employeeId, // Use the validated employee ID
                 approval_date: new Date().toISOString().split('T')[0],
                 decision: 'approved',
                 remarks: 'Approved electronically.'
             })
 
+        // Refetch the updated reports after approval
+        const { data: updatedReports, error: fetchError } = await supabase
+            .from('inventory_report')
+            .select(`
+                inventory_report_id,
+                preparation_date,
+                approval_status,
+                digital_report_url,
+                inventory_request (
+                    inventory_scope,
+                    requesting_office
+                ),
+                government_office (
+                    office_name
+                )
+            `)
+            .eq('approval_status', 'pending')
+            .order('preparation_date', { ascending: false })
+
+        if (fetchError) {
+            console.error('Error fetching updated reports:', fetchError)
+            toast.error('Failed to refresh reports.')
+        } else {
+            setReports(updatedReports || [])
+        }
+
         if (updateError || recordError) {
-            toast.error('Failed to approve submission.', { id: toastId })
-            console.error(updateError, recordError)
-            return
+            console.error('Update Error:', updateError);
+            console.error('Record Error:', recordError);
+            toast.error('Failed to approve submission.', { id: toastId });
+            return;
         }
 
         toast.success(`Approved ${selectedItem.inventory_report_id}!`, { id: toastId })
@@ -107,22 +147,49 @@ export default function ApprovalsPage() {
             .eq('inventory_report_id', selectedItem.inventory_report_id)
 
         // 2. Create approval record (acting as a rejection log)
+        console.log('User ID:', user.id); // Log the user ID for debugging
+
+        if (!user.id) {
+            toast.error('User ID is missing or invalid. Cannot proceed with the action.');
+            return;
+        }
+
+        let employeeId = user.id; // Ensure this matches an existing employee_id in the database
+
+        // Log the employee ID being used for the approval record
+        console.log('Employee ID being used for approval:', employeeId);
+
+        // Validate user ID against the employee table
+        const { data: employeeData, error: employeeError } = await supabase
+            .from('employee')
+            .select('employee_id')
+            .eq('employee_id', user.id)
+            .single();
+
+        if (employeeError || !employeeData) {
+            console.error('Employee validation failed:', employeeError);
+            toast.error('Invalid user ID. Please contact the administrator.');
+            return;
+        }
+
+        employeeId = employeeData.employee_id; // Validated employee ID
+
         const { error: recordError } = await supabase
             .from('approval_record')
             .insert({
                 approval_id: `APR-${Date.now()}`,
                 inventory_report_id: selectedItem.inventory_report_id,
-                approved_by_office: user.role === 'cgsd_management' ? 'OFF-007' : null,
-                approved_by_employee: user.id || 'EMP-007',
+                approved_by_office: user.role === 'cgsd_management' ? 'OFF-007' : null, // Mapped to CGSD logic
+                approved_by_employee: employeeId, // Use the validated employee ID
                 approval_date: new Date().toISOString().split('T')[0],
                 decision: 'rejected',
                 remarks: rejectReason
-            })
+            });
 
-        if (updateError || recordError) {
-            toast.error('Failed to return submission.', { id: toastId })
-            console.error(updateError, recordError)
-            return
+        if (recordError) {
+            console.error('Error inserting approval record:', recordError);
+            toast.error('Failed to return submission. Please check the logs for more details.');
+            return;
         }
 
         toast.success(`Returned ${selectedItem.inventory_report_id} to FAMCD.`, { id: toastId })

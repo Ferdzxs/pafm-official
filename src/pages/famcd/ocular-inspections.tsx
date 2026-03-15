@@ -19,9 +19,6 @@ export default function OcularInspectionsPage() {
     const [newCondition, setNewCondition] = useState('Excellent')
     const [findings, setFindings] = useState('')
     const [recommendation, setRecommendation] = useState('Approve Request')
-    const [selectedPhotos, setSelectedPhotos] = useState<File[]>([])
-
-    const fileInputRef = React.useRef<HTMLInputElement | null>(null)
 
     useEffect(() => {
         fetchPendingInspections()
@@ -34,33 +31,24 @@ export default function OcularInspectionsPage() {
             .from('inventory_request')
             .select(`
                 inventory_request_id,
-                inventory_scope,
-                status,
-                date_requested
+                property_id,
+                property (
+                    property_name,
+                    location,
+                    asset_condition,
+                    acquisition_date
+                )
             `)
             .eq('status', 'pending')
             .order('date_requested', { ascending: false })
 
         if (error) {
             console.error('Error fetching inspections:', error)
-            toast.error(`Failed to load pending inspections queue: ${error.message ?? ''}`)
+            toast.error('Failed to load pending inspections queue.')
         } else {
-            setInspections((data || []).map((item: any) => ({
-                ...item,
-                request_id: item.inventory_request_id,
-            })))
+            setInspections(data || [])
         }
         setIsLoading(false)
-    }
-
-    const handlePhotoAreaClick = () => {
-        fileInputRef.current?.click()
-    }
-
-    const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files
-        if (!files) return
-        setSelectedPhotos(Array.from(files))
     }
 
     const filtered = inspections.filter(a =>
@@ -85,12 +73,12 @@ export default function OcularInspectionsPage() {
             .from('ocular_inspection')
             .insert({
                 inspection_id: inspectionId,
-                property_id: selectedItem.property_id ?? null,
+                property_id: selectedItem.property_id,
                 inventory_request_id: selectedItem.request_id,
                 inspection_date: new Date().toISOString().split('T')[0],
                 conducted_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 conducted_by_employee: user.id || 'EMP-004',
-                physical_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
+                asset_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
             })
 
         // 2. Generate the draft inventory report for CGSD
@@ -110,7 +98,7 @@ export default function OcularInspectionsPage() {
         const { error: reqError } = await supabase
             .from('inventory_request')
             .update({ status: 'completed' }) // or 'in-review'
-            .eq('inventory_request_id', selectedItem.request_id)
+            .eq('request_id', selectedItem.request_id)
 
         if (inspError || repError || reqError) {
             console.error(inspError, repError, reqError)
@@ -121,7 +109,6 @@ export default function OcularInspectionsPage() {
         toast.success(`Inspection Report for ${selectedItem.request_id} submitted to CGSD Approvals queue!`, { id: toastId })
         setSelectedItem(null)
         setFindings('')
-        setSelectedPhotos([])
         fetchPendingInspections()
     }
 
@@ -131,16 +118,7 @@ export default function OcularInspectionsPage() {
                  <div className="flex items-center justify-between mb-6">
                     <div>
                         <div className="flex items-center gap-3">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    setSelectedItem(null)
-                                    setSelectedPhotos([])
-                                    setFindings('')
-                                }}
-                                className="h-8 px-2 text-muted-foreground mr-2"
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedItem(null)} className="h-8 px-2 text-muted-foreground mr-2">
                                 <X size={16} className="mr-1" /> Back
                             </Button>
                             <h1 className="font-display text-2xl font-bold text-foreground">Conduct Inspection</h1>
@@ -199,30 +177,30 @@ export default function OcularInspectionsPage() {
                         </CardContent>
                     </Card>
 
-                    {/* RIGHT COLUMN: New Findings Entry */}
-                    <Card className="shadow-lg border-primary/20 bg-card">
-                        <CardHeader className="pb-4 border-b border-border bg-primary/5">
-                            <CardTitle className="text-lg flex items-center gap-2 text-primary">
-                                <CheckSquare size={18} />
-                                New Inspection Findings
-                            </CardTitle>
-                            <CardDescription>Enter your ocular findings to submit for CGSD Approval.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-6 space-y-5">
-                             <div>
-                                <label className="text-xs font-semibold text-foreground mb-1.5 block">Observed Condition <span className="text-destructive">*</span></label>
-                                <select 
-                                    className="w-full h-10 px-3 rounded-md border border-input bg-background/50 text-sm"
-                                    value={newCondition}
-                                    onChange={e => setNewCondition(e.target.value)}
-                                >
-                                    <option>Excellent</option>
-                                    <option>Good</option>
-                                    <option>Fair</option>
-                                    <option>Poor</option>
-                                    <option>Condemned / Beyond Repair</option>
-                                </select>
-                            </div>
+                        {/* RIGHT COLUMN: New Findings Entry */}
+                        <Card className="shadow-lg border-primary/20 bg-card">
+                            <CardHeader className="pb-4 border-b border-border bg-primary/5">
+                                <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                                    <CheckSquare size={18} />
+                                    New Inspection Findings
+                                </CardTitle>
+                                <CardDescription>Enter your ocular findings to submit for CGSD Approval.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-5">
+                                <div>
+                                    <label className="text-xs font-semibold text-foreground mb-1.5 block">Observed Condition <span className="text-destructive">*</span></label>
+                                    <select 
+                                        className="w-full h-10 px-3 rounded-md border border-input bg-background/50 text-sm"
+                                        value={newCondition}
+                                        onChange={e => setNewCondition(e.target.value)}
+                                    >
+                                        <option>Excellent</option>
+                                        <option>Good</option>
+                                        <option>Fair</option>
+                                        <option>Poor</option>
+                                        <option>Condemned / Beyond Repair</option>
+                                    </select>
+                                </div>
 
                             <div>
                                 <label className="text-xs font-semibold text-foreground mb-1.5 block">Inspection Notes / Variations <span className="text-destructive">*</span></label>
@@ -236,32 +214,11 @@ export default function OcularInspectionsPage() {
 
                             <div>
                                 <label className="text-xs font-semibold text-foreground mb-1.5 block">Photographic Evidence</label>
-                                <div
-                                    className="relative border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer"
-                                    onClick={handlePhotoAreaClick}
-                                >
+                                <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
                                     <Camera size={28} className="text-muted-foreground mb-2" />
                                     <div className="text-sm font-medium">Click to upload photos</div>
                                     <div className="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        className="absolute inset-0 opacity-0 cursor-pointer"
-                                        onChange={handlePhotoChange}
-                                    />
                                 </div>
-                                {selectedPhotos.length > 0 && (
-                                    <div className="mt-2 text-xs text-foreground">
-                                        <div className="font-medium">Selected photos:</div>
-                                        <ul className="list-disc list-inside">
-                                            {selectedPhotos.map((file) => (
-                                                <li key={file.name + file.size}>{file.name}</li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
                             </div>
 
                             <div>

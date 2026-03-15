@@ -307,7 +307,7 @@ INSERT INTO asset_inventory (asset_id, asset_name, asset_type, category, serial_
 ('BLDG-005','Amoranto Sports Complex — Main Arena','building','City-Owned Building','BLD-REG-1978-005','1978-06-12',NULL,NULL,'fair','A. Roces Ave., South Triangle, Quezon City','CGSD — Sports Division','2022-08-01','8,500 sqm GFA. Main arena with spectator stands. Roof structural assessment needed.'),
 ('BLDG-006','Quezon City Science High School Building','building','City-Owned Building','BLD-REG-2003-006','2003-07-20',NULL,NULL,'good','Misamis St., Brgy. Bago Bantay, Quezon City','QC Schools Division','2023-03-10','5,800 sqm GFA. Main academic building with science laboratories.'),
 ('BLDG-007','Batasan Complex Legislative Building','building','City-Owned Building','BLD-REG-1978-007','1978-10-30',NULL,NULL,'good','Constitution Hills, Batasan Hills, Quezon City','QC Sangguniang Panlungsod','2022-10-05','18,500 sqm GFA. Houses SP session hall, committee rooms, and judicial offices.'),
-('BLDG-008','CGSD Main Office and Warehouse','building','City-Owned Building','BLD-REG-2002-008','2002-05-18',NULL,NULL,'good','BIR Road, Brgy. Pinyahan, Quezon City','CGSD Engineering Division','2023-12-01','1,800 sqm GFA. Main engineering office, storage, and workshop.'),
+('BLDG-008','CGSD Main Office and Warehouse','building','City-Owned Building','BLD-REG-2002-008','2002-05-18',NULL,NULL,'good','BIR Road, Brgy. Pinyahan, Quezon City','CGSD Engineering Division',NULL,'1,800 sqm GFA. Main engineering office, storage, and workshop.'),
 ('BLDG-009','Quezon City Public Library — Main Branch','building','City-Owned Building','BLD-REG-2009-009','2009-04-23',NULL,NULL,'good','Elliptical Rd, Diliman, Quezon City','CGSD — FAMCD','2023-07-15','2,400 sqm GFA. Main public library with digital resource center.'),
 ('BLDG-010','Kamuning Public Market Building','building','City-Owned Building','BLD-REG-1990-010','1990-06-01',NULL,NULL,'fair','Kamuning Road, Quezon City','CGSD — Market Authority','2022-05-20','4,200 sqm GFA. Active public market. Roof repair needed in Section C.'),
 ('BLDG-011','Commonwealth Market Building','building','City-Owned Building','BLD-REG-1988-011','1988-09-15',NULL,NULL,'fair','Commonwealth Ave., Quezon City','CGSD — Market Authority','2021-11-10','6,800 sqm GFA. One of the major QC public markets. Structural upgrade pending.'),
@@ -1058,7 +1058,8 @@ CREATE TABLE inventory_request (
     date_requested      DATE,
     status              TEXT DEFAULT 'pending',
     inventory_scope     TEXT,
-    cycle_type          TEXT
+    cycle_type          TEXT,
+    property_id         TEXT REFERENCES property(property_id)
 );
 
 INSERT INTO inventory_request VALUES
@@ -1074,6 +1075,7 @@ CREATE TABLE ocular_inspection (
     inventory_request_id    TEXT REFERENCES inventory_request(inventory_request_id),
     inspection_date         DATE,
     conducted_by_office     TEXT REFERENCES government_office(office_id),
+    conducted_by_employee   TEXT REFERENCES employee(employee_id),
     physical_condition_notes TEXT,
     usage_verified          BOOLEAN DEFAULT FALSE,
     boundary_verified       BOOLEAN DEFAULT FALSE
@@ -1191,4 +1193,3 @@ CREATE POLICY "allow_all_person" ON person FOR ALL USING (true) WITH CHECK (true
 
 -- 6. Ensure default privileges for any future tables you might create
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;

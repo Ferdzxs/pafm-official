@@ -44,10 +44,36 @@ export default function CgsdManagementDashboard() {
                 .select('*', { count: 'exact', head: true })
 
             // Fetch pending inspections
-            const { count: reqCount } = await supabase
+            const { data, error } = await supabase
                 .from('inventory_request')
-                .select('*', { count: 'exact', head: true })
-                .eq('status', 'pending')
+                .select(`
+                    inventory_request_id,
+                    property_id,
+                    property (
+                      property_name,
+                      location,
+                      asset_condition,
+                      acquisition_date
+                    )
+                `)
+                .order('preparation_date', { ascending: false })
+                .limit(5)
+                
+            if (error) {
+                console.error('Error fetching recent activities:', error)
+            }
+
+            // Ensure activities is not undefined before setting state
+            const activities = data?.map((r: any) => ({
+                id: r.inventory_request_id,
+                action: 'Report Submitted',
+                subject: r.property?.property_name || 'General Asset Inventory',
+                time: r.preparation_date,
+                status: r.approval_status
+            }))
+            if (activities) {
+                setRecentActivity(activities);
+            }
 
             // Fetch total reports submitted
             const { count: reportCount } = await supabase
@@ -59,36 +85,19 @@ export default function CgsdManagementDashboard() {
                 .from('inventory_report')
                 .select('*', { count: 'exact', head: true })
                 .eq('approval_status', 'approved')
-                
+
+            // Fetch total pending inspections
+            const { count: reqCount } = await supabase
+                .from('inventory_request')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'pending')
+
             setStats({
                 totalProperties: propCount || 0,
                 pendingInspections: reqCount || 0,
                 reportsSubmitted: reportCount || 0,
                 approvedReports: approvedCount || 0,
             })
-
-            // Fetch recent activities (we'll use inventory_request and inventory_report logic to populate)
-            const { data: recentReports } = await supabase
-                .from('inventory_report')
-                .select(`
-                    inventory_report_id,
-                    preparation_date,
-                    approval_status,
-                    inventory_request ( inventory_scope )
-                `)
-                .order('preparation_date', { ascending: false })
-                .limit(5)
-                
-            if (recentReports) {
-                const activities = recentReports.map((r: any) => ({
-                    id: r.inventory_report_id,
-                    action: 'Report Submitted',
-                    subject: r.inventory_request?.inventory_scope || 'General Asset Inventory',
-                    time: r.preparation_date,
-                    status: r.approval_status
-                }))
-                setRecentActivity(activities)
-            }
         }
 
         fetchDashboardData()

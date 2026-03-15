@@ -30,8 +30,11 @@ export default function InventoryAssetsPage() {
         const { data, error } = await supabase
             .from('property')
             .select(`
-                *,
-                government_office ( office_name )
+                property_id,
+                property_name,
+                location,
+                asset_condition,
+                acquisition_date
             `)
             .order('property_name', { ascending: true })
 
