@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -218,7 +217,7 @@ export default function OcularInspectionsPage() {
                                 <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
                                     <Camera size={28} className="text-muted-foreground mb-2" />
                                     <div className="text-sm font-medium">Click to upload photos</div>
-                                    <div className="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
+                                    <div class="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
                                 </div>
                             </div>
 
@@ -337,16 +336,5 @@ export default function OcularInspectionsPage() {
             </Card>
         </div>
     )
-=======
-import React from 'react'
-import PlaceholderPage from '@/pages/PlaceholderPage'
-
-export default function FamcdOcularInspections() {
-  return (
-    <PlaceholderPage
-      title="Ocular Inspections"
-      description="Schedule and record physical or ocular inspections of city-owned land and building assets for inventory purposes."
-    />
-  )
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
+}
 }
