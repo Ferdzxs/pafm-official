@@ -217,7 +217,7 @@ export default function OcularInspectionsPage() {
                                 <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
                                     <Camera size={28} className="text-muted-foreground mb-2" />
                                     <div className="text-sm font-medium">Click to upload photos</div>
-                                    <div class="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
                                 </div>
                             </div>
 
@@ -336,5 +336,4 @@ export default function OcularInspectionsPage() {
             </Card>
         </div>
     )
-}
 }

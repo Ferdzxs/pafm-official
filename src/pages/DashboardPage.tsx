@@ -213,6 +213,16 @@ const DASHBOARD_DATA: Record<UserRole, {
         ],
         chartData: [],
     },
+    rmcd: {
+        kpis: [
+            { label: 'Pending Routes', value: 8, change: 2, icon: Clock, color: '#fbbf24' },
+            { label: 'Documents Released', value: 45, change: 12, icon: CheckCircle, color: '#34d399' },
+            { label: 'Total Requests', value: 124, change: 15, icon: FileText, color: '#60a5fa' },
+            { label: 'Active Users', value: 3, change: 0, icon: Users, color: '#94a3b8' },
+        ],
+        recentActivity: [],
+        chartData: [],
+    },
 }
 
 const STATUS_BADGE: Record<string, React.ComponentProps<typeof Badge>['variant']> = {

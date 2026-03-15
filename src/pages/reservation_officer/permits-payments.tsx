@@ -51,12 +51,7 @@ const MOCK_PERMITS: ParkPermitRow[] = [
     reservation_id: 'PR-2024-021',
     venue: 'People\'s Park – Central Field',
     event_name: 'Youth Sports Tournament',
-<<<<<<< HEAD
-    organizer: 'District 3 Youth Council',
-=======
-    organizer: 'Brgy. 123 Sangguniang Kabataan',
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
-    schedule_date: '2024-03-10T08:00:00Z',
+    organizer: 'District 3 Youth Council',    schedule_date: '2024-03-10T08:00:00Z',
     payment_status: 'unpaid',
     permit_status: 'waiting_admin',
   },
@@ -232,29 +227,15 @@ export default function PermitsPayments() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-<<<<<<< HEAD
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${PAYMENT_BADGE[row.payment_status]
-                        }`}
-=======
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${
-                        PAYMENT_BADGE[row.payment_status]
-                      }`}
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
-                    >
+                        }`}                    >
                       {row.payment_status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <span
-<<<<<<< HEAD
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${PERMIT_BADGE[row.permit_status]
-                        }`}
-=======
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${
-                        PERMIT_BADGE[row.permit_status]
-                      }`}
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
-                    >
+                        }`}                    >
                       {row.permit_status.replace('_', ' ')}
                     </span>
                   </td>

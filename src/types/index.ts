@@ -12,10 +12,7 @@ export type UserRole =
     | 'utility_helpdesk'
     | 'cgsd_management'
     | 'famcd'
-<<<<<<< HEAD
     | 'rmcd'
-=======
->>>>>>> 58930893a1e4d46885dc70105cdb332ee473e3b4
     | 'treasurer'
     | 'system_admin'
 

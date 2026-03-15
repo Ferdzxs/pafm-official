@@ -69,11 +69,6 @@ import AssignTeamsPage from '@/pages/utility_helpdesk/assign-teams'
 import ConnectionStatusPage from '@/pages/utility_helpdesk/connection-status'
 import TicketTriagePage from '@/pages/utility_helpdesk/ticket-triage'
 
-// ─── Citizen Module ──────────────────────────────────────────────────────────
-import CitizenBurialApplicationPage from '@/pages/citizen/BurialApplicationPage'
-
-// ─── Utility Engineering ────────────────────────────────────────────────────
-import ServiceTicketsPage from '@/pages/utility_engineering/service-tickets'
 
 // ─── Treasurer Module ────────────────────────────────────────────────────────
 import TreasurerTransactionsPage from '@/pages/treasurer/TransactionsPage'
@@ -98,6 +93,8 @@ function DashboardRedirect() {
   const { user } = useAuth()
   if (!user) return null
   return <Navigate to={`/${user.role}/dashboard`} replace />
+}
+
 // ─── Role-aware dashboard: secretary gets its own dashboard ──────────────────
 function SmartDashboard() {
   const { user } = useAuth()

@@ -1,0 +1,9 @@
+﻿src/App.tsx(60,8): error TS2300: Duplicate identifier 'CitizenBurialApplicationPage'.
+src/App.tsx(64,8): error TS2300: Duplicate identifier 'ServiceTicketsPage'.
+src/App.tsx(73,8): error TS2300: Duplicate identifier 'CitizenBurialApplicationPage'.
+src/App.tsx(76,8): error TS2300: Duplicate identifier 'ServiceTicketsPage'.
+src/config/rbac.ts(24,14): error TS2739: Type '{ cemetery_office: { id: string; label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; path: string; }[]; ... 11 more ...; system_admin: { ...; }[]; }' is missing the following properties from type 'Record<UserRole, NavItem[]>': reservation_officer, punong_barangay
+src/contexts/AuthContext.tsx(60,15): error TS2741: Property 'is_citizen' is missing in type '{ id: string; email: string; role: UserRole; full_name: string; }' but required in type 'AuthUser'.
+src/pages/DashboardPage.tsx(14,7): error TS2741: Property 'rmcd' is missing in type '{ cemetery_office: { kpis: { label: string; value: number; change: number; icon: React.ForwardRefExoticComponent<Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>>; color: string; }[]; recentActivity: { ...; }[]; chartData: { ...; }[]; }; ... 12 more ...; system_admin: { ...; }; }' but required in type 'Record<UserRole, { kpis: { label: string; value: string | number; change: number; icon: FC<any>; color: string; }[]; recentActivity: { id: string; action: string; subject: string; time: string; status: string; }[]; chartData?: any; }>'.
+src/pages/famcd/ocular-inspections.tsx(220,42): error TS2322: Type '{ children: string; class: string; }' is not assignable to type 'DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>'.
+  Property 'class' does not exist on type 'DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>'. Did you mean 'className'?
