@@ -39,36 +39,35 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen flex bg-background">
             {/* ─── Left branding panel ─── */}
-            <div className="hidden lg:flex flex-col justify-between w-[460px] flex-shrink-0 p-12 relative overflow-hidden bg-[#0f172a]">
-                <div className="absolute top-24 left-24 w-64 h-64 rounded-full opacity-20 blur-3xl bg-blue-500" />
-                <div className="absolute bottom-32 right-16 w-48 h-48 rounded-full opacity-15 blur-3xl bg-purple-700" />
-
+            <div className="hidden lg:flex flex-col justify-between w-[460px] flex-shrink-0 p-12 border-r border-border-subtle bg-surface-subtle">
                 <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center text-white font-bold text-lg mb-8 shadow-lg">
+                    <div className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg mb-8 shadow-sm">
                         BPM
                     </div>
-                    <h1 className="font-display font-bold text-4xl text-white leading-tight mb-4">
+                    <h1 className="font-display font-bold text-3xl text-text-primary-token leading-tight mb-4">
                         Public Assets &<br />Facilities Management
                     </h1>
-                    <p className="text-slate-400 text-base leading-relaxed">
+                    <p className="text-sm text-text-muted-token leading-relaxed">
                         A unified civic operations platform for Quezon City — cemetery management, parks, barangay facilities, water supply, and asset tracking.
                     </p>
                 </div>
 
                 <div className="relative z-10 space-y-3">
                     {[
-                        { icon: '⚰️', label: 'Cemetery & Burial Management' },
-                        { icon: '🌳', label: 'Parks & Recreation Scheduling' },
-                        { icon: '🏢', label: 'Barangay Facility Reservations' },
-                        { icon: '💧', label: 'Water Supply & Drainage' },
-                        { icon: '📦', label: 'Asset Inventory Tracker' },
-                    ].map(m => (
-                        <div key={m.label} className="flex items-center gap-3">
-                            <span className="text-lg">{m.icon}</span>
-                            <span className="text-slate-300 text-sm">{m.label}</span>
+                        'Cemetery & burial management',
+                        'Parks & recreation scheduling',
+                        'Barangay facility reservations',
+                        'Water supply & drainage',
+                        'Asset inventory tracking',
+                    ].map(label => (
+                        <div key={label} className="flex items-center gap-3">
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[11px] text-muted-foreground">
+                                •
+                            </span>
+                            <span className="text-xs text-text-muted-token">{label}</span>
                         </div>
                     ))}
-                    <div className="mt-8 text-xs text-slate-600 pt-4 border-t border-slate-800">
+                    <div className="mt-8 text-xs text-text-muted-token pt-4 border-t border-border-subtle">
                         © 2026 BPM System — Quezon City Government. All rights reserved.
                     </div>
                 </div>

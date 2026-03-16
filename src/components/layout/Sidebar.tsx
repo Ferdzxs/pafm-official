@@ -61,32 +61,12 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
 
   return (
     <header
-      className="shrink-0 flex items-center gap-3 px-3 sm:px-5"
-      style={{
-        height: "60px",
-        background: "var(--color-sidebar-bg)",
-        borderBottom: "1px solid var(--color-sidebar-border)",
-        position: "sticky",
-        top: 0,
-        zIndex: 40,
-      }}
+      className="shrink-0 flex items-center gap-3 px-3 sm:px-5 h-[60px] bg-surface-subtle border-b border-border-subtle sticky top-0 z-40"
     >
       {/* ── Sidebar toggle (left) ── */}
       <button
         onClick={onToggleSidebar}
-        className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all md:w-8 md:h-8"
-        style={{ color: "var(--color-sidebar-text)" }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background =
-            "var(--color-sidebar-hover)";
-          (e.currentTarget as HTMLElement).style.color =
-            "var(--color-text-primary)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "transparent";
-          (e.currentTarget as HTMLElement).style.color =
-            "var(--color-sidebar-text)";
-        }}
+        className="shrink-0 w-9 h-9 md:w-8 md:h-8 rounded-lg flex items-center justify-center text-[13px] text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] hover:text-[color:var(--text-primary)] transition-colors"
         title={sidebarCollapsed ? "Open navigation" : "Close navigation"}
       >
         {sidebarCollapsed ? <Menu size={18} /> : <X size={18} />}
@@ -97,25 +77,18 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
         <div className="relative w-full max-w-xs sm:max-w-md lg:max-w-130">
           <Search
             size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ color: "var(--color-sidebar-sub)" }}
+            className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[color:var(--color-sidebar-sub)]"
           />
           <input
             type="text"
             placeholder="Search anything across the system…"
             value={searchVal}
             onChange={(e) => setSearchVal(e.target.value)}
-            className="w-full rounded-xl text-xs sm:text-sm outline-none px-3 sm:px-4 py-2 pl-9 transition-all"
-            style={{
-              background: "var(--color-bg-hover)",
-              border: "1px solid var(--color-sidebar-border)",
-              color: "var(--color-text-primary)",
-            }}
+            className="w-full rounded-md border border-[color:var(--color-sidebar-border)] bg-[color:var(--color-bg-hover)] px-3 sm:px-4 py-2 pl-9 text-xs sm:text-sm text-[color:var(--color-text-primary)] placeholder:text-[color:var(--color-sidebar-sub)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface-base)] transition-colors"
           />
           {searchVal && (
             <button
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-              style={{ color: "var(--color-sidebar-sub)" }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--color-sidebar-sub)] hover:text-[color:var(--text-primary)] transition-colors"
               onClick={() => setSearchVal("")}
             >
               <X size={12} />
@@ -129,20 +102,8 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
         {/* Light / Dark toggle */}
         <button
           onClick={toggleTheme}
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] hover:text-[color:var(--text-primary)] transition-colors"
           title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          style={{ color: "var(--color-sidebar-text)" }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background =
-              "var(--color-sidebar-hover)";
-            (e.currentTarget as HTMLElement).style.color =
-              "var(--color-text-primary)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
-            (e.currentTarget as HTMLElement).style.color =
-              "var(--color-sidebar-text)";
-          }}
         >
           {isDark ? (
             <Sun size={17} style={{ color: "#fbbf24" }} />
@@ -154,26 +115,13 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
         {/* Settings */}
         <NavLink
           to="/settings"
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+          className={({ isActive }) =>
+            clsx(
+              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] hover:text-[color:var(--text-primary)]",
+              isActive && "bg-[color:var(--color-sidebar-active-bg)] text-[color:var(--color-sidebar-text-active)]"
+            )
+          }
           title="Settings"
-          style={({ isActive }) => ({
-            color: isActive
-              ? "var(--color-sidebar-text-active)"
-              : "var(--color-sidebar-text)",
-            background: isActive
-              ? "var(--color-sidebar-active-bg)"
-              : "transparent",
-          })}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background =
-              "var(--color-sidebar-hover)";
-            (e.currentTarget as HTMLElement).style.color =
-              "var(--color-text-primary)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "";
-            (e.currentTarget as HTMLElement).style.color = "";
-          }}
         >
           <Settings size={17} />
         </NavLink>
@@ -182,20 +130,8 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setShowNotifs((v) => !v)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all relative"
+            className="w-8 h-8 rounded-lg flex items-center justify-center relative text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] hover:text-[color:var(--text-primary)] transition-colors"
             title="Notifications"
-            style={{ color: "var(--color-sidebar-text)" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background =
-                "var(--color-sidebar-hover)";
-              (e.currentTarget as HTMLElement).style.color =
-                "var(--color-text-primary)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
-              (e.currentTarget as HTMLElement).style.color =
-                "var(--color-sidebar-text)";
-            }}
           >
             <Bell size={17} />
             {unreadCount > 0 && (
@@ -297,26 +233,16 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
 
         {/* Divider */}
         <div
-          className="w-px h-5 mx-1"
-          style={{ background: "var(--color-sidebar-border)" }}
+          className="w-px h-5 mx-1 bg-[color:var(--color-sidebar-border)]"
         />
 
         {/* Profile */}
         <div className="relative" ref={userRef}>
           <button
             onClick={() => setShowUser((v) => !v)}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-xl transition-all"
-            style={{ color: "var(--color-sidebar-text)" }}
-            onMouseEnter={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                "var(--color-sidebar-hover)")
-            }
-            onMouseLeave={(e) =>
-              ((e.currentTarget as HTMLElement).style.background =
-                "transparent")
-            }
+            className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] transition-colors"
           >
-            <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-white text-xs font-bold shadow">
+            <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shadow-sm">
               {user?.full_name.charAt(0) ?? "U"}
             </div>
             <div className="hidden sm:block text-left">
@@ -487,28 +413,20 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   return (
     <aside
       className={clsx(
-        "fixed inset-y-0 left-0 z-40 flex flex-col sidebar-glow transition-transform duration-300 select-none shrink-0 md:static md:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 flex flex-col transition-transform duration-300 select-none shrink-0 md:static md:translate-x-0 shadow-sm bg-surface-subtle border-r border-border-subtle",
         collapsed ? "-translate-x-full md:w-17]" : "translate-x-0 w-64 md:w-55",
       )}
-      style={{
-        background: "var(--color-sidebar-bg)",
-        borderRight: "1px solid var(--color-sidebar-border)",
-      }}
     >
       {/* ── Logo block ──────────────────────────────────────── */}
       <div
-        className="flex flex-col items-center justify-center py-6 px-3"
-        style={{ borderBottom: "1px solid var(--color-sidebar-border)" }}
+        className="flex flex-col items-center justify-center py-6 px-3 border-b border-border-subtle bg-surface-subtle"
       >
         {/* Large BPM logo mark */}
         <div
-          className="gradient-primary rounded-2xl flex items-center justify-center text-white font-bold shadow-lg transition-all duration-300"
-          style={{
-            width: collapsed ? "40px" : "64px",
-            height: collapsed ? "40px" : "64px",
-            fontSize: collapsed ? "14px" : "22px",
-            letterSpacing: "-0.5px",
-          }}
+          className={clsx(
+            "flex items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shadow-sm transition-all duration-200",
+            collapsed ? "w-10 h-10 text-sm" : "w-16 h-16 text-xl"
+          )}
         >
           BPM
         </div>
@@ -534,16 +452,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
       {/* ── Role badge ────────────────────────────────────── */}
       {!collapsed && roleMeta && (
-        <div
-          className="mx-3 mt-4 px-3 py-1.5 rounded-lg animate-fade-in"
-          style={{ background: roleMeta.bgColor }}
-        >
-          <span
-            className="text-xs font-semibold"
-            style={{ color: roleMeta.color }}
-          >
-            {roleMeta.label}
-          </span>
+        <div className="mx-3 mt-4 px-3 py-1.5 rounded-full bg-state-info-soft text-state-info text-xs font-semibold animate-fade-in">
+          {roleMeta.label}
         </div>
       )}
 
@@ -559,7 +469,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
                 clsx(
-                  "relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 sidebar-nav-item",
+                  "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 sidebar-nav-item",
                   isActive ? "sidebar-nav-active" : "sidebar-nav-inactive",
                 )
               }
@@ -571,10 +481,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
                     {item.label}
                   </span>
                   {badge > 0 && (
-                    <span
-                      className="shrink-0 min-w-4.5 h-4.5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center text-white"
-                      style={{ background: "#2563eb" }}
-                    >
+                    <span className="shrink-0 min-w-4.5 h-4.5 px-1 rounded-full text-[10px] font-semibold flex items-center justify-center bg-state-info-soft text-state-info">
                       {badge > 99 ? "99+" : badge}
                     </span>
                   )}

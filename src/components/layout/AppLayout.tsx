@@ -6,10 +6,7 @@ export default function AppLayout() {
     const [collapsed, setCollapsed] = useState(false)
 
     return (
-        <div
-            className="flex min-h-screen overflow-hidden bg-background"
-            style={{ background: 'var(--color-bg)' }}
-        >
+        <div className="flex min-h-screen overflow-hidden bg-background">
             {/* ── Left: Sidebar (logo + nav only) ── */}
             <Sidebar collapsed={collapsed} />
 
@@ -22,10 +19,7 @@ export default function AppLayout() {
                 />
 
                 {/* Scrollable page content */}
-                <main
-                    className="flex-1 overflow-y-auto"
-                    style={{ background: 'var(--color-bg)' }}
-                >
+                <main className="flex-1 overflow-y-auto bg-[color:var(--surface-base)]">
                     <Outlet />
                 </main>
             </div>

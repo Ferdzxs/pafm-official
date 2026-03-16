@@ -73,10 +73,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setIsLoading(false)
                     return { error: 'Invalid password. Try admin123' }
                 }
+
+                // Map legacy / seed roles to the frontend UserRole keys
+                const normalizedRole = (() => {
+                    switch (sysUser.role) {
+                        case 'utility_engineer':
+                            return 'utility_engineering'
+                        case 'reservation_desk':
+                            return 'reservation_officer'
+                        default:
+                            return sysUser.role
+                    }
+                })()
+
                 const safeUser: AuthUser = {
                     id: sysUser.user_id,
                     email: sysUser.email,
-                    role: sysUser.role as any,
+                    role: normalizedRole as any,
                     full_name: sysUser.full_name,
                     is_citizen: false,
                     office: sysUser.department

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { TrendingUp, TrendingDown, Clock, CheckCircle, Package, AlertTriangle } from 'lucide-react'
@@ -7,26 +7,9 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { getHelpdeskStats, getRecentUtilityActivity, type TicketsByTypeStat } from '@/lib/serviceTickets'
 
-const KPI_DATA = [
-    { label: 'Open Tickets', value: 12, change: 4, icon: Clock, color: '#fbbf24' },
-    { label: 'Triaged Today', value: 7, change: 2, icon: CheckCircle, color: '#34d399' },
-    { label: 'Pending Assign', value: 5, change: 1, icon: AlertTriangle, color: '#fb923c' },
-    { label: 'Utility Status', value: 38, change: 5, icon: Package, color: '#38bdf8' },
-]
-
-const RECENT_ACTIVITY = [
-    { id: 'ST-2024-092', action: 'New Ticket Submitted', subject: 'Water Connection — New', time: '5 min ago', status: 'pending' },
-]
-
-const CHART_DATA = [
-    { type: 'Water Connection', count: 18 },
-    { type: 'Leak Report', count: 9 },
-    { type: 'Drainage', count: 6 },
-    { type: 'General', count: 5 },
-]
-
-const PIE_COLORS = ['#3b82f6', '#8b5cf6', '#34d399', '#fbbf24']
+const PIE_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))']
 
 const QUICK_ACTIONS = [
     { label: 'View Tickets', emoji: '🎫', path: '/utility/tickets' },
@@ -47,9 +30,74 @@ function getGreeting() {
 
 export default function UtilityHelpdeskDashboard() {
     const { user } = useAuth()
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [openTickets, setOpenTickets] = useState(0)
+    const [triagedToday, setTriagedToday] = useState(0)
+    const [pendingAssign, setPendingAssign] = useState(0)
+    const [byType, setByType] = useState<TicketsByTypeStat[]>([])
+    const [activity, setActivity] = useState<
+        { id: string; action: string; subject: string; time: string; status: string }[]
+    >([])
+
+    useEffect(() => {
+        let cancelled = false
+        const load = async () => {
+            setLoading(true)
+            setError(null)
+            try {
+                const stats = await getHelpdeskStats()
+                const recent = await getRecentUtilityActivity()
+                if (cancelled) return
+                setOpenTickets(stats.kpis.openCount)
+                setTriagedToday(stats.kpis.triagedToday)
+                setPendingAssign(stats.kpis.pendingAssignment)
+                setByType(stats.byType)
+                setActivity(
+                    recent.map(item => ({
+                        id: item.reference_id,
+                        action: item.message,
+                        subject: item.reference_id,
+                        time: new Date(item.sent_at).toLocaleTimeString('en-PH', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                        }),
+                        status: 'pending',
+                    })),
+                )
+            } catch (err: any) {
+                if (!cancelled) {
+                    setError(err?.message || 'Failed to load utility helpdesk statistics.')
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false)
+                }
+            }
+        }
+
+        load()
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
     if (!user) return null
 
     const meta = ROLE_META[user.role]
+
+    const KPI_DATA = [
+        { label: 'Open Tickets', value: openTickets, change: 0, icon: Clock, tone: 'warning' as const },
+        { label: 'Triaged Today', value: triagedToday, change: 0, icon: CheckCircle, tone: 'success' as const },
+        { label: 'Pending Assign', value: pendingAssign, change: 0, icon: AlertTriangle, tone: 'danger' as const },
+        {
+            label: 'Utility Status',
+            value: openTickets + triagedToday + pendingAssign,
+            change: 0,
+            icon: Package,
+            tone: 'info' as const,
+        },
+    ]
 
     return (
         <div className="px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto animate-fade-in">
@@ -68,19 +116,31 @@ export default function UtilityHelpdeskDashboard() {
                 </p>
             </div>
 
+            {error && (
+                <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                    {error}
+                </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
                 {KPI_DATA.map((kpi, i) => {
                     const Icon = kpi.icon
                     const isPositive = kpi.change >= 0
+                    const toneClasses: Record<typeof kpi.tone, string> = {
+                        info: 'bg-state-info-soft text-state-info',
+                        warning: 'bg-state-warning-soft text-state-warning',
+                        success: 'bg-state-success-soft text-state-success',
+                        danger: 'bg-state-danger-soft text-state-danger',
+                    }
                     return (
                         <Card key={i} className="card-hover">
                             <CardContent className="pt-5">
                                 <div className="flex items-start justify-between mb-4">
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${kpi.color}18` }}>
-                                        <Icon size={18} style={{ color: kpi.color }} />
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${toneClasses[kpi.tone]}`}>
+                                        <Icon size={18} />
                                     </div>
                                     {kpi.change !== 0 && (
-                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-state-success' : 'text-state-danger'}`}>
                                             {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                                             {Math.abs(kpi.change)}
                                         </div>
@@ -104,7 +164,12 @@ export default function UtilityHelpdeskDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-1">
-                            {RECENT_ACTIVITY.map(item => (
+                            {activity.length === 0 && !loading && (
+                                <div className="px-3 py-3 text-xs text-muted-foreground">
+                                    No recent utility activity logged yet.
+                                </div>
+                            )}
+                            {activity.map(item => (
                                 <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
                                     <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
                                         {item.id.slice(0, 2)}
@@ -132,9 +197,18 @@ export default function UtilityHelpdeskDashboard() {
                             <ResponsiveContainer width="100%" height={160}>
                                 <PieChart>
                                     <Pie
-                                        data={CHART_DATA}
+                                        data={
+                                            byType.length === 0
+                                                ? [
+                                                    { ticket_type: 'water_connection', count: 0 },
+                                                    { ticket_type: 'leak_report', count: 0 },
+                                                    { ticket_type: 'drainage', count: 0 },
+                                                    { ticket_type: 'general', count: 0 },
+                                                ]
+                                                : byType
+                                        }
                                         dataKey="count"
-                                        nameKey="type"
+                                        nameKey="ticket_type"
                                         cx="50%"
                                         cy="50%"
                                         outerRadius={55}
@@ -142,11 +216,19 @@ export default function UtilityHelpdeskDashboard() {
                                         labelLine={false}
                                         fontSize={10}
                                     >
-                                        {CHART_DATA.map((_, idx) => (
+                                        {(byType.length === 0 ? [1, 2, 3, 4] : byType).map((_, idx) => (
                                             <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', color: 'hsl(var(--foreground))' }} />
+                                    <Tooltip
+                                        contentStyle={{
+                                            background: 'var(--color-card)',
+                                            border: '1px solid var(--color-border)',
+                                            borderRadius: 8,
+                                            fontSize: 12,
+                                            color: 'var(--color-text-primary)',
+                                        }}
+                                    />
                                 </PieChart>
                             </ResponsiveContainer>
                         </CardContent>

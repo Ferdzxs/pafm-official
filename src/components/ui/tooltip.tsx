@@ -29,7 +29,7 @@ function Tooltip({ content, side = "top", children, className }: TooltipProps) {
             {visible && (
                 <div
                     className={cn(
-                        "absolute z-50 rounded-md bg-popover border border-border px-3 py-1.5 text-xs text-popover-foreground shadow-md whitespace-nowrap pointer-events-none",
+                        "absolute z-50 rounded-md bg-popover border border-border-subtle px-3 py-1.5 text-xs text-popover-foreground shadow-md whitespace-nowrap pointer-events-none",
                         posClass,
                         className
                     )}

@@ -46,9 +46,11 @@ function TabsTrigger({ className, value, children, ...props }: TabsTriggerProps)
             onClick={() => setActiveTab(value)}
             className={cn(
                 "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all cursor-pointer",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 "disabled:pointer-events-none disabled:opacity-50",
-                isActive ? "bg-background text-foreground shadow" : "hover:bg-background/50",
+                isActive
+                    ? "bg-background text-foreground shadow border border-border-subtle"
+                    : "border border-transparent hover:bg-bg-hover",
                 className
             )}
             {...props}

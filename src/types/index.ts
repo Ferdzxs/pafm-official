@@ -142,12 +142,33 @@ export interface BarangayReservationRecord {
 
 // ─── Water & Drainage ────────────────────────────────────────────────────────
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical'
-export type TicketStatus = 'open' | 'assigned' | 'in_progress' | 'resolved' | 'closed'
+
+// Extended to cover full utility lifecycle, but UI components typically
+// use a subset (open → assigned → in_progress → resolved → closed).
+export type TicketStatus =
+    | 'submitted'
+    | 'open'
+    | 'under_review'
+    | 'incomplete'
+    | 'triaged'
+    | 'assigned'
+    | 'in_progress'
+    | 'resolved'
+    | 'closed'
 
 export interface ServiceTicket {
     ticket_id: string
-    ticket_type: 'water_connection' | 'leak_report' | 'drainage' | 'general'
+    ticket_type:
+        | 'water_connection'
+        | 'water_connection:new'
+        | 'water_connection:additional_meter'
+        | 'leak_report'
+        | 'leak:owner'
+        | 'leak:representative'
+        | 'drainage'
+        | 'general'
     requester_name: string
+    requester_contact?: string
     description: string
     location: string
     priority: TicketPriority
@@ -155,6 +176,8 @@ export interface ServiceTicket {
     assigned_to?: string
     created_at: string
     resolved_at?: string
+    person_id?: string
+    image_url?: string
 }
 
 export interface LeakReport {

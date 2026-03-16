@@ -1,11 +1,6 @@
 import React from 'react'
-import PlaceholderPage from '@/pages/PlaceholderPage'
+import ApplyParkReservationPageComponent from '@/pages/citizen/ApplyParkReservationPage'
 
 export default function ApplyPark() {
-  return (
-    <PlaceholderPage
-      title="Apply: Park Reservation"
-      description="Submit an application for a park venue reservation."
-    />
-  )
+  return <ApplyParkReservationPageComponent />
 }

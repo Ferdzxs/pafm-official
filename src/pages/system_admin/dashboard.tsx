@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
 const KPI_DATA = [
-    { label: 'Total Users', value: 248, change: 5, icon: Users, color: '#94a3b8' },
-    { label: 'Active Sessions', value: 12, change: 3, icon: CheckCircle, color: '#34d399' },
-    { label: 'Audit Entries', value: 1024, change: 87, icon: FileText, color: '#60a5fa' },
-    { label: 'System Alerts', value: 2, change: -1, icon: AlertTriangle, color: '#fbbf24' },
+    { label: 'Total Users', value: 248, change: 5, icon: Users, tone: 'muted' as const },
+    { label: 'Active Sessions', value: 12, change: 3, icon: CheckCircle, tone: 'success' as const },
+    { label: 'Audit Entries', value: 1024, change: 87, icon: FileText, tone: 'info' as const },
+    { label: 'System Alerts', value: 2, change: -1, icon: AlertTriangle, tone: 'warning' as const },
 ]
 
 const RECENT_ACTIVITY = [
@@ -65,15 +65,21 @@ export default function SystemAdminDashboard() {
                 {KPI_DATA.map((kpi, i) => {
                     const Icon = kpi.icon
                     const isPositive = kpi.change >= 0
+                    const toneClasses: Record<typeof kpi.tone, string> = {
+                        muted: 'bg-surface-subtle text-text-primary-token',
+                        success: 'bg-state-success-soft text-state-success',
+                        info: 'bg-state-info-soft text-state-info',
+                        warning: 'bg-state-warning-soft text-state-warning',
+                    }
                     return (
                         <Card key={i} className="card-hover">
                             <CardContent className="pt-5">
                                 <div className="flex items-start justify-between mb-4">
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${kpi.color}18` }}>
-                                        <Icon size={18} style={{ color: kpi.color }} />
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${toneClasses[kpi.tone]}`}>
+                                        <Icon size={18} />
                                     </div>
                                     {kpi.change !== 0 && (
-                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-state-success' : 'text-state-danger'}`}>
                                             {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                                             {Math.abs(kpi.change)}
                                         </div>
@@ -98,8 +104,8 @@ export default function SystemAdminDashboard() {
                     <CardContent>
                         <div className="space-y-1">
                             {RECENT_ACTIVITY.map(item => (
-                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                                    <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-md hover:bg-bg-hover transition-colors cursor-pointer">
+                                    <div className="w-8 h-8 rounded-md bg-surface-subtle flex items-center justify-center text-xs font-semibold text-text-primary-token shrink-0">
                                         {item.id.slice(0, 2)}
                                     </div>
                                     <div className="flex-1 min-w-0">

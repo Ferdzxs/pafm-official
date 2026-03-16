@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
 const KPI_DATA = [
-    { label: 'My Applications', value: 2, change: 1, icon: FileText, color: '#60a5fa' },
-    { label: 'Pending Approvals', value: 1, change: 0, icon: Clock, color: '#fbbf24' },
-    { label: 'Completed', value: 3, change: 2, icon: CheckCircle, color: '#34d399' },
-    { label: 'Payments Due', value: 1, change: 0, icon: CreditCard, color: '#f87171' },
+    { label: 'My Applications', value: 2, change: 1, icon: FileText, tone: 'info' as const },
+    { label: 'Pending Approvals', value: 1, change: 0, icon: Clock, tone: 'warning' as const },
+    { label: 'Completed', value: 3, change: 2, icon: CheckCircle, tone: 'success' as const },
+    { label: 'Payments Due', value: 1, change: 0, icon: CreditCard, tone: 'danger' as const },
 ]
 
 const RECENT_ACTIVITY = [
@@ -64,15 +64,21 @@ export default function CitizenDashboard() {
                 {KPI_DATA.map((kpi, i) => {
                     const Icon = kpi.icon
                     const isPositive = kpi.change >= 0
+                    const toneClasses: Record<typeof kpi.tone, string> = {
+                        info: 'bg-state-info-soft text-state-info',
+                        warning: 'bg-state-warning-soft text-state-warning',
+                        success: 'bg-state-success-soft text-state-success',
+                        danger: 'bg-state-danger-soft text-state-danger',
+                    }
                     return (
                         <Card key={i} className="card-hover">
                             <CardContent className="pt-5">
                                 <div className="flex items-start justify-between mb-4">
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${kpi.color}18` }}>
-                                        <Icon size={18} style={{ color: kpi.color }} />
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${toneClasses[kpi.tone]}`}>
+                                        <Icon size={18} />
                                     </div>
                                     {kpi.change !== 0 && (
-                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-state-success' : 'text-state-danger'}`}>
                                             {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                                             {Math.abs(kpi.change)}
                                         </div>
@@ -97,8 +103,8 @@ export default function CitizenDashboard() {
                     <CardContent>
                         <div className="space-y-1">
                             {RECENT_ACTIVITY.map(item => (
-                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                                    <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-bg-hover transition-colors cursor-pointer">
+                                    <div className="w-8 h-8 rounded-lg bg-surface-subtle flex items-center justify-center text-xs font-semibold text-text-primary-token shrink-0">
                                         {item.id.slice(0, 2)}
                                     </div>
                                     <div className="flex-1 min-w-0">

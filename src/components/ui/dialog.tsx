@@ -15,7 +15,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/40"
                 onClick={() => onOpenChange?.(false)}
             />
             {/* Content slot */}
@@ -30,7 +30,7 @@ function DialogContent({ className, children, ...props }: React.ComponentProps<"
     return (
         <div
             className={cn(
-                "relative mx-auto w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-2xl",
+                "relative mx-auto w-full max-w-lg rounded-2xl border border-border-strong bg-surface-elevated p-6 shadow-lg",
                 className
             )}
             {...props}

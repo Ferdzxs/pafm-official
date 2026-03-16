@@ -1,203 +1,360 @@
-import React from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { ROLE_META } from '@/config/rbac'
-import { TrendingUp, TrendingDown, Clock, CheckCircle, Package, FileText } from 'lucide-react'
+import React, { useEffect, useState } from "react"
+import { useAuth } from "@/contexts/AuthContext"
+import { ROLE_META } from "@/config/rbac"
+import { supabase } from "@/lib/supabase"
+
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts"
 
-const KPI_DATA = [
-    { label: 'Pending Reservations', value: 4, change: 2, icon: Clock, color: '#fbbf24' },
-    { label: 'Approved This Month', value: 16, change: 4, icon: CheckCircle, color: '#34d399' },
-    { label: 'Active Venues', value: 8, change: 0, icon: Package, color: '#60a5fa' },
-    { label: 'Usage Log Entries', value: 24, change: 6, icon: FileText, color: '#4ade80' },
-]
+import {
+  Clock,
+  CheckCircle,
+  Package,
+  Activity
+} from "lucide-react"
 
-const RECENT_ACTIVITY = [
-    { id: 'PR-2024-023', action: 'New Reservation Request', subject: 'Burnham Park — Events', time: '1 hr ago', status: 'pending' },
-    { id: 'PR-2024-022', action: 'Permit Issued', subject: 'Amoranto Stadium', time: '3 hrs ago', status: 'approved' },
-]
-
-const CHART_DATA = [
-    { day: 'Mon', reservations: 3 }, { day: 'Tue', reservations: 5 }, { day: 'Wed', reservations: 2 },
-    { day: 'Thu', reservations: 7 }, { day: 'Fri', reservations: 9 }, { day: 'Sat', reservations: 12 }, { day: 'Sun', reservations: 8 },
-]
-
-const INVENTORY_ITEMS = [
-    { id: 'INV-PARK-007', asset: 'Central Park Grandstand & Stage', status: 'in_progress', status_label: 'Inspection Scheduled' },
-    { id: 'INV-PARK-006', asset: 'Playground & Fitness Equipment', status: 'completed', status_label: 'Report Available' },
-]
-
-const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'info' | 'secondary'> = {
-    pending: 'warning',
-    approved: 'success',
-    completed: 'success',
-}
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 function getGreeting() {
-    const h = new Date().getHours()
-    if (h < 12) return 'morning'
-    if (h < 17) return 'afternoon'
-    return 'evening'
+  const h = new Date().getHours()
+  if (h < 12) return "morning"
+  if (h < 17) return "afternoon"
+  return "evening"
+}
+
+// Maps DB status values → badge colors
+function statusColor(status: string) {
+  if (status === "pending")   return "bg-yellow-500"
+  if (status === "approved")  return "bg-green-600"
+  if (status === "completed") return "bg-blue-600"
+  if (status === "rejected")  return "bg-red-600"
+  return "bg-slate-500"
+}
+
+function statusLabel(status: string) {
+  if (status === "pending")   return "Pending"
+  if (status === "approved")  return "Approved"
+  if (status === "completed") return "Completed"
+  if (status === "rejected")  return "Rejected"
+  return status
 }
 
 export default function ParksAdminDashboard() {
-    const { user } = useAuth()
-    if (!user) return null
 
-    const meta = ROLE_META[user.role]
+  const { user } = useAuth()
 
-    return (
-        <div className="px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto animate-fade-in">
-            <div className="mb-8">
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2.5 py-1 rounded-md text-xs font-semibold" style={{ background: meta.bgColor, color: meta.color }}>
-                        {meta.label}
-                    </span>
+  const [chartData, setChartData]         = useState<any[]>([])
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [endorsedQueue, setEndorsedQueue]   = useState<any[]>([])
+  const [activeEvents, setActiveEvents]     = useState<any[]>([])
+  const [kpis, setKpis]                     = useState<any[]>([])
+
+  useEffect(() => {
+    loadDashboard()
+  }, [])
+
+  async function loadDashboard() {
+
+    /* ── KPI 1: Pending Reservations (BPMN Step 2 — awaiting pre-check) ── */
+    const { count: pendingCount } = await supabase
+      .from("park_reservation_record")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending")
+
+    /* ── KPI 2: Approved Reservations (BPMN Step 5 — admin approved) ── */
+    const { count: approvedCount } = await supabase
+      .from("park_reservation_record")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "approved")
+
+    /* ── KPI 3: Total Park Venues (prerequisite registry) ── */
+    const { count: venueCount } = await supabase
+      .from("park_venue")
+      .select("*", { count: "exact", head: true })
+
+    /* ── KPI 4: Site Usage Logs (BPMN Step 15 — Event Monitoring) ── */
+    const { count: usageCount } = await supabase
+      .from("site_usage_log")
+      .select("*", { count: "exact", head: true })
+
+    setKpis([
+      { label: "Pending Reservations",  value: pendingCount  ?? 0, icon: Clock },
+      { label: "Approved Reservations", value: approvedCount ?? 0, icon: CheckCircle },
+      { label: "Park Venues",           value: venueCount    ?? 0, icon: Package },
+      { label: "Site Usage Logs",       value: usageCount    ?? 0, icon: Activity }
+    ])
+
+    /* ── Recent Activity: join venue name via park_venue ── */
+    // BPMN Steps 4–5: shows endorsed + recently processed reservations
+    const { data: reservations } = await supabase
+      .from("park_reservation_record")
+      .select(`
+        reservation_id,
+        reservation_date,
+        time_slot,
+        status,
+        park_venue (
+          park_venue_name,
+          location
+        ),
+        person:applicant_person_id (
+          full_name
+        )
+      `)
+      .order("reservation_date", { ascending: false })
+      .limit(5)
+
+    if (reservations) {
+      setRecentActivity(reservations)
+    }
+
+    /* ── Endorsed Queue: pending reservations awaiting Parks Admin decision ── */
+    // BPMN Step 4 — Desk Officer has endorsed, Parks Admin must approve/reject
+    const { data: endorsed } = await supabase
+      .from("park_reservation_record")
+      .select(`
+        reservation_id,
+        reservation_date,
+        time_slot,
+        park_venue (
+          park_venue_name
+        ),
+        person:applicant_person_id (
+          full_name
+        )
+      `)
+      .eq("status", "pending")
+      .order("reservation_date", { ascending: true })
+      .limit(5)
+
+    if (endorsed) {
+      setEndorsedQueue(endorsed)
+    }
+
+    /* ── Active Events: approved reservations + site usage logs ── */
+    // BPMN Step 15 — Event Monitoring Team monitors event compliance
+    const { data: active } = await supabase
+      .from("site_usage_log")
+      .select(`
+        usage_id,
+        remarks,
+        event_conducted_flag,
+        park_reservation_record:reservation_id (
+          reservation_date,
+          time_slot,
+          status,
+          park_venue (
+            park_venue_name
+          )
+        )
+      `)
+      .limit(5)
+
+    if (active) {
+      setActiveEvents(active)
+    }
+
+    /* ── Daily Reservations Chart ── */
+    const { data: weekly } = await supabase
+      .from("park_reservation_record")
+      .select("reservation_date")
+
+    if (weekly) {
+      const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+      const counts: any = {}
+      days.forEach(d => counts[d] = 0)
+      weekly.forEach((r: any) => {
+        const day = new Date(r.reservation_date).getDay()
+        counts[days[day]]++
+      })
+      setChartData(days.map(d => ({ day: d, reservations: counts[d] })))
+    }
+  }
+
+  if (!user) return null
+
+  const meta = ROLE_META[user.role]
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-6">
+
+      {/* HEADER */}
+      <div className="mb-8">
+        <span
+          className="px-3 py-1 rounded text-xs font-semibold"
+          style={{ background: meta.bgColor, color: meta.color }}
+        >
+          {meta.label}
+        </span>
+        <h1 className="text-2xl font-bold mt-2">
+          Good {getGreeting()}, {user.full_name.split(" ")[0]} 👋
+        </h1>
+      </div>
+
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {kpis.map((kpi, i) => {
+          const Icon = kpi.icon
+          return (
+            <Card key={i}>
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <Icon size={18} />
                 </div>
-                <h1 className="font-display text-2xl font-bold text-foreground">
-                    Good {getGreeting()}, {user.full_name.split(' ')[0]}! 👋
-                </h1>
-                <p className="text-muted-foreground text-sm mt-1">
-                    {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    {user.office && ` · ${user.office}`}
-                </p>
-            </div>
+                <div className="text-2xl font-bold">{kpi.value}</div>
+                <div className="text-xs text-muted-foreground">{kpi.label}</div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-                {KPI_DATA.map((kpi, i) => {
-                    const Icon = kpi.icon
-                    const isPositive = kpi.change >= 0
-                    return (
-                        <Card key={i} className="card-hover">
-                            <CardContent className="pt-5">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${kpi.color}18` }}>
-                                        <Icon size={18} style={{ color: kpi.color }} />
-                                    </div>
-                                    {kpi.change !== 0 && (
-                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                                            {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                            {Math.abs(kpi.change)}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="text-2xl font-bold text-foreground mb-1">{kpi.value}</div>
-                                <div className="text-xs text-muted-foreground">{kpi.label}</div>
-                            </CardContent>
-                        </Card>
-                    )
-                })}
-            </div>
+      {/* ROW 1: Recent Activity + Chart */}
+      <div className="grid lg:grid-cols-3 gap-6 mb-6">
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card className="lg:col-span-2">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Recent Activity</CardTitle>
-                            <span className="text-xs text-muted-foreground">Live updates</span>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-1">
-                            {RECENT_ACTIVITY.map(item => (
-                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                                    <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                        {item.id.slice(0, 2)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium text-foreground truncate">{item.action}</div>
-                                        <div className="text-xs text-muted-foreground truncate">{item.subject}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <Badge variant={STATUS_BADGE[item.status] ?? 'secondary'} className="text-[10px] px-1.5 py-0.5">{item.status}</Badge>
-                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <div className="space-y-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">Daily Reservations</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ResponsiveContainer width="100%" height={160}>
-                                <BarChart data={CHART_DATA}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                                    <XAxis dataKey="day" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
-                                    <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }} />
-                                    <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px', color: 'hsl(var(--foreground))' }} />
-                                    <Bar dataKey="reservations" fill="#34d399" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">My Inventory Requests</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {INVENTORY_ITEMS.map(item => (
-                                    <div key={item.id} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg hover:bg-accent/70 transition-colors">
-                                        <span className="font-mono text-[11px] text-muted-foreground">{item.id}</span>
-                                        <span className="truncate flex-1 text-foreground">{item.asset}</span>
-                                        <Badge variant={item.status === 'completed' ? 'success' : item.status === 'in_progress' ? 'info' : 'secondary'} className="text-[10px] px-1.5 py-0.5">
-                                            {item.status_label}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">My Inventory Reports</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-2">
-                                {INVENTORY_ITEMS.filter(item => item.status === 'completed').map(item => (
-                                    <div key={item.id} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-lg hover:bg-accent/70 transition-colors">
-                                        <span className="font-mono text-[11px] text-muted-foreground">{item.id}</span>
-                                        <span className="truncate flex-1 text-foreground">{item.asset}</span>
-                                        <Badge variant="success" className="text-[10px] px-1.5 py-0.5">Report Available</Badge>
-                                    </div>
-                                ))}
-                                {INVENTORY_ITEMS.filter(item => item.status === 'completed').length === 0 && (
-                                    <p className="text-xs text-muted-foreground">No completed reports yet.</p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-1.5">
-                                {[
-                                    { label: 'View Calendar', emoji: '📅', path: '/parks/calendar' },
-                                    { label: 'Approve Reservations', emoji: '✅', path: '/parks/reservations' },
-                                ].map(qa => (
-                                    <a key={qa.label} href={qa.path} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-all border border-transparent hover:border-border">
-                                        <span>{qa.emoji}</span>
-                                        <span>{qa.label}</span>
-                                    </a>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+        {/* RECENT ACTIVITY — BPMN Steps 4–5 */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Recent Reservations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recentActivity.length === 0 && (
+              <p className="text-sm text-muted-foreground">No recent reservations.</p>
+            )}
+            {recentActivity.map((item: any) => (
+              <div
+                key={item.reservation_id}
+                className="flex justify-between items-center border-b pb-2"
+              >
+                <div>
+                  <div className="text-sm font-medium">
+                    {item.person?.full_name ?? "Unknown Applicant"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {item.park_venue?.park_venue_name ?? "Unknown Venue"} — {item.reservation_date} {item.time_slot}
+                  </div>
                 </div>
-            </div>
-        </div>
-    )
+                <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${statusColor(item.status)}`}>
+                  {statusLabel(item.status)}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* DAILY RESERVATIONS CHART */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Daily Reservations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={chartData}>
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"   stopColor="#6366f1" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#818cf8" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#e5e7eb" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: "10px",
+                    border: "none",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+                  }}
+                />
+                <Bar
+                  dataKey="reservations"
+                  fill="url(#barGradient)"
+                  radius={[8, 8, 0, 0]}
+                  animationDuration={600}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* ROW 2: Endorsement Queue + Event Monitoring */}
+      <div className="grid lg:grid-cols-2 gap-6">
+
+        {/* ENDORSEMENT QUEUE — BPMN Step 4: Pending admin decision */}
+        <Card>
+          <CardHeader>
+            <CardTitle>⏳ Awaiting Your Approval</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {endorsedQueue.length === 0 && (
+              <p className="text-sm text-muted-foreground">No pending reservations.</p>
+            )}
+            {endorsedQueue.map((item: any) => (
+              <div
+                key={item.reservation_id}
+                className="flex justify-between items-center border-b pb-2"
+              >
+                <div>
+                  <div className="text-sm font-medium">
+                    {item.person?.full_name ?? "Unknown Applicant"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {item.park_venue?.park_venue_name ?? "Unknown Venue"} — {item.reservation_date}
+                  </div>
+                </div>
+                <span className="px-2 py-1 rounded-full text-xs font-medium text-white bg-yellow-500">
+                  Pending
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* EVENT MONITORING — BPMN Step 15: Monitor event compliance */}
+        <Card>
+          <CardHeader>
+            <CardTitle> Event Monitoring</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {activeEvents.length === 0 && (
+              <p className="text-sm text-muted-foreground">No event logs yet.</p>
+            )}
+            {activeEvents.map((log: any) => {
+              const reservation = log.park_reservation_record
+              return (
+                <div
+                  key={log.usage_id}
+                  className="flex justify-between items-center border-b pb-2"
+                >
+                  <div>
+                    <div className="text-sm font-medium">
+                      {reservation?.park_venue?.park_venue_name ?? "Unknown Venue"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {reservation?.reservation_date} — {log.remarks ?? "No remarks"}
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${log.event_conducted_flag ? "bg-blue-600" : "bg-slate-500"}`}>
+                    {log.event_conducted_flag ? "Conducted" : "Not Yet"}
+                  </span>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+
+      </div>
+
+    </div>
+  )
 }

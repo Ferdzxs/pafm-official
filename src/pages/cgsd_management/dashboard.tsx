@@ -1,20 +1,10 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { TrendingUp, TrendingDown, Clock, CheckCircle, Package, FileText } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-
-const KPI_DATA = [
-    { label: 'Total Properties', value: 284, change: 3, icon: Package, color: '#f472b6' },
-    { label: 'Pending Inspections', value: 8, change: 2, icon: Clock, color: '#fbbf24' },
-    { label: 'Reports Submitted', value: 12, change: 4, icon: FileText, color: '#60a5fa' },
-    { label: 'Approved Reports', value: 9, change: 3, icon: CheckCircle, color: '#34d399' },
-]
-
-const RECENT_ACTIVITY = [
-    { id: 'IR-2024-035', action: 'Inspection Scheduled', subject: 'City Hall — Equipment', time: '1 hr ago', status: 'pending' },
-]
+import { supabase } from '@/lib/supabase'
 
 const QUICK_ACTIONS = [
     { label: 'New Inspection', emoji: '🔍', path: '/assets/inspections' },
@@ -35,9 +25,93 @@ function getGreeting() {
 
 export default function CgsdManagementDashboard() {
     const { user } = useAuth()
-    if (!user) return null
+    
+    const [stats, setStats] = useState({
+        totalProperties: 0,
+        pendingInspections: 0,
+        reportsSubmitted: 0,
+        approvedReports: 0,
+    })
+    
+    // Using explicit any to avoid TS errors on dynamic properties
+    const [recentActivity, setRecentActivity] = useState<any[]>([])
 
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            // Fetch total properties
+            const { count: propCount } = await supabase
+                .from('property')
+                .select('*', { count: 'exact', head: true })
+
+            // Fetch pending inspections
+            const { data, error } = await supabase
+                .from('inventory_request')
+                .select(`
+                    inventory_request_id,
+                    property_id,
+                    property (
+                      property_name,
+                      location,
+                      asset_condition,
+                      acquisition_date
+                    )
+                `)
+                .order('preparation_date', { ascending: false })
+                .limit(5)
+                
+            if (error) {
+                console.error('Error fetching recent activities:', error)
+            }
+
+            // Ensure activities is not undefined before setting state
+            const activities = data?.map((r: any) => ({
+                id: r.inventory_request_id,
+                action: 'Report Submitted',
+                subject: r.property?.property_name || 'General Asset Inventory',
+                time: r.preparation_date,
+                status: r.approval_status
+            }))
+            if (activities) {
+                setRecentActivity(activities);
+            }
+
+            // Fetch total reports submitted
+            const { count: reportCount } = await supabase
+                .from('inventory_report')
+                .select('*', { count: 'exact', head: true })
+
+            // Fetch total approved reports
+            const { count: approvedCount } = await supabase
+                .from('inventory_report')
+                .select('*', { count: 'exact', head: true })
+                .eq('approval_status', 'approved')
+
+            // Fetch total pending inspections
+            const { count: reqCount } = await supabase
+                .from('inventory_request')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'pending')
+
+            setStats({
+                totalProperties: propCount || 0,
+                pendingInspections: reqCount || 0,
+                reportsSubmitted: reportCount || 0,
+                approvedReports: approvedCount || 0,
+            })
+        }
+
+        fetchDashboardData()
+    }, [])
+
+    if (!user) return null
     const meta = ROLE_META[user.role]
+
+    const KPI_DATA = [
+        { label: 'Total Properties', value: stats.totalProperties, change: 0, icon: Package, color: '#f472b6' },
+        { label: 'Pending Inspections', value: stats.pendingInspections, change: 0, icon: Clock, color: '#fbbf24' },
+        { label: 'Reports Submitted', value: stats.reportsSubmitted, change: 0, icon: FileText, color: '#60a5fa' },
+        { label: 'Approved Reports', value: stats.approvedReports, change: 0, icon: CheckCircle, color: '#34d399' },
+    ]
 
     return (
         <div className="px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto animate-fade-in">
@@ -92,21 +166,25 @@ export default function CgsdManagementDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-1">
-                            {RECENT_ACTIVITY.map(item => (
-                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                                    <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                        {item.id.slice(0, 2)}
+                            {recentActivity.length === 0 ? (
+                                <div className="p-4 text-center text-sm text-muted-foreground">No recent activity found.</div>
+                            ) : (
+                                recentActivity.map(item => (
+                                    <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
+                                        <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                            {item.id.slice(0, 2)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium text-foreground truncate">{item.action}</div>
+                                            <div className="text-xs text-muted-foreground truncate">{item.subject}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <Badge variant={STATUS_BADGE[item.status] ?? 'secondary'} className="text-[10px] px-1.5 py-0.5 uppercase">{item.status}</Badge>
+                                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium text-foreground truncate">{item.action}</div>
-                                        <div className="text-xs text-muted-foreground truncate">{item.subject}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <Badge variant={STATUS_BADGE[item.status] ?? 'secondary'} className="text-[10px] px-1.5 py-0.5">{item.status}</Badge>
-                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -130,5 +208,4 @@ export default function CgsdManagementDashboard() {
                 </div>
             </div>
         </div>
-    )
-}
+    )}
