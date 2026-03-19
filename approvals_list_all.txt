@@ -1,0 +1,6 @@
+src\pages\assets\approvals.tsx
+src\pages\barangay_secretary\pending-approvals.tsx
+src\pages\cgsd_management\approvals.tsx
+src\pages\death_registration\approvals-signing.tsx
+src\pages\punong_barangay\pending-approvals.tsx
+src\pages\reservation_officer\approvals.tsx

@@ -24,7 +24,9 @@ export interface NavItem {
 export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     cemetery_office: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },    ],
+        { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
+        { id: 'requests', label: 'Asset Requests', icon: Send, path: '/burial/asset-requests' },
+    ],
     ssdd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'indigent-cases', label: 'Indigent Assistance', icon: Heart, path: '/ssdd/indigent', badgeKey: 'pending_assistance' },
@@ -49,7 +51,9 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     parks_admin: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },    ],
+        { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
+        { id: 'requests', label: 'Asset Requests', icon: Send, path: '/parks/asset-requests' },
+    ],
     barangay_secretary: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'sec-pending', label: 'Pending Approvals', icon: CheckSquare, path: '/barangay/pending', badgeKey: 'pending_bar_res' },
@@ -75,17 +79,17 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     cgsd_management: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'requests', label: 'Asset Requests', icon: Package, path: '/assets/requests' },
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
         { id: 'inspections', label: 'Inspection Findings', icon: Microscope, path: '/assets/inspections' },
         { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
-        { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/assets/approvals' },    ],
+        { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/assets/approvals' },
+    ],
     famcd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
         { id: 'inspections', label: 'Inspection Findings', icon: Microscope, path: '/assets/inspections' },
         { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
-        { id: 'submissions', label: 'Submissions', icon: Send, path: '/assets/submissions' },
+        { id: 'incoming-requests', label: 'Incoming Requests', icon: ClipboardList, path: '/assets/submissions' },
     ],
     rmcd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },

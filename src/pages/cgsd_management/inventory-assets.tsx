@@ -32,9 +32,13 @@ export default function InventoryAssetsPage() {
             .select(`
                 property_id,
                 property_name,
+                property_type,
                 location,
                 asset_condition,
-                acquisition_date
+                acquisition_date,
+                government_office!managing_office (
+                    office_name
+                )
             `)
             .order('property_name', { ascending: true })
 

@@ -3,18 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Filter, Eye, CheckCircle, XCircle, FileText, AlertTriangle } from 'lucide-react'
+import { Search, Filter, Eye, CheckCircle, XCircle, FileText, AlertTriangle, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-hot-toast'
 
+// Trigger Vite HMR 
 export default function ApprovalsPage() {
     const { user } = useAuth()
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedItem, setSelectedItem] = useState<any | null>(null)
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
     const [rejectReason, setRejectReason] = useState('')
-    
+
     const [reports, setReports] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
@@ -29,6 +30,7 @@ export default function ApprovalsPage() {
             .from('inventory_report')
             .select(`
                 inventory_report_id,
+                inventory_request_id,
                 preparation_date,
                 approval_status,
                 digital_report_url,
@@ -40,7 +42,7 @@ export default function ApprovalsPage() {
                     office_name
                 )
             `)
-            .eq('approval_status', 'pending') // Only fetch pending reports
+            .in('approval_status', ['pending', 'approved', 'returned_for_revision']) // Fetch pending, approved, and returned reports
             .order('preparation_date', { ascending: false })
 
         if (error) {
@@ -59,9 +61,9 @@ export default function ApprovalsPage() {
 
     const handleApprove = async () => {
         if (!selectedItem || !user) return
-        
+
         const toastId = toast.loading('Approving submission...')
-        
+
         // 1. Update report status
         const { error: updateError } = await supabase
             .from('inventory_report')
@@ -93,11 +95,46 @@ export default function ApprovalsPage() {
                 remarks: 'Approved electronically.'
             })
 
+        // 3. Auto-update property.asset_condition from the linked ocular_inspection
+        const requestId = selectedItem.inventory_request?.requesting_office
+            ? null // not needed — we use inventory_request_id from the report join
+            : null
+
+        // Look up the inventory_request_id from the report (already joined)
+        const linkedRequestId = selectedItem.inventory_request_id
+
+        if (linkedRequestId) {
+            // Find the ocular_inspection for this request that has new_condition set
+            const { data: inspectionData } = await supabase
+                .from('ocular_inspection')
+                .select('new_condition, property_id')
+                .eq('inventory_request_id', linkedRequestId)
+                .not('new_condition', 'is', null)
+                .order('inspection_date', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+            if (inspectionData?.new_condition && inspectionData?.property_id) {
+                const { error: conditionError } = await supabase
+                    .from('property')
+                    .update({ asset_condition: inspectionData.new_condition })
+                    .eq('property_id', inspectionData.property_id)
+
+                if (conditionError) {
+                    console.error('Failed to auto-update property condition:', conditionError)
+                    // Non-blocking — approval still succeeds
+                } else {
+                    console.log(`✅ property.asset_condition updated to: ${inspectionData.new_condition}`)
+                }
+            }
+        }
+
         // Refetch the updated reports after approval
         const { data: updatedReports, error: fetchError } = await supabase
             .from('inventory_report')
             .select(`
                 inventory_report_id,
+                inventory_request_id,
                 preparation_date,
                 approval_status,
                 digital_report_url,
@@ -109,7 +146,7 @@ export default function ApprovalsPage() {
                     office_name
                 )
             `)
-            .eq('approval_status', 'pending')
+            .in('approval_status', ['pending', 'approved', 'returned_for_revision'])
             .order('preparation_date', { ascending: false })
 
         if (fetchError) {
@@ -126,10 +163,11 @@ export default function ApprovalsPage() {
             return;
         }
 
-        toast.success(`Approved ${selectedItem.inventory_report_id}!`, { id: toastId })
+        toast.success(`Approved ${selectedItem.inventory_report_id}! Asset condition updated.`, { id: toastId })
         setSelectedItem(null)
         fetchPendingReports()
     }
+
 
     const handleReturn = () => {
         setIsRejectModalOpen(true)
@@ -137,9 +175,9 @@ export default function ApprovalsPage() {
 
     const submitReturn = async () => {
         if (!rejectReason.trim() || !selectedItem || !user) return
-        
+
         const toastId = toast.loading('Returning submission...')
-        
+
         // 1. Update report status
         const { error: updateError } = await supabase
             .from('inventory_report')
@@ -202,6 +240,174 @@ export default function ApprovalsPage() {
         fetchPendingReports()
     }
 
+    const handleGenerateCOAReport = (item: any) => {
+        const reportHtml = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>COA Property Inventory Form</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        font-size: 12px;
+                        line-height: 1.5;
+                        color: #000;
+                        margin: 0;
+                        padding: 20px;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                    }
+                    .header h1 {
+                        font-size: 16px;
+                        margin: 0 0 5px 0;
+                        font-weight: bold;
+                    }
+                    .header h2 {
+                        font-size: 14px;
+                        margin: 0 0 5px 0;
+                        font-weight: normal;
+                    }
+                    .header h3 {
+                        font-size: 14px;
+                        margin: 0;
+                        font-weight: bold;
+                    }
+                    .meta-info {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 20px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 30px;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 8px;
+                        text-align: left;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                        font-weight: bold;
+                        text-align: center;
+                    }
+                    .signatures {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 50px;
+                    }
+                    .signature-block {
+                        width: 45%;
+                        text-align: center;
+                    }
+                    .signature-line {
+                        border-top: 1px solid #000;
+                        margin-top: 40px;
+                        padding-top: 5px;
+                        font-weight: bold;
+                    }
+                    .footer {
+                        margin-top: 50px;
+                        font-size: 10px;
+                        text-align: left;
+                        font-style: italic;
+                    }
+                    @media print {
+                        body {
+                            padding: 0;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2>Republic of the Philippines</h2>
+                    <h2>Quezon City Government</h2>
+                    <h3>CITY GENERAL SERVICES DEPARTMENT</h3>
+                    <br/>
+                    <h1>REPORT ON THE PHYSICAL COUNT OF INVENTORIES</h1>
+                </div>
+
+                <div class="meta-info">
+                    <div>
+                        <strong>Report ID:</strong> \${item.inventory_report_id}<br/>
+                        <strong>Scope:</strong> \${item.inventory_request?.inventory_scope || 'General Asset Inventory'}<br/>
+                        <strong>Prepared By (Office):</strong> \${item.government_office?.office_name || 'System'}
+                    </div>
+                    <div>
+                        <strong>Date Prepared:</strong> \${item.preparation_date || new Date().toLocaleDateString()}<br/>
+                        <strong>Approval Status:</strong> \${item.approval_status.toUpperCase()}
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Item No.</th>
+                            <th>Description</th>
+                            <th>Unit of Measure</th>
+                            <th>Unit Value</th>
+                            <th>Quantity per Property Card</th>
+                            <th>Quantity per Physical Count</th>
+                            <th>Shortage/Overage</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 20px; font-style: italic;">
+                                Detailed inventory items will be attached here based on the scope: \${item.inventory_request?.inventory_scope || 'General Asset Inventory'}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div>
+                    <p>I hereby certify to the correctness of the above information based on actual physical count.</p>
+                </div>
+
+                <div class="signatures">
+                    <div class="signature-block">
+                        <p>Certified Correct by:</p>
+                        <div class="signature-line">
+                            CGSD Inventory Committee Member<br/>
+                            <span style="font-weight: normal; font-size: 10px;">Signature over Printed Name</span>
+                        </div>
+                    </div>
+                    <div class="signature-block">
+                        <p>Approved by:</p>
+                        <div class="signature-line">
+                            Head of Agency / Authorized Representative<br/>
+                            <span style="font-weight: normal; font-size: 10px;">Signature over Printed Name</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer">
+                    * Reference: COA Circular No. 2018-002, Property Inventory Form (PIF)
+                </div>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.open();
+            printWindow.document.write(reportHtml);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
+        } else {
+            toast.error('Could not open print window. Please allow popups.');
+        }
+    }
+
     return (
         <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
@@ -235,60 +441,60 @@ export default function ApprovalsPage() {
                 <div className="overflow-x-auto">
                     <div className="max-h-[60vh] overflow-y-auto">
                         <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="border-b border-border bg-muted/50">
-                                <th className="p-4 text-xs font-semibold text-muted-foreground w-1/4">Report ID</th>
-                                <th className="p-4 text-xs font-semibold text-muted-foreground w-1/3">Scope / Details</th>
-                                <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Prepared By</th>
-                                <th className="p-4 text-xs font-semibold text-muted-foreground w-[15%]">Status</th>
-                                <th className="p-4 text-xs font-semibold text-muted-foreground text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {isLoading ? (
-                                <tr>
-                                    <td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">
-                                        Loading submissions...
-                                    </td>
+                            <thead>
+                                <tr className="border-b border-border bg-muted/50">
+                                    <th className="p-4 text-xs font-semibold text-muted-foreground w-1/4">Report ID</th>
+                                    <th className="p-4 text-xs font-semibold text-muted-foreground w-1/3">Scope / Details</th>
+                                    <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Prepared By</th>
+                                    <th className="p-4 text-xs font-semibold text-muted-foreground w-[15%]">Status</th>
+                                    <th className="p-4 text-xs font-semibold text-muted-foreground text-right">Actions</th>
                                 </tr>
-                            ) : filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">
-                                        No submissions found.
-                                    </td>
-                                </tr>
-                            ) : filtered.map((item) => (
-                                <tr key={item.inventory_report_id} className="hover:bg-accent/50 transition-colors">
-                                    <td className="p-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
-                                                <FileText size={18} />
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {isLoading ? (
+                                    <tr>
+                                        <td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">
+                                            Loading submissions...
+                                        </td>
+                                    </tr>
+                                ) : filtered.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">
+                                            No submissions found.
+                                        </td>
+                                    </tr>
+                                ) : filtered.map((item) => (
+                                    <tr key={item.inventory_report_id} className="hover:bg-accent/50 transition-colors">
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
+                                                    <FileText size={18} />
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-sm text-foreground">{item.inventory_report_id}</div>
+                                                    <div className="text-xs text-muted-foreground">Report</div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div className="font-semibold text-sm text-foreground">{item.inventory_report_id}</div>
-                                                <div className="text-xs text-muted-foreground">Report</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="text-sm text-foreground font-medium truncate max-w-[250px]">{item.inventory_request?.inventory_scope || 'General Asset Inventory'}</div>
-                                        <div className="text-xs text-muted-foreground">Submitted: {item.preparation_date || 'N/A'}</div>
-                                    </td>
-                                    <td className="p-4 text-sm text-muted-foreground">{item.government_office?.office_name || 'System Generated'}</td>
-                                    <td className="p-4">
-                                        {item.approval_status === 'pending' && <Badge variant="warning" className="text-[10px] uppercase">Pending</Badge>}
-                                        {item.approval_status === 'approved' && <Badge variant="success" className="text-[10px] uppercase">Approved</Badge>}
-                                        {item.approval_status === 'returned_for_revision' && <Badge variant="destructive" className="text-[10px] uppercase">Returned</Badge>}
-                                        {item.approval_status === 'draft' && <Badge variant="secondary" className="text-[10px] uppercase">Draft</Badge>}
-                                    </td>
-                                    <td className="p-4 text-right">
-                                        <Button variant="ghost" size="sm" onClick={() => setSelectedItem(item)}>
-                                            <Eye size={16} className="mr-2" /> View
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
+                                        </td>
+                                        <td className="p-4">
+                                            <div className="text-sm text-foreground font-medium truncate max-w-[250px]">{item.inventory_request?.inventory_scope || 'General Asset Inventory'}</div>
+                                            <div className="text-xs text-muted-foreground">Submitted: {item.preparation_date || 'N/A'}</div>
+                                        </td>
+                                        <td className="p-4 text-sm text-muted-foreground">{item.government_office?.office_name || 'System Generated'}</td>
+                                        <td className="p-4">
+                                            {item.approval_status === 'pending' && <Badge variant="warning" className="text-[10px] uppercase">Pending</Badge>}
+                                            {item.approval_status === 'approved' && <Badge variant="success" className="text-[10px] uppercase">Approved</Badge>}
+                                            {item.approval_status === 'returned_for_revision' && <Badge variant="destructive" className="text-[10px] uppercase">Returned</Badge>}
+                                            {item.approval_status === 'draft' && <Badge variant="secondary" className="text-[10px] uppercase">Draft</Badge>}
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <Button variant="ghost" size="sm" onClick={() => setSelectedItem(item)}>
+                                                <Eye size={16} className="mr-2" /> View
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
                         </table>
                     </div>
                 </div>
@@ -320,7 +526,7 @@ export default function ApprovalsPage() {
                                     <div className="font-medium">{selectedItem.government_office?.office_name || 'System'}</div>
                                 </div>
                             </div>
-                            
+
                             {selectedItem.approval_status === 'returned_for_revision' && (
                                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-600 flex gap-2">
                                     <AlertTriangle size={16} className="shrink-0 mt-0.5" />
@@ -348,6 +554,13 @@ export default function ApprovalsPage() {
                                     </Button>
                                     <Button onClick={handleApprove} className="bg-success text-white hover:bg-success/90">
                                         <CheckCircle size={16} className="mr-2" /> Approve
+                                    </Button>
+                                </div>
+                            )}
+                            {selectedItem.approval_status === 'approved' && (
+                                <div className="flex justify-end gap-3 pt-4 border-t border-border">
+                                    <Button onClick={() => handleGenerateCOAReport(selectedItem)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                                        <Printer size={16} className="mr-2" /> Generate COA Report (PDF)
                                     </Button>
                                 </div>
                             )}
