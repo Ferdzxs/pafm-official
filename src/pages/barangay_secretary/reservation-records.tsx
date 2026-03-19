@@ -16,17 +16,14 @@ interface ReservationRecord {
   reservation_id: string;
   facility_name: string;
   applicant_name: string;
-  purpose: string;
+  time_slot: string;
   reservation_date: string;
-  status: "pending" | "forwarded" | "confirmed" | "rejected" | "completed";
-  filed_by_name: string;
+  status: "pending" | "confirmed" | "rejected" | "completed";
   created_at: string;
-  notes?: string | null;
 }
 
 const STATUS_BADGE: Record<string, string> = {
   pending: "badge-pending",
-  forwarded: "badge-pending",
   confirmed: "badge-approved",
   rejected: "badge-rejected",
   completed: "badge-completed",
@@ -35,7 +32,6 @@ const STATUS_BADGE: Record<string, string> = {
 const STATUS_OPTIONS = [
   "all",
   "pending",
-  "forwarded",
   "confirmed",
   "rejected",
   "completed",
@@ -43,17 +39,16 @@ const STATUS_OPTIONS = [
 
 interface RawReservationData {
   reservation_id: string;
-  purpose: string;
   reservation_date: string;
-  status: "pending" | "forwarded" | "confirmed" | "rejected" | "completed";
+  time_slot: string | null;
+  status: "pending" | "confirmed" | "rejected" | "completed";
   created_at: string;
-  notes: string | null;
   barangay_facility:
     | { facility_name: string }
     | { facility_name: string }[]
     | null;
-  constituent_records: { full_name: string } | { full_name: string }[] | null;
-  filed_by: { office_name: string } | { office_name: string }[] | null;
+  person: { full_name: string } | { full_name: string }[] | null;
+  applicant_person_id: string | null;
 }
 
 export default function BarangaySecretaryReservationRecords() {
@@ -68,10 +63,9 @@ export default function BarangaySecretaryReservationRecords() {
   const [constituents, setConstituents] = useState<{ id: string; name: string }[]>([]);
   const [formData, setFormData] = useState({
     facility_id: "",
-    constituent_id: "",
-    purpose: "",
+    applicant_person_id: "",
+    time_slot: "",
     reservation_date: "",
-    notes: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -83,14 +77,13 @@ export default function BarangaySecretaryReservationRecords() {
         .select(
           `
                     reservation_id,
-                    purpose,
                     reservation_date,
+                    time_slot,
                     status,
                     created_at,
-                    notes,
                     barangay_facility ( facility_name ),
-                    constituent_records ( full_name ),
-                    filed_by:office_records!filed_by_office ( office_name )
+                    person:applicant_person_id ( full_name ),
+                    applicant_person_id
                 `,
         )
         .order("created_at", { ascending: false });
@@ -103,23 +96,18 @@ export default function BarangaySecretaryReservationRecords() {
         const facility = Array.isArray(item.barangay_facility)
           ? item.barangay_facility[0]
           : item.barangay_facility;
-        const constituent = Array.isArray(item.constituent_records)
-          ? item.constituent_records[0]
-          : item.constituent_records;
-        const filedBy = Array.isArray(item.filed_by)
-          ? item.filed_by[0]
-          : item.filed_by;
+        const applicant = Array.isArray(item.person)
+          ? item.person[0]
+          : item.person;
 
         return {
           reservation_id: item.reservation_id,
           facility_name: facility?.facility_name || "N/A",
-          applicant_name: constituent?.full_name || "N/A",
-          purpose: item.purpose,
+          applicant_name: applicant?.full_name || "N/A",
+          time_slot: item.time_slot ?? "—",
           reservation_date: item.reservation_date,
           status: item.status,
-          filed_by_name: filedBy?.office_name || "System",
           created_at: item.created_at,
-          notes: item.notes || undefined,
         };
       });
 
@@ -141,12 +129,12 @@ export default function BarangaySecretaryReservationRecords() {
 
   const fetchSupportData = async () => {
     try {
-      const [{ data: facs }, { data: cons }] = await Promise.all([
-        supabase.from("barangay_facility").select("facility_id, facility_name"),
-        supabase.from("constituent_records").select("record_id, full_name"),
+      const [{ data: facs }, { data: persons }] = await Promise.all([
+        supabase.from("barangay_facility").select("barangay_facility_id, facility_name"),
+        supabase.from("person").select("person_id, full_name"),
       ]);
-      if (facs) setFacilities(facs.map(f => ({ id: f.facility_id, name: f.facility_name })));
-      if (cons) setConstituents(cons.map(c => ({ id: c.record_id, name: c.full_name })));
+      if (facs) setFacilities(facs.map((f: any) => ({ id: f.barangay_facility_id, name: f.facility_name })));
+      if (persons) setConstituents(persons.map((p: any) => ({ id: p.person_id, name: p.full_name })));
     } catch (err) {
       console.error("Error fetching support data:", err);
     }
@@ -154,7 +142,7 @@ export default function BarangaySecretaryReservationRecords() {
 
   const handleCreateReservation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.facility_id || !formData.constituent_id || !formData.purpose || !formData.reservation_date) {
+    if (!formData.facility_id || !formData.applicant_person_id || !formData.time_slot || !formData.reservation_date) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -162,12 +150,11 @@ export default function BarangaySecretaryReservationRecords() {
     try {
       setSaving(true);
       const { error } = await supabase.from("barangay_reservation_record").insert({
-        facility_id: formData.facility_id,
-        constituent_id: formData.constituent_id,
-        purpose: formData.purpose,
+        barangay_facility_id: formData.facility_id,
+        applicant_person_id: formData.applicant_person_id,
         reservation_date: formData.reservation_date,
+        time_slot: formData.time_slot,
         status: "pending",
-        notes: formData.notes || null,
       });
 
       if (error) throw error;
@@ -176,10 +163,9 @@ export default function BarangaySecretaryReservationRecords() {
       setShowAddModal(false);
       setFormData({
         facility_id: "",
-        constituent_id: "",
-        purpose: "",
+        applicant_person_id: "",
+        time_slot: "",
         reservation_date: "",
-        notes: "",
       });
       fetchData();
     } catch (error: unknown) {
@@ -193,7 +179,7 @@ export default function BarangaySecretaryReservationRecords() {
 
   const handleUpdateStatus = async (
     id: string,
-    newStatus: "pending" | "rejected",
+    newStatus: "confirmed" | "rejected",
   ) => {
     try {
       setUpdating(id);
@@ -205,7 +191,7 @@ export default function BarangaySecretaryReservationRecords() {
       if (error) throw error;
 
       toast.success(
-        `Reservation ${newStatus === "pending" ? "forwarded to PB" : "rejected"} successfully`,
+        `Reservation ${newStatus === "confirmed" ? "confirmed" : "rejected"} successfully`,
       );
       setReservations((prev) =>
         prev.map((r) =>
@@ -257,7 +243,7 @@ export default function BarangaySecretaryReservationRecords() {
             className="text-sm mt-0.5"
             style={{ color: "var(--color-text-muted)" }}
           >
-            Barangay_Reservation_Record — Filed & forwarded requests
+            Barangay_Reservation_Record — Reservations
           </p>
         </div>
         <button
@@ -410,7 +396,7 @@ export default function BarangaySecretaryReservationRecords() {
                     className="px-4 py-3 text-sm max-w-45 truncate"
                     style={{ color: "var(--color-text-muted)" }}
                   >
-                    {rec.purpose}
+                    {rec.time_slot}
                   </td>
                   <td
                     className="px-4 py-3 text-sm"
@@ -450,23 +436,8 @@ export default function BarangaySecretaryReservationRecords() {
                           >
                             <Eye size={14} />
                           </button>
-                          {(rec.status === "forwarded" ||
-                            rec.status === "pending") && (
+                          {rec.status === "pending" && (
                             <>
-                              {rec.status === "forwarded" && (
-                                <button
-                                  className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-400/10 transition-colors"
-                                  title="Forward to PB"
-                                  onClick={() =>
-                                    handleUpdateStatus(
-                                      rec.reservation_id,
-                                      "pending",
-                                    )
-                                  }
-                                >
-                                  <CheckCircle size={14} />
-                                </button>
-                              )}
                               <button
                                 className="p-1.5 rounded-lg text-red-400 hover:bg-red-400/10 transition-colors"
                                 title="Reject"
@@ -541,7 +512,7 @@ export default function BarangaySecretaryReservationRecords() {
               {[
                 ["Facility", selected.facility_name],
                 ["Applicant", selected.applicant_name],
-                ["Purpose", selected.purpose],
+                ["Time Slot", selected.time_slot],
                 [
                   "Event Date",
                   new Date(selected.reservation_date).toLocaleDateString(
@@ -549,12 +520,10 @@ export default function BarangaySecretaryReservationRecords() {
                   ),
                 ],
                 ["Status", selected.status],
-                ["Filed By", selected.filed_by_name],
                 [
                   "Submitted",
                   new Date(selected.created_at).toLocaleString("en-PH"),
                 ],
-                ...(selected.notes ? [["Notes", selected.notes]] : []),
               ].map(([l, v]) => (
                 <div
                   key={l}
@@ -588,22 +557,8 @@ export default function BarangaySecretaryReservationRecords() {
                 </div>
               ) : (
                 <>
-                  {(selected.status === "forwarded" ||
-                    selected.status === "pending") && (
+                  {selected.status === "pending" && (
                     <>
-                      {selected.status === "forwarded" && (
-                        <button
-                          className="btn-success flex-1 justify-center"
-                          onClick={() =>
-                            handleUpdateStatus(
-                              selected.reservation_id,
-                              "pending",
-                            )
-                          }
-                        >
-                          <CheckCircle size={14} /> Forward to PB
-                        </button>
-                      )}
                       <button
                         className="btn-danger flex-1 justify-center"
                         onClick={() =>
@@ -655,8 +610,8 @@ export default function BarangaySecretaryReservationRecords() {
                   <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Applicant *</label>
                   <select 
                     className="input-field" 
-                    value={formData.constituent_id} 
-                    onChange={e => setFormData({...formData, constituent_id: e.target.value})}
+                    value={formData.applicant_person_id} 
+                    onChange={e => setFormData({...formData, applicant_person_id: e.target.value})}
                   >
                     <option value="" disabled>Select Constituent</option>
                     {constituents.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -675,22 +630,12 @@ export default function BarangaySecretaryReservationRecords() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Purpose / Details *</label>
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Time Slot / Details *</label>
                 <textarea 
                   className="input-field min-h-20" 
-                  placeholder="Official purpose of reservation" 
-                  value={formData.purpose} 
-                  onChange={e => setFormData({...formData, purpose: e.target.value})}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Additional Notes</label>
-                <textarea 
-                  className="input-field" 
-                  placeholder="Internal notes or specific requirements" 
-                  value={formData.notes} 
-                  onChange={e => setFormData({...formData, notes: e.target.value})}
+                  placeholder="e.g. 08:00-12:00 | Community meeting" 
+                  value={formData.time_slot} 
+                  onChange={e => setFormData({...formData, time_slot: e.target.value})}
                 />
               </div>
 

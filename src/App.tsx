@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import type { UserRole } from "@/types";
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 import AppLayout from "@/components/layout/AppLayout";
@@ -59,6 +60,7 @@ import ApplyWaterPage from "@/pages/citizen/apply-utility_request";
 import ApplyBarangayFacilityPage from "@/pages/citizen/apply-barangay";
 import MyApplicationsPage from "@/pages/citizen/my-applications";
 import ApplyPark from "@/pages/citizen/apply-park";
+import CitizenParkApplicationFormPage from "@/pages/citizen/park-application-form";
 
 // ─── Utility Engineering & Helpdesk ─────────────────────────────────────────
 import ServiceTicketsPage from "@/pages/utility_engineering/service-tickets";
@@ -75,6 +77,10 @@ import TreasurerTransactionsPage from "@/pages/treasurer/TransactionsPage";
 // ─── System Admin ────────────────────────────────────────────────────────────
 import UserManagementPage from "@/pages/system_admin/user-role-management";
 import LegacyMigrationPage from "@/pages/system_admin/legacy-migration";
+import SystemAdminAuditLogsPage from "@/pages/system_admin/audit-logs";
+import SystemAdminSettingsPage from "@/pages/system_admin/system-settings";
+import OfficeManagementPage from "@/pages/system_admin/office-management";
+import EmployeeMasterPage from "@/pages/system_admin/employee-master";
 import MyDocumentsPage from "./pages/citizen/my-documents";
 
 // ─── Parks Admin (detailed pages) ────────────────────────────────────────────
@@ -122,6 +128,30 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function RoleRoute({
+  allow,
+  children,
+}: {
+  allow: UserRole[];
+  children: React.ReactNode;
+}) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!allow.includes(user.role)) return <Navigate to={`/${user.role}/dashboard`} replace />;
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "system_admin") {
+    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  }
   return <>{children}</>;
 }
 
@@ -290,14 +320,37 @@ function AppRoutes() {
         <Route path="death/approvals" element={<DeathApprovalsSigningPage />} />
 
         {/* ── Citizen ── */}
-        <Route path="citizen/applications" element={<MyApplicationsPage />} />
+        <Route
+          path="citizen/applications"
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <MyApplicationsPage />
+            </RoleRoute>
+          }
+        />
         <Route
           path="citizen/apply/burial"
-          element={<CitizenBurialApplicationPage />}
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <CitizenBurialApplicationPage />
+            </RoleRoute>
+          }
         />
         <Route
           path="citizen/apply/park"
-          element={<ApplyPark />}
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <ApplyPark />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="citizen/parks/:reservationId/application"
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <CitizenParkApplicationFormPage />
+            </RoleRoute>
+          }
         />
         <Route
           path="citizen/apply/barangay"
@@ -317,35 +370,70 @@ function AppRoutes() {
         {/* ── Parks ── */}
         <Route
           path="parks/venues"
-          element={<ParkVenues />}
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <ParkVenues />
+            </RoleRoute>
+          }
         />
         <Route
           path="parks/reservations"
-          element={<Reservations />}
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <Reservations />
+            </RoleRoute>
+          }
         />
         <Route
           path="parks/usage-logs"
-          element={<SiteUsageLogs />}
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <SiteUsageLogs />
+            </RoleRoute>
+          }
         />
         <Route
           path="parks/calendar"
-          element={<BookingCalendar />}
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <BookingCalendar />
+            </RoleRoute>
+          }
         />
         <Route
           path="parks/asset-requests"
-          element={<ParksAssetRequestsPage />}
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <Navigate to="/assets/requests" replace />
+            </RoleRoute>
+          }
         />
 
         {/* ── Parks (Reservation Desk) ── */}
         <Route
           path="parks/desk-reservations"
-          element={<ReservationRecordsPage />}
+          element={
+            <RoleRoute allow={["reservation_officer"]}>
+              <ReservationRecordsPage />
+            </RoleRoute>
+          }
         />
         <Route
           path="parks/desk-approvals"
-          element={<ReservationApprovalsPage />}
+          element={
+            <RoleRoute allow={["reservation_officer"]}>
+              <ReservationApprovalsPage />
+            </RoleRoute>
+          }
         />
-        <Route path="parks/desk-permits" element={<PermitsPaymentsPage />} />
+        <Route
+          path="parks/desk-permits"
+          element={
+            <RoleRoute allow={["reservation_officer"]}>
+              <PermitsPaymentsPage />
+            </RoleRoute>
+          }
+        />
 
         {/* ── Barangay (shared) ── */}
         <Route
@@ -444,27 +532,55 @@ function AppRoutes() {
           }
         />
 
-        {/* ── Admin ── */}
-        <Route path="admin/users" element={<UserManagementPage />} />
+        {/* ── Admin (System Admin only) ── */}
+        <Route
+          path="admin/users"
+          element={
+            <AdminRoute>
+              <UserManagementPage />
+            </AdminRoute>
+          }
+        />
         <Route
           path="admin/audit"
           element={
-            <PlaceholderPage
-              title="Audit Logs"
-              description="System-wide audit log of all key data changes."
-            />
+            <AdminRoute>
+              <SystemAdminAuditLogsPage />
+            </AdminRoute>
           }
         />
-        <Route path="admin/settings" element={<SettingsPage />} />
+        <Route
+          path="admin/settings"
+          element={
+            <AdminRoute>
+              <SystemAdminSettingsPage />
+            </AdminRoute>
+          }
+        />
         <Route
           path="admin/offices"
-          element={<PlaceholderPage title="Office Management" />}
+          element={
+            <AdminRoute>
+              <OfficeManagementPage />
+            </AdminRoute>
+          }
         />
         <Route
           path="admin/employees"
-          element={<PlaceholderPage title="Employee Master List" />}
+          element={
+            <AdminRoute>
+              <EmployeeMasterPage />
+            </AdminRoute>
+          }
         />
-        <Route path="admin/migration" element={<LegacyMigrationPage />} />
+        <Route
+          path="admin/migration"
+          element={
+            <AdminRoute>
+              <LegacyMigrationPage />
+            </AdminRoute>
+          }
+        />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

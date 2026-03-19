@@ -43,7 +43,8 @@ CREATE TABLE system_users (
     department      TEXT,
     contact_no      TEXT,
     is_active       BOOLEAN DEFAULT TRUE,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    password_hash   TEXT
 );
 
 ALTER TABLE system_users ENABLE ROW LEVEL SECURITY;
@@ -362,6 +363,9 @@ DROP TABLE IF EXISTS citizen_account             CASCADE;
 DROP TABLE IF EXISTS employee                    CASCADE;
 DROP TABLE IF EXISTS government_office           CASCADE;
 DROP TABLE IF EXISTS person                      CASCADE;
+DROP TABLE IF EXISTS audit_logs                  CASCADE;
+DROP TABLE IF EXISTS system_settings             CASCADE;
+DROP TABLE IF EXISTS system_backups              CASCADE;
 
 -- ══════════════════════════════════════════════════════════════════════
 -- CORE ENTITIES
@@ -423,7 +427,9 @@ CREATE TABLE employee (
     department      TEXT,
     employee_no     TEXT,
     contact_number  TEXT,
-    is_active       BOOLEAN DEFAULT TRUE
+    is_active       BOOLEAN DEFAULT TRUE,
+    email           TEXT,
+    system_user_id  UUID REFERENCES system_users(user_id)
 );
 
 INSERT INTO employee VALUES

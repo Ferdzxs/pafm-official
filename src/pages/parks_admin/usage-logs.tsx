@@ -425,6 +425,8 @@ export default function SiteUsageLogs() {
   const { user } = useAuth()
 
   const [logs, setLogs]       = useState<UsageLog[]>([])
+  const [eligible, setEligible] = useState<any[]>([])
+  const [adminOffices, setAdminOffices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
@@ -433,6 +435,11 @@ export default function SiteUsageLogs() {
   const [filterCompliance, setFilterCompliance] = useState<"all" | "compliant" | "issue" | "no_show">("all")
 
   const [viewLog, setViewLog] = useState<UsageLog | null>(null)
+  const [createFor, setCreateFor] = useState<any | null>(null)
+  const [createRemarks, setCreateRemarks] = useState("")
+  const [createConducted, setCreateConducted] = useState(true)
+  const [createOfficeId, setCreateOfficeId] = useState("")
+  const [createSaving, setCreateSaving] = useState(false)
 
   useEffect(() => { void loadData() }, [])
 
@@ -455,12 +462,13 @@ export default function SiteUsageLogs() {
         .order("usage_id", { ascending: false })
 
       if (e1) throw new Error(`Usage logs: ${e1.message}`)
-      if (!rawLogs || rawLogs.length === 0) { setLogs([]); return }
+      const safeLogs = rawLogs ?? []
+      if (safeLogs.length === 0) setLogs([])
 
       // ── 2. Collect unique FKs from site_usage_log ─────────────
-      const reservationIds = [...new Set(rawLogs.map((l: any) => l.reservation_id).filter(Boolean))]  as string[]
-      const officeIds      = [...new Set(rawLogs.map((l: any) => l.monitored_by_office).filter(Boolean))] as string[]
-      const permitDocIds   = [...new Set(rawLogs.map((l: any) => l.permit_document).filter(Boolean))]  as string[]
+      const reservationIds = [...new Set(safeLogs.map((l: any) => l.reservation_id).filter(Boolean))]  as string[]
+      const officeIds      = [...new Set(safeLogs.map((l: any) => l.monitored_by_office).filter(Boolean))] as string[]
+      const permitDocIds   = [...new Set(safeLogs.map((l: any) => l.permit_document).filter(Boolean))]  as string[]
 
       // ── 3. park_reservation_record (BPMN Steps 13–14) ─────────
       // Note: payment_id column needed for BPMN Steps 10–12
@@ -548,7 +556,7 @@ export default function SiteUsageLogs() {
       ;(payments     ?? []).forEach((p: any) => { paymentMap[p.payment_id]        = p })
 
       // ── 7. Merge all data into each log ───────────────────────
-      const merged: UsageLog[] = rawLogs.map((l: any) => {
+      const merged: UsageLog[] = safeLogs.map((l: any) => {
         const res = resMap[l.reservation_id] ?? null
         return {
           ...l,
@@ -562,10 +570,87 @@ export default function SiteUsageLogs() {
       })
 
       setLogs(merged)
+
+      // ── 8. Eligible reservations without monitoring log (BPMN Step 15 input) ──
+      const today = new Date().toISOString().split("T")[0]
+      const { data: rel, error: e8 } = await supabase
+        .from("park_reservation_record")
+        .select("reservation_id, reservation_date, time_slot, status, park_venue(park_venue_name), person:applicant_person_id(full_name), applicant_person_id")
+        .in("status", ["permit_released"])
+        .lte("reservation_date", today)
+        .order("reservation_date", { ascending: false })
+      if (e8) throw new Error(e8.message)
+      const loggedSet = new Set(reservationIds)
+      setEligible((rel ?? []).filter((r: any) => !loggedSet.has(r.reservation_id)))
+
+      // ── 9. Admin offices for monitoring office selection ───────────────────
+      const { data: adminOfficesData, error: e9 } = await supabase
+        .from("administration_office")
+        .select("admin_office_id, office_name, parent_department, location")
+        .order("office_name")
+      if (e9) throw new Error(e9.message)
+      setAdminOffices(adminOfficesData ?? [])
+      if (!createOfficeId && (adminOfficesData?.[0]?.admin_office_id)) {
+        setCreateOfficeId(adminOfficesData[0].admin_office_id)
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load usage logs.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function createLog() {
+    if (!createFor) return
+    if (!createOfficeId) {
+      setError("Please select monitoring office.")
+      return
+    }
+    setCreateSaving(true)
+    setError(null)
+    try {
+      const usageId = `SUL-${Date.now()}`
+      const { error: e1 } = await supabase.from("site_usage_log").insert({
+        usage_id: usageId,
+        reservation_id: createFor.reservation_id,
+        permit_document: null,
+        monitored_by_office: createOfficeId,
+        remarks: createRemarks || null,
+        event_conducted_flag: createConducted,
+      })
+      if (e1) throw new Error(e1.message)
+
+      if (createConducted) {
+        await supabase
+          .from("park_reservation_record")
+          .update({ status: "completed" })
+          .eq("reservation_id", createFor.reservation_id)
+
+        const { data: acct } = await supabase
+          .from("citizen_account")
+          .select("account_id")
+          .eq("person_id", createFor.applicant_person_id)
+          .maybeSingle()
+        if (acct?.account_id) {
+          await supabase.from("notification_log").insert({
+            notif_id: `NLOG-${Date.now()}`,
+            account_id: acct.account_id,
+            module_reference: "parks",
+            reference_id: createFor.reservation_id,
+            notif_type: "reservation_completed",
+            message: `Your park reservation ${createFor.reservation_id} has been marked completed.`,
+          })
+        }
+      }
+
+      setCreateFor(null)
+      setCreateRemarks("")
+      setCreateConducted(true)
+      await loadData()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to create monitoring log.")
+    } finally {
+      setCreateSaving(false)
     }
   }
 
@@ -637,6 +722,39 @@ export default function SiteUsageLogs() {
           </button>
         </div>
       )}
+
+      {/* CREATE QUEUE — BPMN Step 15 */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle>Monitoring Queue (Create Usage Log)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {eligible.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No released permits awaiting monitoring logs.</p>
+          ) : (
+            <div className="space-y-2">
+              {eligible.slice(0, 8).map((r: any) => (
+                <div
+                  key={r.reservation_id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-border-subtle bg-card px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-foreground">
+                      {r.reservation_id} · {r.park_venue?.park_venue_name ?? "—"}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {r.person?.full_name ?? "Unknown"} · {r.reservation_date} · {r.time_slot ?? "—"}
+                    </div>
+                  </div>
+                  <button className="btn-primary shrink-0" onClick={() => setCreateFor(r)}>
+                    Create log
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* KPI CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -940,6 +1058,64 @@ export default function SiteUsageLogs() {
       {/* DETAIL MODAL */}
       {viewLog && (
         <DetailModal log={viewLog} onClose={() => setViewLog(null)} />
+      )}
+
+      {/* CREATE LOG MODAL */}
+      {createFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+              <h2 className="text-sm font-semibold text-slate-100">
+                Create Usage Log — {createFor.reservation_id}
+              </h2>
+              <button onClick={() => setCreateFor(null)} className="text-slate-500 hover:text-slate-100 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
+                  Monitoring office
+                </label>
+                <select className="input-field" value={createOfficeId} onChange={(e) => setCreateOfficeId(e.target.value)}>
+                  <option value="">Select office…</option>
+                  {adminOffices.map((o: any) => (
+                    <option key={o.admin_office_id} value={o.admin_office_id}>
+                      {o.office_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm text-slate-200">
+                <input type="checkbox" checked={createConducted} onChange={(e) => setCreateConducted(e.target.checked)} />
+                Event conducted as scheduled
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
+                  Monitoring remarks
+                </label>
+                <textarea
+                  rows={4}
+                  className="input-field"
+                  placeholder="Notes, compliance issues, incidents, cleanup, etc."
+                  value={createRemarks}
+                  onChange={(e) => setCreateRemarks(e.target.value)}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button className="btn-secondary" onClick={() => setCreateFor(null)} disabled={createSaving}>
+                  Cancel
+                </button>
+                <button className="btn-primary" onClick={createLog} disabled={createSaving}>
+                  {createSaving ? "Saving…" : "Save log"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

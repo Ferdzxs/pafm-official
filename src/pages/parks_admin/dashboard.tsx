@@ -124,6 +124,7 @@ export default function ParksAdminDashboard() {
         reservation_id,
         reservation_date,
         time_slot,
+        status,
         park_venue (
           park_venue_name
         ),
@@ -131,7 +132,7 @@ export default function ParksAdminDashboard() {
           full_name
         )
       `)
-      .eq("status", "pending")
+      .in("status", ["endorsed_to_admin", "pending"])
       .order("reservation_date", { ascending: true })
       .limit(5)
 

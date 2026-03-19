@@ -374,6 +374,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       // Only fetch if relevant for the current role
       const isBrgyUser =
         user.role === "punong_barangay" || user.role === "barangay_secretary";
+      const isParksAdmin = user.role === "parks_admin";
+      const isDesk = user.role === "reservation_officer";
 
       if (isBrgyUser) {
         const { count, error } = await supabase
@@ -385,25 +387,49 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           setBadgeCounts((prev) => ({ ...prev, pending_bar_res: count }));
         }
       }
+
+      if (isParksAdmin) {
+        const { count, error } = await supabase
+          .from("park_reservation_record")
+          .select("*", { count: "exact", head: true })
+          .in("status", ["endorsed_to_admin", "pending"]);
+
+        if (!error && count !== null) {
+          setBadgeCounts((prev) => ({ ...prev, pending_park_res: count }));
+        }
+      }
+
+      if (isDesk) {
+        const { count, error } = await supabase
+          .from("park_reservation_record")
+          .select("*", { count: "exact", head: true })
+          .in("status", ["pending", "pending_loi", "desk_logged"]);
+
+        if (!error && count !== null) {
+          setBadgeCounts((prev) => ({ ...prev, pending_park_res: count }));
+        }
+      }
     };
 
     fetchCounts();
 
-    // Subscription for real-time updates
+    // Subscription for real-time updates (role-scoped tables)
+    const tables: string[] = [];
+    if (user.role === "punong_barangay" || user.role === "barangay_secretary") tables.push("barangay_reservation_record");
+    if (user.role === "parks_admin" || user.role === "reservation_officer") tables.push("park_reservation_record");
+
     const channel = supabase
       .channel("db-changes")
-      .on(
+      ;
+
+    tables.forEach((table) => {
+      channel.on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "barangay_reservation_record",
-        },
-        () => {
-          fetchCounts();
-        },
-      )
-      .subscribe();
+        { event: "*", schema: "public", table },
+        () => fetchCounts(),
+      );
+    });
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);

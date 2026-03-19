@@ -21,7 +21,8 @@ const RECENT_ACTIVITY = [
 const QUICK_ACTIONS = [
     { label: 'Manage Users', emoji: '👥', path: '/admin/users' },
     { label: 'View Audit Logs', emoji: '📜', path: '/admin/audit' },
-    { label: 'Legacy Migration', emoji: '📦', path: '/admin/migration' },
+    { label: 'Backups', emoji: '💾', path: '/admin/migration' },
+    { label: 'Government Directory', emoji: '🏛️', path: '/admin/employees' },
 ]
 
 const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'secondary'> = {

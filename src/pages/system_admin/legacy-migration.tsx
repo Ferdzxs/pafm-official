@@ -1,193 +1,465 @@
-import React, { useState } from 'react'
-import { Upload, AlertTriangle, CheckCircle, Database, FileText, PlayCircle, Download } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { CalendarClock, Download, RefreshCw, Save, Database, PlayCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
+import { fetchBackups, fetchSystemSettings, logBackupRow, updateSystemSetting } from '@/lib/admin'
 
-type MigrationPhase = 'upload' | 'mapping' | 'preview' | 'execute' | 'done'
+type BackupRow = {
+  id: string
+  filename: string
+  date: string
+  type: string
+  size: string | null
+  status: string
+}
 
-const LEGACY_COLUMNS = ['legacy_fullname', 'legacy_address', 'legacy_contact', 'legacy_dob', 'legacy_death_cert_no', 'legacy_date_of_death', 'legacy_burial_date', 'legacy_death_cert_no']
-const SYSTEM_COLUMNS = ['Person.full_name', 'Person.address', 'Person.contact_number', 'Person.date_of_birth', 'Deceased.death_certificate_no', 'Deceased.date_of_death', 'Burial_Record.burial_date', '(skip)']
+type BackupSchedule = {
+  enabled: boolean
+  frequency: 'daily' | 'weekly' | 'monthly'
+  timeOfDay: string // HH:mm
+  tables: string[]
+  nextRunAt: string | null // ISO
+}
 
-const MOCK_PREVIEW = [
-    { legacy_fullname: 'DELA CRUZ, MARIA SOCORRO', legacy_address: 'Blk 4 Lot 2, QC', legacy_contact: '09171234567', legacy_death_cert_no: 'DC-1998-0001', legacy_date_of_death: '1998-03-12', legacy_burial_date: '1998-03-15', _status: 'ok' },
-    { legacy_fullname: 'SANTOS, JOSE SR.', legacy_address: 'Brgy. 123, QC', legacy_contact: '', legacy_death_cert_no: 'DC-2001-0042', legacy_date_of_death: '2001-07-28', legacy_burial_date: '2001-08-01', _status: 'ok' },
-    { legacy_fullname: 'REYES,  CARMEN', legacy_address: 'QC', legacy_contact: '09281234567', legacy_death_cert_no: '', legacy_date_of_death: '2005-11-15', legacy_burial_date: '2005-11-18', _status: 'warn' },
-    { legacy_fullname: 'DELA CRUZ, MARIA SOCORRO', legacy_address: 'Blk 4 Lot 2, QC', legacy_contact: '09171234567', legacy_death_cert_no: 'DC-1998-0001', legacy_date_of_death: '1998-03-12', legacy_burial_date: '1998-03-15', _status: 'dupe' },
+// Full database backup tables (derived from init_db.sql + admin tables used in app)
+const ALL_TABLES = [
+  'system_users',
+  'burial_applications',
+  'service_tickets',
+  'constituent_records',
+  'barangay_ordinances',
+  'barangay_documents',
+  'asset_inventory',
+  'person',
+  'system_users',
+  'government_office',
+  'employee',
+  'citizen_account',
+  'digital_document',
+  'digital_payment',
+  'notification_log',
+  'deceased',
+  'cemetery',
+  'funeral_home',
+  'niche_record',
+  'indigent_assistance_record',
+  'burial_record',
+  'online_burial_application',
+  'administration_office',
+  'park_venue',
+  'park_reservation_record',
+  'site_usage_log',
+  'barangay',
+  'barangay_facility',
+  'barangay_reservation_record',
+  'barangay_reservation_approval',
+  'water_connection_request',
+  'hcdrd_clearance',
+  'technical_assessment',
+  'installation_record',
+  'leak_report',
+  'excavation_clearance',
+  'leak_repair_record',
+  'drainage_request',
+  'drainage_inspection_report',
+  'program_of_works',
+  'drainage_repair_record',
+  'property',
+  'inventory_request',
+  'ocular_inspection',
+  'inventory_report',
+  'approval_record',
+  'submission_record',
+
+  // Admin/support tables referenced by the app (may exist in your DB even if not created in init_db.sql)
+  'audit_logs',
+  'system_settings',
+  'system_backups',
 ]
 
+const SETTINGS_KEY = 'backup_schedule'
+
+function downloadJson(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  return blob.size
+}
+
+function toSizeString(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  if (kb < 1024) return `${kb.toFixed(1)} KB`
+  const mb = kb / 1024
+  if (mb < 1024) return `${mb.toFixed(1)} MB`
+  const gb = mb / 1024
+  return `${gb.toFixed(2)} GB`
+}
+
+function computeNextRun(now: Date, frequency: BackupSchedule['frequency'], timeOfDay: string) {
+  const [hh, mm] = timeOfDay.split(':').map(v => Number(v))
+  const base = new Date(now)
+  base.setSeconds(0, 0)
+  base.setHours(Number.isFinite(hh) ? hh : 2, Number.isFinite(mm) ? mm : 0, 0, 0)
+
+  const next = new Date(base)
+  if (next <= now) {
+    if (frequency === 'daily') next.setDate(next.getDate() + 1)
+    if (frequency === 'weekly') next.setDate(next.getDate() + 7)
+    if (frequency === 'monthly') next.setMonth(next.getMonth() + 1)
+  }
+  return next
+}
+
+async function loadScheduleFromSettings(): Promise<BackupSchedule | null> {
+  const rows = await fetchSystemSettings()
+  const found = rows.find((r: any) => r.key === SETTINGS_KEY)
+  if (!found) return null
+  try {
+    const v = typeof found.value === 'string' ? JSON.parse(found.value) : found.value
+    return v as BackupSchedule
+  } catch {
+    return null
+  }
+}
+
 export default function LegacyMigration() {
-    const [phase, setPhase] = useState<MigrationPhase>('upload')
-    const [mapping, setMapping] = useState<Record<string, string>>({
-        legacy_fullname: 'Person.full_name', legacy_address: 'Person.address',
-        legacy_contact: 'Person.contact_number', legacy_dob: 'Person.date_of_birth',
-        legacy_death_cert_no: 'Deceased.death_certificate_no', legacy_date_of_death: 'Deceased.date_of_death',
-        legacy_burial_date: 'Burial_Record.burial_date',
-    })
-    const [executing, setExecuting] = useState(false)
+  const { user } = useAuth()
+  const canManage = user?.role === 'system_admin'
 
-    const handleExecute = () => {
-        setExecuting(true)
-        setTimeout(() => { setExecuting(false); setPhase('done') }, 2000)
+  const [isLoading, setIsLoading] = useState(false)
+  const [backups, setBackups] = useState<BackupRow[]>([])
+
+  const [schedule, setSchedule] = useState<BackupSchedule>({
+    enabled: false,
+    frequency: 'daily',
+    timeOfDay: '02:00',
+    tables: ALL_TABLES,
+    nextRunAt: null,
+  })
+
+  const runnerBusyRef = useRef(false)
+
+  const scheduleLabel = useMemo(() => {
+    const base = `${schedule.frequency} @ ${schedule.timeOfDay}`
+    return schedule.enabled ? base : `Disabled (${base})`
+  }, [schedule.enabled, schedule.frequency, schedule.timeOfDay])
+
+  const refreshBackups = async () => {
+    try {
+      const data = (await fetchBackups()) as any[]
+      setBackups(data as BackupRow[])
+    } catch (err: any) {
+      console.error('Failed to load backups', err)
+      toast.error('Failed to load backups list.')
     }
+  }
 
-    return (
-        <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in max-w-4xl">
-            <div className="mb-6">
-                <h1 className="font-display text-2xl font-bold text-white">Legacy Registry Migration</h1>
-                <p className="text-slate-400 text-sm mt-0.5">Import historical cemetery & burial records into the system</p>
-            </div>
+  const refreshSchedule = async () => {
+    try {
+      const s = await loadScheduleFromSettings()
+      if (s) {
+        setSchedule(prev => ({ ...prev, ...s }))
+        return
+      }
+      // fallback to localStorage if settings table is not available
+      const raw = localStorage.getItem(SETTINGS_KEY)
+      if (raw) setSchedule(prev => ({ ...prev, ...(JSON.parse(raw) as any) }))
+    } catch (err) {
+      // ignore
+    }
+  }
 
-            {/* Phase stepper */}
-            <div className="flex items-center gap-2 mb-8">
-                {(['upload', 'mapping', 'preview', 'execute', 'done'] as MigrationPhase[]).map((p, i) => (
-                    <React.Fragment key={p}>
-                        <div
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
-                            style={{
-                                background: phase === p ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)',
-                                color: phase === p ? '#60a5fa' : '#64748b',
-                                border: `1px solid ${phase === p ? 'rgba(59,130,246,0.3)' : 'rgba(148,163,184,0.08)'}`,
-                            }}
-                            onClick={() => setPhase(p)}
-                        >
-                            <span>{i + 1}.</span>
-                            <span className="capitalize">{p}</span>
-                        </div>
-                        {i < 4 && <div className="h-px flex-1" style={{ background: 'rgba(148,163,184,0.1)' }} />}
-                    </React.Fragment>
-                ))}
-            </div>
+  const persistSchedule = async (next: BackupSchedule) => {
+    const normalized: BackupSchedule = {
+      ...next,
+      // Keep schedule tables pinned to ALL_TABLES for full backups
+      tables: ALL_TABLES,
+    }
+    try {
+      await updateSystemSetting(SETTINGS_KEY, normalized, 'Automatic backup schedule (UI-managed)')
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalized))
+      setSchedule(normalized)
+      toast.success('Backup schedule saved.')
+    } catch (err: any) {
+      console.error('Failed to save schedule', err)
+      // local fallback so schedule UI still works in prototype environments
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(normalized))
+      setSchedule(normalized)
+      toast.error('Saved locally, but failed to save to database settings.')
+    }
+  }
 
-            {/* ─── Upload Phase ─── */}
-            {phase === 'upload' && (
-                <div className="space-y-5 animate-fade-in">
-                    <div
-                        className="glass rounded-2xl p-10 text-center cursor-pointer hover:bg-white/5 transition-all"
-                        style={{ border: '2px dashed rgba(148,163,184,0.2)' }}
-                        onClick={() => setPhase('mapping')}
-                    >
-                        <Upload size={32} className="mx-auto mb-4 text-slate-400" />
-                        <h3 className="text-white font-semibold mb-1">Upload CSV or Excel File</h3>
-                        <p className="text-slate-400 text-sm mb-4">Drag and drop your legacy registry file or click to browse</p>
-                        <span className="btn-primary">Browse Files</span>
-                    </div>
-                    <div className="glass rounded-xl p-4 text-sm text-slate-400" style={{ border: '1px solid rgba(148,163,184,0.08)' }}>
-                        <strong className="text-white">Supported formats:</strong> CSV, XLSX, XLS. Max file size: 50MB.
-                        Records must include at minimum: full name, date of death, and death certificate number.
-                    </div>
-                </div>
-            )}
+  const fetchAllRows = async (table: string) => {
+    const pageSize = 1000
+    let from = 0
+    const all: any[] = []
+    for (;;) {
+      const { data, error } = await supabase
+        .from(table)
+        .select('*')
+        .range(from, from + pageSize - 1)
+      if (error) throw new Error(`${table}: ${error.message}`)
+      const chunk = (data ?? []) as any[]
+      all.push(...chunk)
+      if (chunk.length < pageSize) break
+      from += pageSize
+    }
+    return all
+  }
 
-            {/* ─── Mapping Phase ─── */}
-            {phase === 'mapping' && (
-                <div className="animate-fade-in">
-                    <div className="glass rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid rgba(148,163,184,0.08)' }}>
-                        <div className="px-5 py-3 bg-white/3 text-sm font-semibold text-white" style={{ borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
-                            Field Mapping — Legacy Column → System Field
-                        </div>
-                        <div className="p-5 space-y-3">
-                            {LEGACY_COLUMNS.slice(0, 7).map(col => (
-                                <div key={col} className="flex items-center gap-4">
-                                    <div className="flex-1 px-3 py-2 rounded-lg text-sm font-mono text-blue-300" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
-                                        {col}
-                                    </div>
-                                    <span className="text-slate-500">→</span>
-                                    <select
-                                        className="flex-1 input-field text-sm"
-                                        value={mapping[col] ?? '(skip)'}
-                                        onChange={e => setMapping(prev => ({ ...prev, [col]: e.target.value }))}
-                                    >
-                                        {SYSTEM_COLUMNS.map(sc => <option key={sc} value={sc}>{sc}</option>)}
-                                    </select>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <button className="btn-primary" onClick={() => setPhase('preview')}>Continue to Preview →</button>
-                </div>
-            )}
+  const runBackupNow = async (mode: 'Manual' | 'Scheduled') => {
+    if (runnerBusyRef.current) return
+    runnerBusyRef.current = true
+    setIsLoading(true)
+    try {
+      const startedAt = new Date()
+      const snapshot: Record<string, any> = {
+        meta: {
+          generated_at: startedAt.toISOString(),
+          generated_by: user?.email ?? null,
+          mode,
+          tables: ALL_TABLES,
+        },
+        data: {},
+      }
 
-            {/* ─── Preview Phase ─── */}
-            {phase === 'preview' && (
-                <div className="animate-fade-in">
-                    <div className="flex items-center gap-4 mb-4">
-                        {[
-                            { icon: CheckCircle, color: '#34d399', label: '2 Clean records' },
-                            { icon: AlertTriangle, color: '#fbbf24', label: '1 Warning (missing field)' },
-                            { icon: AlertTriangle, color: '#f87171', label: '1 Duplicate detected' },
-                        ].map(({ icon: Icon, color, label }) => (
-                            <div key={label} className="flex items-center gap-2 text-sm" style={{ color }}>
-                                <Icon size={14} /> {label}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="glass rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid rgba(148,163,184,0.08)' }}>
-                        <table className="w-full text-xs">
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.08)', background: 'rgba(255,255,255,0.02)' }}>
-                                    {['Status', 'Full Name', 'Address', 'Death Cert #', 'Date of Death', 'Burial Date'].map(h => (
-                                        <th key={h} className="px-3 py-2 text-left text-slate-400 uppercase tracking-wide font-semibold">{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {MOCK_PREVIEW.map((row, i) => (
-                                    <tr key={i} className="border-b border-white/5" style={{ background: row._status === 'dupe' ? 'rgba(239,68,68,0.05)' : row._status === 'warn' ? 'rgba(251,191,36,0.05)' : 'transparent' }}>
-                                        <td className="px-3 py-2">
-                                            {row._status === 'ok' && <CheckCircle size={12} className="text-emerald-400" />}
-                                            {row._status === 'warn' && <AlertTriangle size={12} className="text-yellow-400" />}
-                                            {row._status === 'dupe' && <AlertTriangle size={12} className="text-red-400" />}
-                                        </td>
-                                        <td className="px-3 py-2 text-white">{row.legacy_fullname}</td>
-                                        <td className="px-3 py-2 text-slate-400">{row.legacy_address}</td>
-                                        <td className="px-3 py-2 text-slate-400 font-mono">{row.legacy_death_cert_no || <span className="text-yellow-500">Missing</span>}</td>
-                                        <td className="px-3 py-2 text-slate-400">{row.legacy_date_of_death}</td>
-                                        <td className="px-3 py-2 text-slate-400">{row.legacy_burial_date}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="flex gap-3">
-                        <button className="btn-primary" onClick={() => setPhase('execute')}><PlayCircle size={14} /> Execute Migration</button>
-                        <button className="btn-secondary" onClick={() => setPhase('mapping')}>← Back</button>
-                    </div>
-                </div>
-            )}
+      const failures: { table: string; error: string }[] = []
 
-            {/* ─── Execute / Done Phase ─── */}
-            {(phase === 'execute' || phase === 'done') && (
-                <div className="animate-fade-in text-center py-12">
-                    {phase === 'execute' && !executing && (
-                        <>
-                            <Database size={48} className="mx-auto mb-4 text-blue-400" />
-                            <h3 className="text-white text-lg font-bold mb-2">Ready to Execute Migration</h3>
-                            <p className="text-slate-400 text-sm mb-6">This will import 3 records (1 duplicate skipped) in transaction-safe batches.</p>
-                            <button className="btn-primary mx-auto" onClick={handleExecute}><PlayCircle size={15} /> Start Migration</button>
-                        </>
-                    )}
-                    {executing && (
-                        <>
-                            <div className="w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin mx-auto mb-4" />
-                            <h3 className="text-white text-lg font-bold mb-2">Migrating Records…</h3>
-                            <p className="text-slate-400 text-sm">Processing in transaction-safe batches. Please wait.</p>
-                        </>
-                    )}
-                    {phase === 'done' && (
-                        <>
-                            <CheckCircle size={48} className="mx-auto mb-4 text-emerald-400" />
-                            <h3 className="text-white text-lg font-bold mb-2">Migration Complete!</h3>
-                            <div className="glass rounded-xl p-5 max-w-xs mx-auto mb-6" style={{ border: '1px solid rgba(52,211,153,0.2)' }}>
-                                {[['Imported', '3'], ['Duplicates Skipped', '1'], ['Errors', '0'], ['Warnings', '1']].map(([l, v]) => (
-                                    <div key={l} className="flex justify-between py-2" style={{ borderBottom: '1px solid rgba(148,163,184,0.07)' }}>
-                                        <span className="text-xs text-slate-400">{l}</span>
-                                        <span className="text-sm font-bold text-white">{v}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button className="btn-secondary mx-auto"><Download size={14} /> Download Migration Log</button>
-                        </>
-                    )}
-                </div>
-            )}
+      for (const table of ALL_TABLES) {
+        try {
+          const rows = await fetchAllRows(table)
+          ;(snapshot.data as any)[table] = rows
+          ;(snapshot.meta as any)[`${table}__count`] = rows.length
+        } catch (err: any) {
+          failures.push({ table, error: err?.message ?? String(err) })
+          ;(snapshot.data as any)[table] = []
+          ;(snapshot.meta as any)[`${table}__count`] = 0
+          ;(snapshot.meta as any)[`${table}__error`] = err?.message ?? String(err)
+        }
+      }
+
+      ;(snapshot.meta as any).failures = failures
+
+      const filename = `bpm_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+      const bytes = downloadJson(filename, snapshot)
+      const sizeStr = toSizeString(bytes)
+
+      const status = failures.length > 0 ? 'Partial' : 'Completed'
+      await logBackupRow({ filename, type: mode, size: sizeStr, status })
+      if (failures.length > 0) {
+        toast.error(`Backup created with warnings: ${failures.length} table(s) failed.`)
+      } else {
+        toast.success(`Backup created: ${filename}`)
+      }
+      await refreshBackups()
+    } catch (err: any) {
+      console.error('Backup failed', err)
+      toast.error(err?.message ?? 'Backup failed.')
+      try {
+        const filename = `bpm_backup_failed_${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+        await logBackupRow({ filename, type: mode, size: null, status: 'Failed' })
+        await refreshBackups()
+      } catch {
+        // ignore
+      }
+    } finally {
+      setIsLoading(false)
+      runnerBusyRef.current = false
+    }
+  }
+
+  const handleSaveSchedule = async () => {
+    if (!canManage) {
+      toast.error('Only system admin can change backup scheduling.')
+      return
+    }
+    const nextRun = schedule.enabled
+      ? computeNextRun(new Date(), schedule.frequency, schedule.timeOfDay).toISOString()
+      : null
+    await persistSchedule({ ...schedule, nextRunAt: nextRun })
+  }
+
+  useEffect(() => {
+    void refreshBackups()
+    void refreshSchedule()
+  }, [])
+
+  useEffect(() => {
+    // Auto-runner: only triggers while the app is open.
+    const timer = window.setInterval(async () => {
+      if (!schedule.enabled) return
+      if (!schedule.nextRunAt) return
+      if (runnerBusyRef.current) return
+
+      const now = new Date()
+      const next = new Date(schedule.nextRunAt)
+      if (Number.isNaN(next.getTime())) return
+      if (now < next) return
+
+      // run scheduled backup
+      await runBackupNow('Scheduled')
+
+      // compute and persist next run
+      const next2 = computeNextRun(new Date(), schedule.frequency, schedule.timeOfDay).toISOString()
+      await persistSchedule({ ...schedule, nextRunAt: next2 })
+    }, 30_000)
+    return () => window.clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedule.enabled, schedule.frequency, schedule.timeOfDay, schedule.nextRunAt, schedule.tables.join('|')])
+
+  return (
+    <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-white">Backups</h1>
+          <p className="text-slate-400 text-sm mt-0.5">
+            Manual snapshots + automatic scheduling. Scheduled backups run while the app is open.
+          </p>
         </div>
-    )
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button className="btn-secondary" onClick={() => void refreshBackups()} disabled={isLoading}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+          <button className="btn-primary" onClick={() => void runBackupNow('Manual')} disabled={isLoading}>
+            <PlayCircle size={14} /> Run Backup Now
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <div className="glass rounded-2xl p-4 lg:col-span-1" style={{ border: '1px solid rgba(148,163,184,0.08)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-sm font-semibold text-white">Automatic schedule</div>
+              <div className="text-xs text-slate-400 mt-0.5 inline-flex items-center gap-2">
+                <CalendarClock size={14} className="text-slate-500" />
+                {scheduleLabel}
+              </div>
+            </div>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${schedule.enabled ? 'badge-active' : 'bg-white/10 text-slate-300'}`}>
+              {schedule.enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 text-sm">
+            <label className="flex items-center gap-2 text-xs text-slate-300">
+              <input
+                type="checkbox"
+                checked={schedule.enabled}
+                onChange={e => setSchedule(prev => ({ ...prev, enabled: e.target.checked }))}
+                disabled={!canManage}
+              />
+              Enable automatic backups
+            </label>
+
+            <select
+              className="input-field"
+              value={schedule.frequency}
+              onChange={e => setSchedule(prev => ({ ...prev, frequency: e.target.value as any }))}
+              disabled={!canManage}
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+
+            <input
+              className="input-field"
+              type="time"
+              value={schedule.timeOfDay}
+              onChange={e => setSchedule(prev => ({ ...prev, timeOfDay: e.target.value }))}
+              disabled={!canManage}
+            />
+
+            <div className="text-xs text-slate-400">
+              Next run:{' '}
+              <span className="text-white font-semibold">
+                {schedule.nextRunAt ? new Date(schedule.nextRunAt).toLocaleString() : '—'}
+              </span>
+            </div>
+
+            <div className="glass rounded-xl p-3" style={{ border: '1px solid rgba(148,163,184,0.08)' }}>
+              <div className="text-xs font-semibold text-slate-300 mb-2 inline-flex items-center gap-2">
+                <Database size={14} className="text-slate-500" />
+                Included tables
+              </div>
+              <div className="text-[11px] text-slate-500 mt-2">
+                This backup includes <span className="text-slate-300 font-semibold">{ALL_TABLES.length}</span> tables and downloads all rows using pagination.
+              </div>
+            </div>
+
+            <button className="btn-primary" onClick={() => void handleSaveSchedule()} disabled={isLoading || !canManage}>
+              <Save size={14} /> Save Schedule
+            </button>
+            {!canManage && (
+              <div className="text-[11px] text-slate-500">
+                Only <span className="text-slate-300 font-semibold">System Administrator</span> can change schedule settings.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass rounded-2xl overflow-hidden lg:col-span-2" style={{ border: '1px solid rgba(148,163,184,0.08)' }}>
+          <div className="px-4 py-3 text-sm font-semibold text-white" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(148,163,184,0.08)' }}>
+            Backup history
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px]">
+              <thead>
+                <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+                  {['Date', 'Filename', 'Type', 'Size', 'Status'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {backups.map(b => (
+                  <tr key={b.id} className="border-b border-white/5 hover:bg-white/3 transition-colors">
+                    <td className="px-4 py-3 text-xs text-slate-400 font-mono">
+                      {b.date ? new Date(b.date).toLocaleString() : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-white">
+                      <span className="inline-flex items-center gap-2">
+                        <Download size={14} className="text-slate-500" />
+                        {b.filename}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-400">{b.type ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-slate-400">{b.size ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${b.status === 'Completed' ? 'badge-active' : 'badge-rejected'}`}>
+                        {b.status ?? '—'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {backups.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">
+                      {isLoading ? 'Loading backups…' : 'No backups logged yet.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass rounded-xl p-4 text-sm text-slate-400" style={{ border: '1px solid rgba(148,163,184,0.08)' }}>
+        <strong className="text-white">Important:</strong> This is an in-app scheduler. For true server-side backups (runs even when nobody is logged in),
+        you’ll want a backend scheduled job (e.g., Supabase cron/Edge Function) that generates and stores backups in storage.
+      </div>
+    </div>
+  )
 }

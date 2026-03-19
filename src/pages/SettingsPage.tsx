@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Sun, Moon, Bell, Shield, Globe, Save, CheckCircle, Loader2 } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { logAudit, updateSystemSetting } from '@/lib/admin'
 
 export default function SettingsPage() {
     const { user } = useAuth()
@@ -22,9 +24,57 @@ export default function SettingsPage() {
     })
     const [language, setLanguage] = useState('en-PH')
 
-    const handleSave = () => {
+    const storageKey = useMemo(() => (user ? `bpm_user_settings:${user.id}` : 'bpm_user_settings:anon'), [user])
+
+    useEffect(() => {
+        if (!user) return
+        try {
+            const raw = localStorage.getItem(storageKey)
+            if (!raw) return
+            const parsed = JSON.parse(raw)
+            if (parsed?.notifications) setNotifSettings((prev: any) => ({ ...prev, ...parsed.notifications }))
+            if (parsed?.privacy) setPrivacySettings((prev: any) => ({ ...prev, ...parsed.privacy }))
+            if (parsed?.language) setLanguage(parsed.language)
+        } catch {
+            // ignore
+        }
+    }, [storageKey, user])
+
+    const handleSave = async () => {
+        if (!user) return
         setSaving(true)
-        setTimeout(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 3000) }, 1000)
+        try {
+            const payload = {
+                notifications: notifSettings,
+                privacy: privacySettings,
+                language,
+                theme,
+                updated_at: new Date().toISOString(),
+            }
+            localStorage.setItem(storageKey, JSON.stringify(payload))
+
+            // If system admin, also persist as a system setting (optional / best-effort)
+            if (user.role === 'system_admin') {
+                await updateSystemSetting(`user_settings:${user.id}`, payload, `User settings for ${user.email}`)
+            }
+
+            await logAudit({
+                action: 'settings_updated',
+                module: 'settings',
+                performed_by: user.email,
+                subject: user.id,
+                details: { language, theme, notifications: notifSettings, privacy: privacySettings },
+            })
+
+            setSaved(true)
+            toast.success('Settings saved.')
+            setTimeout(() => setSaved(false), 3000)
+        } catch (err: any) {
+            console.error('Failed to save settings', err)
+            toast.error(err?.message ?? 'Failed to save settings.')
+        } finally {
+            setSaving(false)
+        }
     }
 
     if (!user) return null

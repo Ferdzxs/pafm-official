@@ -62,7 +62,8 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/parks/reservations', badgeKey: 'pending_park_res' },
         { id: 'usage-logs', label: 'Site Usage Logs', icon: ClipboardList, path: '/parks/usage-logs' },
         { id: 'calendar', label: 'Booking Calendar', icon: Calendar, path: '/parks/calendar' },
-        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/parks/asset-requests' },
+        // Route to the shared Assets module (no mock parks page)
+        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/assets/requests' },
     ],
     reservation_officer: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -125,10 +126,9 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'dashboard', label: 'Admin Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'users', label: 'User & Role Management', icon: UserCog, path: '/admin/users' },
         { id: 'audit', label: 'Audit Logs', icon: Eye, path: '/admin/audit' },
-        { id: 'settings', label: 'System Settings', icon: Settings, path: '/admin/settings' },
         { id: 'offices', label: 'Office Management', icon: Building2, path: '/admin/offices' },
-        { id: 'employees', label: 'Employee Master', icon: Users, path: '/admin/employees' },
-        { id: 'migration', label: 'Legacy Migration', icon: Database, path: '/admin/migration' },
+        { id: 'employees', label: 'Government Directory', icon: Users, path: '/admin/employees' },
+        { id: 'migration', label: 'Backups', icon: Database, path: '/admin/migration' },
     ],
 }
 

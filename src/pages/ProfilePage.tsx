@@ -1,25 +1,180 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { Save, Camera, Loader2, CheckCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { supabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/admin'
 
 export default function ProfilePage() {
-    const { user } = useAuth()
+    const { user, updateSessionUser } = useAuth()
     const [saved, setSaved] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [loadingProfile, setLoadingProfile] = useState(false)
+    const [personId, setPersonId] = useState<string | null>(null)
+    const [storedPassword, setStoredPassword] = useState<string | null>(null)
     const [form, setForm] = useState({
         full_name: user?.full_name ?? '',
         email: user?.email ?? '',
-        contact: '09171234567',
-        address: 'Quezon City',
+        contact: '',
+        address: '',
         current_password: '',
         new_password: '',
         confirm_password: '',
     })
 
-    const handleSave = () => {
+    const canEditAddress = useMemo(() => !!user?.is_citizen, [user?.is_citizen])
+
+    useEffect(() => {
+        if (!user) return
+        const run = async () => {
+            setLoadingProfile(true)
+            try {
+                if (user.is_citizen) {
+                    const { data, error } = await supabase
+                        .from('citizen_account')
+                        .select('account_id, person_id, email, password_hash, person(person_id, full_name, address, contact_number)')
+                        .eq('account_id', user.id)
+                        .maybeSingle()
+                    if (error) throw error
+                    if (!data) throw new Error('Citizen account not found.')
+
+                    const p = Array.isArray((data as any).person) ? (data as any).person[0] : (data as any).person
+                    setPersonId((data as any).person_id ?? p?.person_id ?? null)
+                    setStoredPassword((data as any).password_hash ?? null)
+                    setForm(prev => ({
+                        ...prev,
+                        full_name: p?.full_name ?? user.full_name ?? '',
+                        email: (data as any).email ?? user.email ?? '',
+                        contact: p?.contact_number ?? '',
+                        address: p?.address ?? '',
+                    }))
+                } else {
+                    const { data, error } = await supabase
+                        .from('system_users')
+                        .select('user_id, full_name, email, contact_no, password_hash')
+                        .eq('user_id', user.id)
+                        .maybeSingle()
+                    if (error) throw error
+                    if (!data) throw new Error('System user not found.')
+                    setStoredPassword((data as any).password_hash ?? null)
+                    setForm(prev => ({
+                        ...prev,
+                        full_name: (data as any).full_name ?? user.full_name ?? '',
+                        email: (data as any).email ?? user.email ?? '',
+                        contact: (data as any).contact_no ?? '',
+                        address: prev.address ?? '',
+                    }))
+                }
+            } catch (err: any) {
+                console.error('Failed to load profile', err)
+                toast.error(err?.message ?? 'Failed to load profile.')
+            } finally {
+                setLoadingProfile(false)
+            }
+        }
+        void run()
+    }, [user])
+
+    const isSeedLikePassword = (hash: string | null) => !hash || hash === '' || hash.startsWith('$2b$')
+
+    const verifyCurrentPassword = (current: string) => {
+        if (!current) return false
+        if (isSeedLikePassword(storedPassword)) {
+            if (user?.is_citizen) return current === 'citizen123' || current === 'admin123' || current === 'password'
+            return current === 'admin123' || current === 'password'
+        }
+        return storedPassword === current
+    }
+
+    const handleSave = async () => {
+        if (!user) return
+        if (!form.full_name.trim() || !form.email.trim()) {
+            toast.error('Full name and email are required.')
+            return
+        }
+        if (form.new_password || form.confirm_password || form.current_password) {
+            if (!verifyCurrentPassword(form.current_password)) {
+                toast.error('Current password is incorrect.')
+                return
+            }
+            if (!form.new_password || form.new_password.length < 4) {
+                toast.error('New password is too short.')
+                return
+            }
+            if (form.new_password !== form.confirm_password) {
+                toast.error('New password and confirmation do not match.')
+                return
+            }
+        }
+
         setSaving(true)
-        setTimeout(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 3000) }, 1200)
+        try {
+            if (user.is_citizen) {
+                const pid = personId
+                if (!pid) throw new Error('Missing person record for this citizen.')
+
+                const { error: pErr } = await supabase
+                    .from('person')
+                    .update({
+                        full_name: form.full_name,
+                        address: form.address || null,
+                        contact_number: form.contact || null,
+                    })
+                    .eq('person_id', pid)
+                if (pErr) throw pErr
+
+                const updates: any = { email: form.email }
+                if (form.new_password) updates.password_hash = form.new_password
+
+                const { error: cErr } = await supabase
+                    .from('citizen_account')
+                    .update(updates)
+                    .eq('account_id', user.id)
+                if (cErr) throw cErr
+
+                await logAudit({
+                    action: 'profile_updated',
+                    module: 'profile',
+                    performed_by: user.email,
+                    subject: user.id,
+                    details: { is_citizen: true, email_changed: form.email !== user.email, password_changed: !!form.new_password },
+                })
+            } else {
+                const updates: any = {
+                    full_name: form.full_name,
+                    email: form.email,
+                    contact_no: form.contact || null,
+                }
+                if (form.new_password) updates.password_hash = form.new_password
+
+                const { error } = await supabase
+                    .from('system_users')
+                    .update(updates)
+                    .eq('user_id', user.id)
+                if (error) throw error
+
+                await logAudit({
+                    action: 'profile_updated',
+                    module: 'profile',
+                    performed_by: user.email,
+                    subject: user.id,
+                    details: { is_citizen: false, email_changed: form.email !== user.email, password_changed: !!form.new_password },
+                })
+            }
+
+            updateSessionUser({ full_name: form.full_name, email: form.email })
+            setStoredPassword(form.new_password ? form.new_password : storedPassword)
+            setForm(prev => ({ ...prev, current_password: '', new_password: '', confirm_password: '' }))
+            setSaved(true)
+            toast.success('Profile updated.')
+            setTimeout(() => setSaved(false), 3000)
+        } catch (err: any) {
+            console.error('Failed to save profile', err)
+            toast.error(err?.message ?? 'Failed to save profile.')
+        } finally {
+            setSaving(false)
+        }
     }
 
     if (!user) return null
@@ -70,10 +225,16 @@ export default function ProfilePage() {
                                 type={f.type}
                                 className="input-field"
                                 value={(form as any)[f.key]}
+                                disabled={loadingProfile || (f.key === 'address' && !canEditAddress)}
                                 onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                             />
                         </div>
                     ))}
+                    {!canEditAddress && (
+                        <div className="text-xs text-slate-500">
+                            Address is managed at the citizen/person record level.
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -95,7 +256,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Save button */}
-            <button className="btn-primary" onClick={handleSave} disabled={saving}>
+            <button className="btn-primary" onClick={() => { void handleSave() }} disabled={saving || loadingProfile}>
                 {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : saved ? <><CheckCircle size={14} /> Saved!</> : <><Save size={14} /> Save Changes</>}
             </button>
         </div>

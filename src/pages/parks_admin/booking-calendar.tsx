@@ -292,7 +292,7 @@ function ReservationModal({ r, onClose, onApprove, onReject, actionLoading }: {
       )}
 
       {/* BPMN Step 5: Approve / Reject */}
-      {r.status === "pending" && (
+      {(r.status === "endorsed_to_admin" || r.status === "pending") && (
         <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-800">
           <button
             onClick={() => onReject(r.reservation_id)}
@@ -531,7 +531,7 @@ export default function BookingCalendar() {
     try {
       const { error: e } = await supabase
         .from("park_reservation_record")
-        .update({ status: "approved" })
+        .update({ status: "admin_approved" })
         .eq("reservation_id", id)
       if (e) throw new Error(e.message)
       setViewR(null)
@@ -547,7 +547,7 @@ export default function BookingCalendar() {
     try {
       const { error: e } = await supabase
         .from("park_reservation_record")
-        .update({ status: "rejected" })
+        .update({ status: "admin_rejected" })
         .eq("reservation_id", id)
       if (e) throw new Error(e.message)
       setViewR(null)
@@ -610,7 +610,7 @@ export default function BookingCalendar() {
   // ── KPIs for current viewed month ────────────────────────────
   const monthKey     = `${calYear}-${String(calMonth + 1).padStart(2, "0")}`
   const monthRes     = filteredReservations.filter(r => r.reservation_date.startsWith(monthKey))
-  const pendingCount   = monthRes.filter(r => r.status === "pending").length
+  const pendingCount   = monthRes.filter(r => r.status === "endorsed_to_admin" || r.status === "pending").length
   const approvedCount  = monthRes.filter(r => r.status === "approved").length
   const monitoredCount = monthRes.filter(r => r.monitored).length
   const paidCount      = monthRes.filter(r => r.payment?.payment_status === "settled").length
@@ -776,7 +776,7 @@ export default function BookingCalendar() {
                   const dayRes   = byDate[dateStr] ?? []
                   const isToday    = dateStr === todayYMD
                   const isSelected = dateStr === selectedDate
-                  const hasPending = dayRes.some(r => r.status === "pending")
+                  const hasPending = dayRes.some(r => r.status === "endorsed_to_admin" || r.status === "pending")
                   const hasPaid    = dayRes.some(r => r.payment?.payment_status === "settled")
 
                   return (

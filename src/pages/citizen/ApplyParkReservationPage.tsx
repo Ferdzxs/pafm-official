@@ -28,6 +28,8 @@ function genReservationId() {
 function genPersonId()  { return `PER-${Math.floor(Math.random() * 90000 + 10000)}` }
 function genAccountId() { return `ACC-${Math.floor(Math.random() * 90000 + 10000)}` }
 
+const BUCKET_PARKS_DOCS = 'parks-docs'
+
 export default function ApplyParkReservationPage() {
   const { user } = useAuth()
 
@@ -36,6 +38,7 @@ export default function ApplyParkReservationPage() {
   const [submittedId, setSubmittedId]     = useState<string | null>(null)
   const [venues, setVenues]               = useState<Venue[]>([])
   const [loadingVenues, setLoadingVenues] = useState(true)
+  const [loiFile, setLoiFile]             = useState<File | null>(null)
 
   const [form, setForm] = useState({
     event_name:     '',
@@ -133,6 +136,37 @@ export default function ApplyParkReservationPage() {
 
       const reservationId = genReservationId()
 
+      // Step C: Upload LOI (optional but no longer a dead-end)
+      let letterDocId: string | null = null
+      if (loiFile) {
+        const safeName = loiFile.name.replace(/[^a-zA-Z0-9._-]/g, "_")
+        const path = `loi/${reservationId}/${Date.now()}-${safeName}`
+        const { error: upErr } = await supabase.storage.from(BUCKET_PARKS_DOCS).upload(path, loiFile, { upsert: true })
+
+        let fileUrl = ""
+        if (!upErr) {
+          const { data: urlData } = supabase.storage.from(BUCKET_PARKS_DOCS).getPublicUrl(path)
+          fileUrl = urlData.publicUrl
+        }
+
+        letterDocId = `DDOC-${Date.now()}`
+        const { error: docErr } = await supabase.from("digital_document").insert({
+          document_id: letterDocId,
+          document_type: "park_letter_of_intent",
+          reference_no: `LOI-${reservationId}`,
+          date_created: new Date().toISOString().split("T")[0],
+          status: "active",
+          created_by_office: null,
+          received_by_employee: null,
+          person_id: personId,
+          file_url: fileUrl,
+        })
+        if (docErr) {
+          // If doc creation fails, proceed with reservation insert but keep LOI null.
+          letterDocId = null
+        }
+      }
+
       const { error: insertErr } = await supabase
         .from('park_reservation_record')
         .insert([{
@@ -141,8 +175,8 @@ export default function ApplyParkReservationPage() {
           park_venue_id:         form.venue_id,
           reservation_date:      form.event_date,
           time_slot:             timeSlotValue,
-          status:                'pending',
-          letter_of_intent_doc:  null,
+          status:                'pending_loi',
+          letter_of_intent_doc:  letterDocId,
           application_form_doc:  null,
           processed_by_admin:    null,
           received_by_employee:  null,
@@ -156,6 +190,7 @@ export default function ApplyParkReservationPage() {
       toast.success('Park reservation submitted successfully!')
       setSubmittedId(reservationId)
       setSubmitted(true)
+      setLoiFile(null)
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to submit reservation.'
@@ -348,11 +383,16 @@ export default function ApplyParkReservationPage() {
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
               Supporting Letter / Letter of Intent
-              <span className="ml-2 text-slate-600 normal-case font-normal">(Coming soon)</span>
             </label>
-            <div className="input-field text-slate-500 text-sm bg-slate-800/50 cursor-not-allowed">
-              File upload will be available soon. (BPMN Step 1 — Letter of Intent)
-            </div>
+            <input
+              type="file"
+              accept=".pdf,image/*"
+              className="input-field"
+              onChange={(e) => setLoiFile(e.target.files?.[0] ?? null)}
+            />
+            <p className="text-[11px] text-slate-600 mt-1">
+              Optional, but recommended. If provided, it will be attached to your request (BPMN Step 1).
+            </p>
           </div>
 
           {/* Info note */}

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { AuthUser, UserRole, NotificationLog } from '@/types'
 import { supabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/admin'
 
 // ─── Mock demo users for the UI dropdown ───────────────────────────────────────
 export const DEMO_USERS: Record<string, { role: UserRole, password: string }> = {
@@ -19,11 +20,38 @@ export const DEMO_USERS: Record<string, { role: UserRole, password: string }> = 
     'juan.delacruz@email.com': { role: 'citizen', password: 'citizen123' }
 }
 
-// ─── Mock notifications ────────────────────────────────────────────────────────
-const MOCK_NOTIFICATIONS: NotificationLog[] = [
-    { notif_id: 'n1', user_id: 'u1', title: 'New Burial Application', message: 'Application #BA-2024-001 submitted.', is_read: false, notif_type: 'info', created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString() },
-    { notif_id: 'n2', user_id: 'u1', title: 'Document Verified', message: 'Death certificate has been validated', is_read: false, notif_type: 'success', created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
-]
+function titleFromNotifType(t?: string | null) {
+    const raw = (t ?? '').replace(/_/g, ' ').trim()
+    if (!raw) return 'Notification'
+    return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
+
+function levelFromNotifType(t?: string | null): NotificationLog['notif_type'] {
+    if (!t) return 'info'
+    if (t.includes('approved') || t.includes('validated') || t.includes('completed') || t.includes('settled')) return 'success'
+    if (t.includes('rejected') || t.includes('disapproved') || t.includes('failed')) return 'error'
+    if (t.includes('pending') || t.includes('incomplete')) return 'warning'
+    return 'info'
+}
+
+async function fetchCitizenNotifications(accountId: string): Promise<NotificationLog[]> {
+    const { data } = await supabase
+        .from('notification_log')
+        .select('notif_id, account_id, notif_type, message, sent_at')
+        .eq('account_id', accountId)
+        .order('sent_at', { ascending: false })
+        .limit(30)
+
+    return (data ?? []).map((n: any) => ({
+        notif_id: n.notif_id,
+        user_id: n.account_id,
+        title: titleFromNotifType(n.notif_type),
+        message: n.message ?? '',
+        is_read: false, // DB schema in init_db.sql has no is_read; keep UI-local
+        notif_type: levelFromNotifType(n.notif_type),
+        created_at: n.sent_at ?? new Date().toISOString(),
+    }))
+}
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 interface AuthContextType {
@@ -34,6 +62,7 @@ interface AuthContextType {
     signup: (fullName: string, email: string, password: string) => Promise<{ error?: string }>
     logout: () => void
     markNotifRead: (id: string) => void
+    updateSessionUser: (patch: Partial<AuthUser>) => void
     isLoading: boolean
 }
 
@@ -44,14 +73,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [notifications, setNotifications] = useState<NotificationLog[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
+    const updateSessionUser = (patch: Partial<AuthUser>) => {
+        setUser(prev => {
+            if (!prev) return prev
+            const next = { ...prev, ...patch }
+            localStorage.setItem('bpm_user', JSON.stringify(next))
+            return next
+        })
+    }
+
     useEffect(() => {
-        // Check persisted session
         const stored = localStorage.getItem('bpm_user')
         if (stored) {
             try {
                 const parsed = JSON.parse(stored)
                 setUser(parsed)
-                setNotifications(MOCK_NOTIFICATIONS.filter(n => n.user_id === parsed.id))
+
+                // Validate session remotely to ensure user isn't inactive/unverified 
+                if (parsed.role === 'citizen') {
+                    void supabase.from('citizen_account').select('verification_status').eq('account_id', parsed.id).maybeSingle().then(({ data }) => {
+                        if (data && data.verification_status !== 'verified') {
+                            setUser(null)
+                            localStorage.removeItem('bpm_user')
+                        } else {
+                            void fetchCitizenNotifications(parsed.id).then(setNotifications)
+                        }
+                    })
+                } else {
+                    void supabase.from('system_users').select('is_active').eq('user_id', parsed.id).maybeSingle().then(({ data }) => {
+                        if (data && !data.is_active) {
+                            setUser(null)
+                            localStorage.removeItem('bpm_user')
+                        } else {
+                            setNotifications([])
+                        }
+                    })
+                }
             } catch { }
         }
         setIsLoading(false)
@@ -68,10 +125,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .maybeSingle()
 
             if (sysUser) {
-                // Since system_users has no password in the DB seed, we use a placeholder check
-                if (password !== 'admin123' && password !== 'password') {
+                const storedHash = (sysUser as any).password_hash as string | null
+                const isSeedLike = !storedHash || storedHash === '' || storedHash.startsWith('$2b$')
+                if (!sysUser.is_active) {
                     setIsLoading(false)
-                    return { error: 'Invalid password. Try admin123' }
+                    void logAudit({
+                        action: 'login_failed',
+                        module: 'auth',
+                        status: 'error',
+                        subject: sysUser.user_id,
+                        performed_by: email,
+                        details: { reason: 'account_inactive', is_citizen: false },
+                    })
+                    return { error: 'Your account is currently inactive. Please contact the administrator.' }
+                }
+
+                if (isSeedLike) {
+                    if (password !== 'admin123' && password !== 'password') {
+                        setIsLoading(false)
+                        void logAudit({
+                            action: 'login_failed',
+                            module: 'auth',
+                            status: 'error',
+                            subject: sysUser.user_id,
+                            performed_by: email,
+                            details: { reason: 'invalid_password', is_citizen: false },
+                        })
+                        return { error: 'Invalid password. Try admin123' }
+                    }
+                } else {
+                    if (storedHash !== password) {
+                        setIsLoading(false)
+                        void logAudit({
+                            action: 'login_failed',
+                            module: 'auth',
+                            status: 'error',
+                            subject: sysUser.user_id,
+                            performed_by: email,
+                            details: { reason: 'invalid_password', is_citizen: false },
+                        })
+                        return { error: 'Invalid password.' }
+                    }
                 }
 
                 // Map legacy / seed roles to the frontend UserRole keys
@@ -95,9 +189,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     office: sysUser.department
                 }
                 setUser(safeUser)
-                setNotifications(MOCK_NOTIFICATIONS) // just assign mock for now
+                setNotifications([])
                 localStorage.setItem('bpm_user', JSON.stringify(safeUser))
                 setIsLoading(false)
+                void logAudit({
+                    action: 'login',
+                    module: 'auth',
+                    status: 'success',
+                    subject: safeUser.id,
+                    performed_by: safeUser.email,
+                    details: { role: safeUser.role, is_citizen: false },
+                })
                 return {}
             }
 
@@ -114,13 +216,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (isSeedData) {
                     if (password !== 'citizen123' && password !== 'admin123' && password !== 'password') {
                         setIsLoading(false)
+                        void logAudit({
+                            action: 'login_failed',
+                            module: 'auth',
+                            status: 'error',
+                            subject: citAcc.account_id,
+                            performed_by: email,
+                            details: { reason: 'invalid_password', is_citizen: true },
+                        })
                         return { error: 'Invalid password. Try citizen123' }
                     }
                 } else {
                     if (storedHash !== password) {
                         setIsLoading(false)
+                        void logAudit({
+                            action: 'login_failed',
+                            module: 'auth',
+                            status: 'error',
+                            subject: citAcc.account_id,
+                            performed_by: email,
+                            details: { reason: 'invalid_password', is_citizen: true },
+                        })
                         return { error: 'Invalid password.' }
                     }
+                }
+
+                if (citAcc.verification_status !== 'verified') {
+                    setIsLoading(false)
+                    void logAudit({
+                        action: 'login_failed',
+                        module: 'auth',
+                        status: 'error',
+                        subject: citAcc.account_id,
+                        performed_by: email,
+                        details: { reason: 'account_inactive', is_citizen: true, status: citAcc.verification_status },
+                    })
+                    return { error: `Your account is ${citAcc.verification_status}. Please contact the administrator.` }
                 }
 
                 // If citizen_account doesn't embed `person` easily based on the type definition vs real db
@@ -139,13 +270,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     is_citizen: true
                 }
                 setUser(safeUser)
-                setNotifications(MOCK_NOTIFICATIONS)
+                setNotifications(await fetchCitizenNotifications(safeUser.id))
                 localStorage.setItem('bpm_user', JSON.stringify(safeUser))
                 setIsLoading(false)
+                void logAudit({
+                    action: 'login',
+                    module: 'auth',
+                    status: 'success',
+                    subject: safeUser.id,
+                    performed_by: safeUser.email,
+                    details: { role: safeUser.role, is_citizen: true },
+                })
                 return {}
             }
 
             setIsLoading(false)
+            void logAudit({
+                action: 'login_failed',
+                module: 'auth',
+                status: 'error',
+                subject: email,
+                performed_by: email,
+                details: { reason: 'user_not_found' },
+            })
             return { error: 'User not found in the database.' }
         } catch (err: any) {
             setIsLoading(false)
@@ -190,6 +337,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             })
             if (cErr) return { error: cErr.message }
 
+            void logAudit({
+                action: 'citizen_signup',
+                module: 'auth',
+                status: 'success',
+                subject: accountId,
+                performed_by: email,
+                details: { email },
+            })
+
             // Auto-login after signup
             return login(email, password)
         } catch (err: any) {
@@ -198,6 +354,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const logout = () => {
+        if (user) {
+            void logAudit({
+                action: 'logout',
+                module: 'auth',
+                status: 'success',
+                subject: user.id,
+                performed_by: user.email,
+                details: { role: user.role, is_citizen: user.is_citizen },
+            })
+        }
         setUser(null)
         setNotifications([])
         localStorage.removeItem('bpm_user')
@@ -210,7 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unreadCount = notifications.filter(n => !n.is_read).length
 
     return (
-        <AuthContext.Provider value={{ user, notifications, unreadCount, login, signup, logout, markNotifRead, isLoading }}>
+        <AuthContext.Provider value={{ user, notifications, unreadCount, login, signup, logout, markNotifRead, updateSessionUser, isLoading }}>
             {children}
         </AuthContext.Provider>
     )

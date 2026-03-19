@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { Loader2, Search, Filter, X, Clock, CheckCircle2, ChevronRight, Calendar, User, AlignLeft } from 'lucide-react'
 import { CITIZEN_STEP_MAP, UTILITY_TICKET_TYPES } from '@/config/utilityRequest'
+import { useNavigate } from 'react-router-dom'
 
 type UnifiedApplication = {
   id: string
@@ -39,6 +40,7 @@ const MODULE_COLORS: Record<string, { bg: string, text: string }> = {
 
 export default function MyApplications() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [apps, setApps] = useState<UnifiedApplication[]>([])
   const [filtered, setFiltered] = useState<UnifiedApplication[]>([])
   const [search, setSearch] = useState('')
@@ -442,7 +444,19 @@ export default function MyApplications() {
                 >
                   Close
                 </button>
-                <button className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all">
+                {selectedApp.module === 'parks' &&
+                  (selectedApp.status === 'application_form_issued' || selectedApp.status === 'application_incomplete') && (
+                    <button
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
+                      onClick={() => {
+                        navigate(`/citizen/parks/${selectedApp.id}/application`)
+                        setSelectedApp(null)
+                      }}
+                    >
+                      Submit application form
+                    </button>
+                  )}
+                <button className="px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary hover:bg-primary/15 shadow-sm transition-all">
                   Contact office
                 </button>
               </div>

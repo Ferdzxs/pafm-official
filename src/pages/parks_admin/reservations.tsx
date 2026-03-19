@@ -88,10 +88,15 @@ function parseTimeSlot(raw: string | null): ParsedSlot {
 // ─────────────────────────────────────────────
 function statusBg(s: string) {
   switch (s) {
-    case "pending":   return "bg-yellow-500"
-    case "approved":  return "bg-green-600"
+    case "pending_loi":
+    case "desk_logged":
+    case "endorsed_to_admin":
+    case "pending":   return "bg-yellow-500" // legacy pending
+    case "admin_approved":
+    case "approved":  return "bg-green-600" // legacy approved
     case "completed": return "bg-blue-600"
-    case "rejected":  return "bg-red-600"
+    case "admin_rejected":
+    case "rejected":  return "bg-red-600"   // legacy rejected
     default:          return "bg-slate-500"
   }
 }
@@ -110,12 +115,40 @@ function cap(s: string) {
 }
 function bpmnLabel(status: string) {
   switch (status) {
-    case "pending":   return "BPMN Step 4 — Awaiting Parks Admin Decision"
-    case "approved":  return "BPMN Step 5 ✓ — Approved · Permit Issued (Step 13)"
+    case "pending_loi":       return "BPMN Step 1 — LOI submitted (awaiting desk processing)"
+    case "desk_logged":       return "BPMN Steps 2–3 — Desk pre-check & availability"
+    case "endorsed_to_admin": return "BPMN Step 4 — Endorsed to Parks Admin"
+    case "pending":           return "BPMN Step 4/5 — Legacy pending (treat as endorsed)"
+    case "admin_approved":
+    case "approved":          return "BPMN Step 5 ✓ — Admin approved"
     case "completed": return "BPMN Step 15 — Event Monitored & Completed"
-    case "rejected":  return "BPMN Step 5 ✗ — Request Disapproved"
+    case "admin_rejected":
+    case "rejected":          return "BPMN Step 5 ✗ — Request Disapproved"
     default:          return ""
   }
+}
+
+async function notifyCitizenByPersonId(params: {
+  personId: string | null
+  referenceId: string
+  notifType: string
+  message: string
+}) {
+  if (!params.personId) return
+  const { data: acct } = await supabase
+    .from("citizen_account")
+    .select("account_id")
+    .eq("person_id", params.personId)
+    .maybeSingle()
+  if (!acct?.account_id) return
+  await supabase.from("notification_log").insert({
+    notif_id: `NLOG-${Date.now()}`,
+    account_id: acct.account_id,
+    module_reference: "parks",
+    reference_id: params.referenceId,
+    notif_type: params.notifType,
+    message: params.message,
+  })
 }
 
 // ─────────────────────────────────────────────
@@ -257,7 +290,7 @@ function DetailModal({ r, onClose, onApprove, onReject, loading }: {
       )}
 
       {/* BPMN Step 5: Approve / Reject */}
-      {r.status === "pending" && (
+      {(r.status === "endorsed_to_admin" || r.status === "pending") && (
         <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-800">
           <button
             onClick={() => onReject(r.reservation_id)}
@@ -393,9 +426,16 @@ export default function Reservations() {
   async function handleApprove(id: string) {
     setActionLoading(true)
     try {
+      const r = reservations.find(x => x.reservation_id === id) ?? null
       const { error: e } = await supabase
-        .from("park_reservation_record").update({ status: "approved" }).eq("reservation_id", id)
+        .from("park_reservation_record").update({ status: "admin_approved" }).eq("reservation_id", id)
       if (e) throw new Error(e.message)
+      await notifyCitizenByPersonId({
+        personId: r?.applicant_person_id ?? null,
+        referenceId: id,
+        notifType: "reservation_approved",
+        message: `Your park reservation ${id} has been approved.`,
+      })
       setConfirmAction(null); setViewR(null)
       await loadData()
     } catch (err: unknown) {
@@ -406,9 +446,16 @@ export default function Reservations() {
   async function handleReject(id: string) {
     setActionLoading(true)
     try {
+      const r = reservations.find(x => x.reservation_id === id) ?? null
       const { error: e } = await supabase
-        .from("park_reservation_record").update({ status: "rejected" }).eq("reservation_id", id)
+        .from("park_reservation_record").update({ status: "admin_rejected" }).eq("reservation_id", id)
       if (e) throw new Error(e.message)
+      await notifyCitizenByPersonId({
+        personId: r?.applicant_person_id ?? null,
+        referenceId: id,
+        notifType: "reservation_disapproved",
+        message: `Your park reservation ${id} was not approved.`,
+      })
       setConfirmAction(null); setViewR(null)
       await loadData()
     } catch (err: unknown) {
@@ -435,12 +482,12 @@ export default function Reservations() {
     )
   })
 
-  const pending = reservations.filter((r) => r.status === "pending")
+  const pending = reservations.filter((r) => r.status === "endorsed_to_admin" || r.status === "pending")
 
   const kpis = [
     { label: "Total Reservations",  value: reservations.length,                                          icon: FileText    },
-    { label: "Pending (Step 4)",    value: pending.length,                                                icon: Clock       },
-    { label: "Approved (Step 5)",   value: reservations.filter((r) => r.status === "approved").length,  icon: CheckCircle  },
+    { label: "For Admin Review (Step 5)", value: pending.length,                                          icon: Clock       },
+    { label: "Approved (Step 5)",   value: reservations.filter((r) => ["admin_approved","approved"].includes(r.status)).length,  icon: CheckCircle  },
     { label: "Completed (Step 15)", value: reservations.filter((r) => r.status === "completed").length, icon: CheckCircle2 },
   ]
 
@@ -505,10 +552,13 @@ export default function Reservations() {
             onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
+            <option value="endorsed_to_admin">Endorsed to Admin</option>
+            <option value="pending">Legacy Pending</option>
+            <option value="admin_approved">Admin Approved</option>
+            <option value="approved">Legacy Approved</option>
             <option value="completed">Completed</option>
-            <option value="rejected">Rejected</option>
+            <option value="admin_rejected">Admin Rejected</option>
+            <option value="rejected">Legacy Rejected</option>
           </select>
           <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
         </div>
@@ -640,7 +690,7 @@ export default function Reservations() {
                       <span className={`px-2 py-1 rounded-full text-[11px] font-semibold text-white ${statusBg(r.status)}`}>
                         {cap(r.status)}
                       </span>
-                      {r.status === "pending" && (
+                      {(r.status === "endorsed_to_admin" || r.status === "pending") && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => openConfirm("approve", r)} className="p-1.5 rounded text-muted-foreground hover:text-green-600 hover:bg-green-50 transition" title="Approve">
                             <ThumbsUp size={13} />

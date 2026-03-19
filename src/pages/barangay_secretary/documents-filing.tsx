@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { Search, Plus, FileText, Download, Upload, Eye, User, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface BrgyDocument {
     id: string
@@ -22,14 +23,15 @@ const DOC_COLOR: Record<string, string> = {
 
 interface RawDocumentData {
     document_id: string
-    document_number: string | null
+    document_no: string | null
     title: string
     document_type: string
-    recipient_name: string | null
+    issued_to: string | null
+    purpose: string | null
     created_at: string
     status: string
-    file_url: string | null
-    filed_by: { office_name: string } | { office_name: string }[] | null
+    issued_by: string | null
+    document_date: string | null
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -37,6 +39,7 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 export default function DocumentsFiling() {
+    const { user } = useAuth()
     const [documents, setDocuments] = useState<BrgyDocument[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -60,30 +63,29 @@ export default function DocumentsFiling() {
                 .from('barangay_documents')
                 .select(`
                     document_id,
-                    document_number,
+                    document_no,
                     title,
                     document_type,
-                    recipient_name,
+                    issued_to,
+                    purpose,
                     created_at,
                     status,
-                    file_url,
-                    filed_by:office_records!filed_by_office ( office_name )
+                    issued_by,
+                    document_date
                 `)
                 .order('created_at', { ascending: false })
 
             if (error) throw error
 
             const formatted: BrgyDocument[] = (data as unknown as RawDocumentData[] || []).map(d => {
-                const filedByData = Array.isArray(d.filed_by) ? d.filed_by[0] : d.filed_by
-                
                 return {
                     id: d.document_id,
-                    doc_no: d.document_number || d.document_id,
+                    doc_no: d.document_no || d.document_id,
                     title: d.title,
                     type: d.document_type as BrgyDocument['type'],
-                    for_name: d.recipient_name || undefined,
+                    for_name: d.issued_to || undefined,
                     filed_date: d.created_at,
-                    filed_by: filedByData?.office_name || 'Secretary Office',
+                    filed_by: d.issued_by || 'Secretary Office',
                     status: d.status as BrgyDocument['status']
                 }
             })
@@ -114,13 +116,14 @@ export default function DocumentsFiling() {
             const { error } = await supabase
                 .from('barangay_documents')
                 .insert({
-                    document_number: formData.doc_no,
+                    document_no: formData.doc_no,
                     title: formData.title,
                     document_type: formData.type,
-                    recipient_name: formData.for_name || null,
+                    issued_to: formData.for_name || null,
+                    purpose: null,
                     status: formData.status,
-                    // filed_by_office would normally be set here, 
-                    // but we'll let the DB handled it or set a default if needed
+                    issued_by: user?.full_name ?? null,
+                    document_date: new Date().toISOString().split('T')[0],
                 })
 
             if (error) throw error
