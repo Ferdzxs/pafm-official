@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { Package, Plus, Search, Filter, Clock, CheckCircle, XCircle, Send, RefreshCw } from 'lucide-react'
+import { Package, Plus, Search, Filter, Clock, CheckCircle, XCircle, Send, RefreshCw, Paperclip } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
 
@@ -37,6 +37,7 @@ export default function PunongBarangayAssetRequestsPage() {
     const [formItem, setFormItem] = useState('')
     const [formPriority, setFormPriority] = useState('Medium')
     const [formNotes, setFormNotes] = useState('')
+    const [formFiles, setFormFiles] = useState<Record<string, File | null>>({ letter: null, ra16: null, nr15: null })
 
     const load = async () => {
         setIsLoading(true)
@@ -114,10 +115,14 @@ export default function PunongBarangayAssetRequestsPage() {
         const today = new Date().toISOString().split('T')[0]
         const reqId = `REQ-BR-${Date.now()}`
 
+        const attachedDocs = Object.entries(formFiles).filter(([, f]) => f !== null)
+        const docLabel = attachedDocs.map(([k]) => k === 'letter' ? 'Request Letter' : k === 'ra16' ? 'RA-16' : 'NR-15').join(', ')
+        const scopeWithDocs = formItem.trim() + (docLabel ? ` [Docs: ${docLabel}]` : '')
+
         const { error } = await supabase.from('inventory_request').insert({
             inventory_request_id: reqId,
             requesting_office: officeData.office_id,
-            inventory_scope: formItem.trim(),
+            inventory_scope: scopeWithDocs,
             status: 'pending',
             date_requested: today,
             cycle_type: formPriority,
@@ -127,17 +132,48 @@ export default function PunongBarangayAssetRequestsPage() {
             console.error(error)
             toast.error('Failed to submit request: ' + error.message)
         } else {
+            // Convert files to base64 and save directly to digital_document
+            const toBase64 = (file: File): Promise<string> =>
+                new Promise((res, rej) => {
+                    const r = new FileReader()
+                    r.onload = () => res(r.result as string)
+                    r.onerror = rej
+                    r.readAsDataURL(file)
+                })
+
+            await Promise.all(
+                attachedDocs.map(async ([key, file]) => {
+                    try {
+                        const dataUrl = await toBase64(file!)
+                        await supabase.from('digital_document').insert({
+                            document_id: `DOC-${reqId}-${key}`,
+                            document_type: `asset_request_${key}`,
+                            reference_no: reqId,
+                            date_created: today,
+                            status: 'attached',
+                            created_by_office: officeData.office_id,
+                            received_by_employee: null,
+                            person_id: null,
+                            file_url: dataUrl,
+                        })
+                    } catch (err) {
+                        console.error('Failed to save doc:', err)
+                    }
+                })
+            )
             toast.success('Request submitted to FAMCD!')
             setShowModal(false)
             setFormItem('')
             setFormPriority('Medium')
             setFormNotes('')
+            setFormFiles({ letter: null, ra16: null, nr15: null })
             load()
         }
         setSubmitting(false)
     }
 
     return (
+        <>
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto animate-fade-in">
             {/* HEADER */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -251,9 +287,11 @@ export default function PunongBarangayAssetRequestsPage() {
                 </div>
             </div>
 
-            {/* NEW REQUEST MODAL */}
-            {showModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+        </div>
+
+        {/* NEW REQUEST MODAL */}
+        {showModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-md rounded-2xl shadow-xl p-6 space-y-5" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
                         <div className="flex justify-between items-center">
                             <div>
@@ -300,6 +338,36 @@ export default function PunongBarangayAssetRequestsPage() {
                                     onChange={e => setFormNotes(e.target.value)}
                                 />
                             </div>
+                            {/* DOCUMENT ATTACHMENTS */}
+                            <div>
+                                <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--color-text-muted)' }}>Supporting Documents <span className="font-normal">(optional)</span></label>
+                                <div className="space-y-2">
+                                    {[
+                                        { key: 'letter', label: 'Request Letter', hint: 'QCG-GSD-FAIS-IRL' },
+                                        { key: 'ra16',   label: 'Land Assessment Form', hint: 'RA-16' },
+                                        { key: 'nr15',   label: 'Building / Structure Form', hint: 'NR-15' },
+                                    ].map(doc => (
+                                        <div key={doc.key} className="flex items-center gap-3 p-2.5 rounded-xl" style={{ border: '1px dashed var(--color-border)', background: 'var(--color-bg)' }}>
+                                            <Paperclip size={14} style={{ color: 'var(--color-text-muted)' }} className="flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{doc.label} <span style={{ color: 'var(--color-text-muted)' }}>({doc.hint})</span></p>
+                                                {formFiles[doc.key] ? (
+                                                    <p className="text-xs truncate" style={{ color: '#10b981' }}>✓ {formFiles[doc.key]!.name}</p>
+                                                ) : (
+                                                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No file selected</p>
+                                                )}
+                                            </div>
+                                            <label className="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold flex-shrink-0" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
+                                                Browse
+                                                <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" className="hidden"
+                                                    onChange={e => setFormFiles(prev => ({ ...prev, [doc.key]: e.target.files?.[0] ?? null }))}
+                                                />
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] mt-1.5" style={{ color: 'var(--color-text-muted)' }}>Accepted: PDF, Word, JPG, PNG</p>
+                            </div>
                             <div className="flex justify-end gap-3 pt-2">
                                 <button type="button" onClick={() => setShowModal(false)}
                                     className="px-4 py-2 rounded-xl text-sm font-medium border hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
@@ -313,9 +381,9 @@ export default function PunongBarangayAssetRequestsPage() {
                                 </button>
                             </div>
                         </form>
-                    </div>
                 </div>
-            )}
-        </div>
+            </div>
+        )}
+        </>
     )
 }

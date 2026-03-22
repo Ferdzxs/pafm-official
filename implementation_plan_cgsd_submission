@@ -1,0 +1,58 @@
+# Split CGSD Approvals: Inspection vs. Asset Reports
+
+## Goal
+
+Right now, ALL `inventory_report` records with `approval_status = 'pending'` land in one shared **CGSD Approvals** page — whether they came from FAMCD's formal reports OR from FAMCD's ocular inspection submission.
+
+The user wants them separated into **two distinct places**:
+
+| Source | Currently goes to | Should go to |
+|---|---|---|
+| FAMCD ocular inspection → "Submit Report to CGSD" | `cgsd/approvals.tsx` ❌ | `cgsd/ocular-inspections.tsx` ✅ |
+| FAMCD inventory reports → "Submit to CGSD" | `cgsd/approvals.tsx` ✅ | stays in `cgsd/approvals.tsx` ✅ |
+
+---
+
+## How to Tell Them Apart
+
+When FAMCD submits from [ocular-inspections.tsx](file:///c:/Users/clare/Downloads/pafm-official-main/pafm-official-main/src/pages/famcd/ocular-inspections.tsx), it creates **both**:
+- An `ocular_inspection` record
+- An `inventory_report` record (linked via `inventory_request_id`)
+
+When FAMCD submits from [inventory-reports.tsx](file:///c:/Users/clare/Downloads/pafm-official-main/pafm-official-main/src/pages/famcd/inventory-reports.tsx), it only creates/updates:
+- An `inventory_report` record (NO `ocular_inspection` record for the same `inventory_request_id`)
+
+So: **if an `ocular_inspection` record exists for the `inventory_request_id` → it's an inspection report, not a formal asset report.**
+
+---
+
+## Proposed Changes
+
+### 1. [cgsd_management/approvals.tsx](file:///c:/Users/clare/Downloads/pafm-official-main/pafm-official-main/src/pages/cgsd_management/approvals.tsx) — filter OUT inspection reports
+
+Modify the fetch to **exclude** reports that have an associated `ocular_inspection` record:
+
+```ts
+// Fetch pending reports that did NOT come from ocular inspections
+// Join ocular_inspection and only include rows where inspection is NULL
+```
+
+Client-side: fetch all pending `inventory_report`, then also fetch all `ocular_inspection` IDs, and filter out matches.
+
+### 2. [cgsd_management/ocular-inspections.tsx](file:///c:/Users/clare/Downloads/pafm-official-main/pafm-official-main/src/pages/cgsd_management/ocular-inspections.tsx) — add Approve/Return actions for inspection reports
+
+Currently this page is read-only. Update it to:
+- Fetch `inventory_request` with `status = 'completed'` (FAMCD did the field inspection)
+- For each, also fetch the linked `inventory_report` (the pending report FAMCD submitted)
+- Show the FAMCD inspector's findings: condition, notes, recommendation
+- Add **Approve** and **Return for Revision** buttons (same logic as current [approvals.tsx](file:///c:/Users/clare/Downloads/pafm-official-main/pafm-official-main/src/pages/cgsd_management/approvals.tsx))
+- On Approve: `approval_record` insert, `inventory_report.approval_status → 'approved'`, auto-update `property.asset_condition`
+
+---
+
+## Verification Plan
+
+1. FAMCD submits inspection → check it appears in `cgsd/ocular-inspections.tsx` only
+2. FAMCD submits formal inventory report → check it appears in `cgsd/approvals.tsx` only
+3. CGSD approves from [ocular-inspections.tsx](file:///c:/Users/clare/Downloads/pafm-official-main/pafm-official-main/src/pages/famcd/ocular-inspections.tsx) → `property.asset_condition` updates correctly
+4. No cross-contamination between the two queues

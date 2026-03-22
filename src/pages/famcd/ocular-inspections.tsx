@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Filter, Camera, CheckSquare, UploadCloud, X, Loader2 } from 'lucide-react'
+import { Search, Filter, Camera, CheckSquare, UploadCloud, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'react-hot-toast'
@@ -19,43 +19,47 @@ export default function OcularInspectionsPage() {
     const [newCondition, setNewCondition] = useState('Excellent')
     const [findings, setFindings] = useState('')
     const [recommendation, setRecommendation] = useState('Approve Request')
-    const [evidenceFiles, setEvidenceFiles] = useState<File[]>([])
-    const [isSubmitting, setIsSubmitting] = useState(false)
 
-    useEffect(() => {
-        fetchPendingInspections()
-    }, [])
-
-    const fetchPendingInspections = async () => {
+    async function fetchPendingInspections() {
         setIsLoading(true)
         // Fetch inventory requests that are pending
         const { data, error } = await supabase
             .from('inventory_request')
             .select(`
                 inventory_request_id,
-                inventory_scope,
                 property_id,
-                property!left (
+                inventory_scope,
+                property (
                     property_name,
                     location,
                     asset_condition,
                     acquisition_date
                 )
             `)
-            .in('status', ['pending', 'approved', 'in_progress'])
+            .eq('status', 'pending')
             .order('date_requested', { ascending: false })
 
         if (error) {
             console.error('Error fetching inspections:', error)
             toast.error('Failed to load pending inspections queue.')
         } else {
-            setInspections(data || [])
+            // Ensure we normalize inventory_request_id to request_id so UI code remains consistent
+            const normalized = (data || []).map((item: any) => ({
+                ...item,
+                request_id: item.inventory_request_id || item.request_id,
+            }))
+            setInspections(normalized)
         }
+
         setIsLoading(false)
     }
 
+    useEffect(() => {
+        fetchPendingInspections()
+    }, [])
+
     const filtered = inspections.filter(a =>
-        a.inventory_request_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.request_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.inventory_scope?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.property?.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -68,40 +72,8 @@ export default function OcularInspectionsPage() {
             return
         }
 
-        setIsSubmitting(true)
         const toastId = toast.loading('Submitting inspection report to CGSD...')
         
-        // 0. Upload photos if there are any
-        const uploadedEvidenceUrls: string[] = []
-        if (evidenceFiles.length > 0) {
-            toast.loading(`Uploading ${evidenceFiles.length} photo(s)...`, { id: toastId })
-            
-            for (const file of evidenceFiles) {
-                const fileExt = file.name.split('.').pop()
-                const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-                const filePath = `ocular-inspections/${selectedItem.inventory_request_id}/${fileName}`
-
-                const { error: uploadError } = await supabase.storage
-                    .from('inspection-evidence')
-                    .upload(filePath, file)
-
-                if (uploadError) {
-                    console.error('Error uploading file:', uploadError)
-                    toast.error(`Failed to upload ${file.name}. Proceeding with others.`)
-                } else {
-                    const { data: publicUrlData } = supabase.storage
-                        .from('inspection-evidence')
-                        .getPublicUrl(filePath)
-                    
-                    if (publicUrlData) {
-                        uploadedEvidenceUrls.push(publicUrlData.publicUrl)
-                    }
-                }
-            }
-        }
-
-        toast.loading('Saving inspection records...', { id: toastId })
-
         // 1. Create an ocular_inspection record
         const inspectionId = `INSP-${Date.now()}`
         const { error: inspError } = await supabase
@@ -109,33 +81,12 @@ export default function OcularInspectionsPage() {
             .insert({
                 inspection_id: inspectionId,
                 property_id: selectedItem.property_id,
-                inventory_request_id: selectedItem.inventory_request_id,
+                inventory_request_id: selectedItem.request_id,
                 inspection_date: new Date().toISOString().split('T')[0],
                 conducted_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 conducted_by_employee: user.id || 'EMP-004',
-                new_condition: newCondition, // stored cleanly for auto-update on CGSD approval
-                physical_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
+                asset_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
             })
-
-        // 1.5. Save photo evidence records
-        if (uploadedEvidenceUrls.length > 0) {
-            const evidenceRecords = uploadedEvidenceUrls.map(url => ({
-                evidence_id: `EVID-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-                inspection_id: inspectionId,
-                photo_url: url,
-                description: `Evidence for ${selectedItem.inventory_request_id}`,
-                uploaded_by_employee: user.id || 'EMP-004'
-            }));
-
-            const { error: evidenceError } = await supabase
-                .from('inspection_photo_evidence')
-                .insert(evidenceRecords);
-
-            if (evidenceError) {
-                 console.error('Error saving photo evidence URLs:', evidenceError)
-                 toast.error('Failed to link some photos to the report, but report will proceed.')
-            }
-        }
 
         // 2. Generate the draft inventory report for CGSD
         const reportId = `IRP-${Date.now()}`
@@ -143,7 +94,7 @@ export default function OcularInspectionsPage() {
             .from('inventory_report')
             .insert({
                 inventory_report_id: reportId,
-                inventory_request_id: selectedItem.inventory_request_id,
+                inventory_request_id: selectedItem.request_id,
                 preparation_date: new Date().toISOString().split('T')[0],
                 prepared_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 prepared_by_employee: user.id || 'EMP-004',
@@ -154,21 +105,18 @@ export default function OcularInspectionsPage() {
         const { error: reqError } = await supabase
             .from('inventory_request')
             .update({ status: 'completed' }) // or 'in-review'
-            .eq('inventory_request_id', selectedItem.inventory_request_id)
+            .eq('inventory_request_id', selectedItem.request_id)
 
         if (inspError || repError || reqError) {
             console.error(inspError, repError, reqError)
             toast.error('Failed to submit inspection report.', { id: toastId })
-            setIsSubmitting(false)
             return
         }
 
-        toast.success(`Inspection Report for ${selectedItem.inventory_request_id} submitted to CGSD Approvals queue!`, { id: toastId })
+        toast.success(`Inspection Report for ${selectedItem.request_id} submitted to CGSD Approvals queue!`, { id: toastId })
         setSelectedItem(null)
         setFindings('')
-        setEvidenceFiles([])
         fetchPendingInspections()
-        setIsSubmitting(false)
     }
 
     if (selectedItem) {
@@ -183,7 +131,7 @@ export default function OcularInspectionsPage() {
                             <h1 className="font-display text-2xl font-bold text-foreground">Conduct Inspection</h1>
                         </div>
                         <p className="text-muted-foreground text-sm mt-1 ml-16">
-                            {selectedItem.inventory_request_id} — {selectedItem.inventory_scope}
+                            {selectedItem.request_id} — {selectedItem.inventory_scope}
                         </p>
                     </div>
                 </div>
@@ -273,47 +221,11 @@ export default function OcularInspectionsPage() {
 
                             <div>
                                 <label className="text-xs font-semibold text-foreground mb-1.5 block">Photographic Evidence</label>
-                                <label className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer block">
-                                    <input 
-                                        type="file" 
-                                        className="hidden" 
-                                        accept="image/jpeg, image/png" 
-                                        multiple 
-                                        onChange={(e) => {
-                                            if (e.target.files && e.target.files.length > 0) {
-                                                const newFiles = Array.from(e.target.files)
-                                                setEvidenceFiles(prev => [...prev, ...newFiles])
-                                                toast.success(`${newFiles.length} photo(s) selected for upload.`)
-                                            }
-                                        }}
-                                    />
+                                <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
                                     <Camera size={28} className="text-muted-foreground mb-2" />
                                     <div className="text-sm font-medium">Click to upload photos</div>
                                     <div className="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
-                                </label>
-                                {evidenceFiles.length > 0 && (
-                                    <div className="mt-4 space-y-2">
-                                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Selected Files:</div>
-                                        <div className="flex flex-col gap-2">
-                                            {evidenceFiles.map((file, idx) => (
-                                                <div key={idx} className="flex items-center justify-between bg-muted/30 p-2.5 rounded-md text-sm border border-border/50">
-                                                    <span className="truncate max-w-[200px] text-xs font-medium" title={file.name}>{file.name}</span>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                                        onClick={(e) => {
-                                                            e.preventDefault()
-                                                            setEvidenceFiles(prev => prev.filter((_, i) => i !== idx))
-                                                        }}
-                                                    >
-                                                        <X size={14} />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                </div>
                             </div>
 
                             <div>
@@ -331,18 +243,8 @@ export default function OcularInspectionsPage() {
                             </div>
 
                             <div className="pt-4 border-t border-border mt-6">
-                                <Button 
-                                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
-                                    size="lg" 
-                                    onClick={handleSubmitReport}
-                                    disabled={isSubmitting}
-                                >
-                                    {isSubmitting ? (
-                                        <Loader2 size={18} className="mr-2 animate-spin" />
-                                    ) : (
-                                        <UploadCloud size={18} className="mr-2" />
-                                    )}
-                                    {isSubmitting ? 'Submitting Report...' : 'Submit Report to CGSD'}
+                                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" size="lg" onClick={handleSubmitReport}>
+                                    <UploadCloud size={18} className="mr-2" /> Submit Report to CGSD
                                 </Button>
                             </div>
                         </CardContent>
@@ -407,14 +309,14 @@ export default function OcularInspectionsPage() {
                                     </td>
                                 </tr>
                             ) : filtered.map((item) => (
-                                <tr key={item.inventory_request_id} className="hover:bg-accent/50 transition-colors">
+                                <tr key={item.request_id} className="hover:bg-accent/50 transition-colors">
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
                                                 <Search size={18} />
                                             </div>
                                             <div>
-                                                <div className="font-semibold text-sm text-foreground">{item.inventory_request_id}</div>
+                                                <div className="font-semibold text-sm text-foreground">{item.request_id}</div>
                                                 <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={item.inventory_scope}>
                                                     {item.inventory_scope}
                                                 </div>

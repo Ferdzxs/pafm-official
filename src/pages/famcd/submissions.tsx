@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectItem } from '@/components/ui/select'
 import {
     Search, Filter, Upload, FileText, Calendar, CheckCircle, Eye, XCircle,
-    Package, Users, TreePine, Building2, RefreshCw
+    Package, Users, TreePine, Building2, RefreshCw, Paperclip, ExternalLink
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
@@ -70,6 +70,32 @@ export default function Submissions() {
     const [incomingLoading, setIncomingLoading] = useState(true)
     const [incomingSearch, setIncomingSearch] = useState('')
     const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+    // ── Document viewer state ──
+    type AttachedDoc = { document_id: string; document_type: string; file_url: string | null }
+    const [docsModalReq, setDocsModalReq] = useState<IncomingRequest | null>(null)
+    const [attachedDocs, setAttachedDocs] = useState<AttachedDoc[]>([])
+    const [docsLoading, setDocsLoading] = useState(false)
+
+    const openDocsModal = async (req: IncomingRequest) => {
+        setDocsModalReq(req)
+        setAttachedDocs([])
+        setDocsLoading(true)
+        const { data, error } = await supabase
+            .from('digital_document')
+            .select('document_id, document_type, file_url')
+            .eq('reference_no', req.id)
+            .like('document_type', 'asset_request_%')
+        if (!error) setAttachedDocs(data || [])
+        setDocsLoading(false)
+    }
+
+    const docTypeLabel = (type: string) => {
+        if (type.includes('letter')) return '📄 Request Letter (IRL)'
+        if (type.includes('ra16')) return '🗺️ Land Assessment Form (RA-16)'
+        if (type.includes('nr15')) return '🏛️ Building / Structure Form (NR-15)'
+        return '📎 Attachment'
+    }
 
     // ── Existing report submissions state ──
     const [isLoading, setIsLoading] = useState(true)
@@ -305,10 +331,10 @@ export default function Submissions() {
                 </Card>
 
                 <Card className="shadow-sm border-border overflow-hidden">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overflow-y-auto max-h-[420px]">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-border bg-muted/50">
+                                <tr className="border-b border-border bg-muted/50 sticky top-0 z-10 bg-card">
                                     <th className="p-4 text-xs font-semibold text-muted-foreground">Request ID</th>
                                     <th className="p-4 text-xs font-semibold text-muted-foreground">Office</th>
                                     <th className="p-4 text-xs font-semibold text-muted-foreground">Item / Service</th>
@@ -356,6 +382,14 @@ export default function Submissions() {
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
+                                                        className="gap-1"
+                                                        onClick={() => openDocsModal(req)}
+                                                    >
+                                                        <Paperclip size={13} /> Docs
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
                                                         className="text-destructive hover:bg-destructive/10 border-destructive"
                                                         disabled={actionLoading === req.id}
                                                         onClick={() => handleUpdateStatus(req.id, 'rejected')}
@@ -372,7 +406,12 @@ export default function Submissions() {
                                                     </Button>
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-muted-foreground italic">No action needed</span>
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="ghost" size="sm" className="gap-1" onClick={() => openDocsModal(req)}>
+                                                        <Paperclip size={13} /> Docs
+                                                    </Button>
+                                                    <span className="text-xs text-muted-foreground italic self-center">No action needed</span>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -383,136 +422,58 @@ export default function Submissions() {
                 </Card>
             </div>
 
-            {/* ══════════════════════════════════════════════════════════════
-                SECTION 2 — INVENTORY REPORT SUBMISSIONS (existing)
-            ══════════════════════════════════════════════════════════════ */}
-            <div>
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                    <div>
-                        <h2 className="font-display text-xl font-bold text-foreground">Inventory Report Submissions</h2>
-                        <p className="text-muted-foreground text-sm mt-1">
-                            Track submission of finalized inventory reports to COA, City Accounting, and the Office of the City Mayor.
-                        </p>
-                    </div>
-                </div>
-
-                <Card className="mb-4 shadow-sm border-border">
-                    <CardContent className="p-4 flex gap-4 items-center bg-card">
-                        <div className="relative w-full sm:w-96">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                            <Input
-                                placeholder="Search by report ID or scope..."
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="pl-9 h-10 w-full bg-background"
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="shadow-sm border-border overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <div className="max-h-[60vh] overflow-y-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/50">
-                                        <th className="p-4 text-xs font-semibold text-muted-foreground w-1/4">Report</th>
-                                        <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Prepared By</th>
-                                        <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Date</th>
-                                        <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Status</th>
-                                        <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Submitted To</th>
-                                        <th className="p-4 text-xs font-semibold text-muted-foreground text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {isLoading ? (
-                                        <tr><td colSpan={6} className="p-8 text-center text-muted-foreground text-sm">Loading submissions...</td></tr>
-                                    ) : filteredReports.length === 0 ? (
-                                        <tr><td colSpan={6} className="p-8 text-center text-muted-foreground text-sm">No reports found.</td></tr>
-                                    ) : filteredReports.map(item => {
-                                        const submission = submissions[item.inventory_report_id]
-                                        const destinationLabel = getSubmissionDestination(submission)
-                                        return (
-                                            <tr key={item.inventory_report_id} className="hover:bg-accent/50 transition-colors">
-                                                <td className="p-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
-                                                            <FileText size={18} />
-                                                        </div>
-                                                        <div>
-                                                            <div className="font-semibold text-sm text-foreground">{item.inventory_report_id}</div>
-                                                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                                                {item.inventory_request?.inventory_scope || 'General Inventory Report'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 text-sm text-foreground font-medium">{item.government_office?.office_name || 'System'}</td>
-                                                <td className="p-4">
-                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                        <Calendar size={14} />
-                                                        <span>{item.preparation_date || 'N/A'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="p-4">{getStatusBadge(item.approval_status)}</td>
-                                                <td className="p-4 text-sm text-muted-foreground">{destinationLabel || '-'}</td>
-                                                <td className="p-4 text-right">
-                                                    {submission ? (
-                                                        <Button variant="ghost" size="sm" onClick={() => { if (submission.file_url) window.open(submission.file_url, '_blank'); else toast.error('No attached file.') }}>
-                                                            <Eye size={16} className="mr-2" /> View
-                                                        </Button>
-                                                    ) : (
-                                                        <Button variant="ghost" size="sm" onClick={() => { setSelectedReport(item); setDestination(DESTINATIONS[0].value); setComment('') }}>
-                                                            <Upload size={16} className="mr-2" /> Submit
-                                                        </Button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </Card>
-            </div>
-
-            {/* ── Submit Report Modal ─────────────────────────────────── */}
-            {selectedReport && (
+            {/* ── Attached Documents Modal ─────────────────────────────── */}
+            {docsModalReq && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-                    <Card className="w-full max-w-lg shadow-xl relative z-[101] bg-card">
-                        <CardContent className="p-6 space-y-6">
+                    <Card className="w-full max-w-md shadow-xl relative z-[101] bg-card">
+                        <CardContent className="p-6 space-y-4">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h2 className="text-xl font-semibold text-foreground">Submit Inventory Report</h2>
-                                    <p className="text-sm text-muted-foreground mt-1">{selectedReport.inventory_report_id}</p>
+                                    <h2 className="text-lg font-semibold text-foreground">Attached Documents</h2>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{docsModalReq.id} — {docsModalReq.office}</p>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => setSelectedReport(null)}>
+                                <Button variant="ghost" size="icon" onClick={() => setDocsModalReq(null)}>
                                     <XCircle size={20} />
                                 </Button>
                             </div>
-                            <div className="grid grid-cols-1 gap-4">
-                                <div>
-                                    <label className="text-xs font-semibold text-muted-foreground">Send to</label>
-                                    <Select value={destination} onChange={e => setDestination(e.target.value)}>
-                                        {DESTINATIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-                                    </Select>
+
+                            {docsLoading ? (
+                                <p className="text-sm text-muted-foreground py-4 text-center">Loading documents...</p>
+                            ) : attachedDocs.length === 0 ? (
+                                <div className="py-6 text-center">
+                                    <Paperclip size={28} className="mx-auto mb-2 text-muted-foreground opacity-40" />
+                                    <p className="text-sm text-muted-foreground">No documents attached to this request.</p>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-muted-foreground">Notes (optional)</label>
-                                    <textarea
-                                        className="w-full min-h-[100px] p-3 rounded-md border border-input bg-background/50 text-sm resize-y"
-                                        placeholder="Add context for the recipient."
-                                        value={comment}
-                                        onChange={e => setComment(e.target.value)}
-                                    />
+                            ) : (
+                                <div className="space-y-2">
+                                    {attachedDocs.map(doc => (
+                                        <div key={doc.document_id} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
+                                            <Paperclip size={15} className="text-muted-foreground flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-foreground">{docTypeLabel(doc.document_type)}</p>
+                                                <p className="text-xs text-muted-foreground truncate">
+                                                    {doc.file_url ? 'File attached' : 'No file'}
+                                                </p>
+                                            </div>
+                                            {doc.file_url ? (
+                                                <a
+                                                    href={doc.file_url}
+                                                    download={`${doc.document_type}_${doc.document_id}.${doc.file_url.substring(5, doc.file_url.indexOf(';'))?.split('/')[1] || 'pdf'}`}
+                                                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold flex-shrink-0"
+                                                    style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}
+                                                >
+                                                    <ExternalLink size={12} /> Download
+                                                </a>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">Unavailable</span>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <Button variant="outline" onClick={() => setSelectedReport(null)}>Cancel</Button>
-                                <Button onClick={handleSubmitReport}>
-                                    <CheckCircle size={16} className="mr-2" /> Submit
-                                </Button>
+                            )}
+
+                            <div className="flex justify-end pt-2">
+                                <Button variant="outline" onClick={() => setDocsModalReq(null)}>Close</Button>
                             </div>
                         </CardContent>
                     </Card>

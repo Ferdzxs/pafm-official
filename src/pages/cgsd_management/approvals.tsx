@@ -19,12 +19,23 @@ export default function ApprovalsPage() {
     const [reports, setReports] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
 
+    const [inspectionRequestIds, setInspectionRequestIds] = useState<Set<string>>(new Set())
+
     useEffect(() => {
         fetchPendingReports()
     }, [])
 
     const fetchPendingReports = async () => {
         setIsLoading(true)
+
+        // Fetch all inventory_request_ids that came through ocular inspections
+        const { data: inspData } = await supabase
+            .from('ocular_inspection')
+            .select('inventory_request_id')
+
+        const ocularRequestIds = new Set<string>((inspData || []).map((r: any) => r.inventory_request_id))
+        setInspectionRequestIds(ocularRequestIds)
+
         // Fetch inventory reports that are pending or have been returned
         const { data, error } = await supabase
             .from('inventory_report')
@@ -42,14 +53,18 @@ export default function ApprovalsPage() {
                     office_name
                 )
             `)
-            .in('approval_status', ['pending', 'approved', 'returned_for_revision']) // Fetch pending, approved, and returned reports
+            .in('approval_status', ['pending', 'approved', 'returned_for_revision'])
             .order('preparation_date', { ascending: false })
 
         if (error) {
             console.error('Error fetching reports:', error)
             toast.error('Failed to load pending approvals.')
         } else {
-            setReports(data || [])
+            // Exclude any report that was submitted from an ocular inspection
+            const formalOnly = (data || []).filter(
+                (r: any) => !ocularRequestIds.has(r.inventory_request_id)
+            )
+            setReports(formalOnly)
         }
         setIsLoading(false)
     }
@@ -558,10 +573,19 @@ export default function ApprovalsPage() {
                                 </div>
                             )}
                             {selectedItem.approval_status === 'approved' && (
-                                <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                                    <Button onClick={() => handleGenerateCOAReport(selectedItem)} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                        <Printer size={16} className="mr-2" /> Generate COA Report (PDF)
-                                    </Button>
+                                <div className="space-y-4 pt-4 border-t border-border">
+                                    <div className="p-3 bg-teal-500/10 border border-teal-500/20 rounded-lg text-sm text-teal-700 flex gap-2 items-start">
+                                        <CheckCircle size={16} className="shrink-0 mt-0.5 text-teal-600" />
+                                        <div>
+                                            <div className="font-semibold mb-0.5">Approved — Forwarded to RMCD</div>
+                                            <div className="text-teal-600/80 text-xs">RMCD has been notified and will handle the official document release to the requesting office.</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button onClick={() => handleGenerateCOAReport(selectedItem)} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                                            <Printer size={16} className="mr-2" /> Generate COA Report (PDF)
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
