@@ -14,12 +14,21 @@ interface BurialApp {
   document_validation_status: string
   application_status: string
   deceased_id: string
+  doc_death_cert_url: string | null
+  doc_medical_cert_url: string | null
+  doc_embalming_cert_url: string | null
+  doc_valid_id_url: string | null
+  doc_proof_relationship_url: string | null
   person: { full_name: string; contact_number: string | null }
   deceased: {
     full_name: string
     date_of_death: string
     death_certificate_no: string | null
     place_of_death: string | null
+    age_at_death: number | null
+    last_name: string | null
+    first_name: string | null
+    middle_name: string | null
   }
   indigent_assistance_record: { status: string; digital_cert_of_guarantee_url: string | null }[]
 }
@@ -45,8 +54,9 @@ export default function ReceivedDocuments() {
         .from('online_burial_application')
         .select(`
           application_id, submission_date, document_validation_status, application_status, deceased_id,
+          doc_death_cert_url, doc_medical_cert_url, doc_embalming_cert_url, doc_valid_id_url, doc_proof_relationship_url,
           person:person_id(full_name, contact_number),
-          deceased:deceased_id(full_name, date_of_death, death_certificate_no, place_of_death)
+          deceased:deceased_id(full_name, date_of_death, death_certificate_no, place_of_death, age_at_death, last_name, first_name, middle_name)
         `)
         .order('submission_date', { ascending: false })
       if (appErr) throw appErr
@@ -58,16 +68,16 @@ export default function ReceivedDocuments() {
       if (iarErr) throw iarErr
 
       // Merge by deceased_id
-      const merged = (appData || []).map((app: any) => ({
+      const merged = (appData || []).map((app: Record<string, unknown>) => ({
         ...app,
         indigent_assistance_record: (iarData || []).filter(
-          (iar: any) => iar.deceased_id === app.deceased_id
+          (iar: Record<string, unknown>) => iar.deceased_id === app.deceased_id
         ),
       }))
 
-      setApps(merged as any)
-    } catch (err: any) {
-      toast.error('Failed to load incoming documents: ' + (err?.message ?? String(err)))
+      setApps(merged as unknown as BurialApp[])
+    } catch (err: unknown) {
+      toast.error('Failed to load incoming documents: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setLoading(false)
     }
@@ -87,8 +97,8 @@ export default function ReceivedDocuments() {
       toast.success(status === 'validated' ? '✅ Documents validated. Forwarded to verification.' : '❌ Documents rejected. Applicant notified.')
       setSelected(null)
       fetchIncomingDocs()
-    } catch (err: any) {
-      toast.error('Validation failed: ' + err.message)
+    } catch (err: unknown) {
+      toast.error('Validation failed: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setValidating(null)
     }
@@ -143,7 +153,7 @@ export default function ReceivedDocuments() {
         ].map(({ key, label, value, color }) => (
           <button
             key={key}
-            onClick={() => setValidationFilter(validationFilter === key ? 'all' : key as any)}
+            onClick={() => setValidationFilter(validationFilter === key ? 'all' : key as 'pending' | 'validated' | 'rejected')}
             className={`glass rounded-xl p-4 border text-left transition-all ${
               validationFilter === key ? 'border-blue-500 ring-1 ring-blue-500/30' : 'border-white/5 hover:border-white/15'
             }`}
@@ -277,6 +287,7 @@ export default function ReceivedDocuments() {
                 ['Date of Death', selected.deceased?.date_of_death
                   ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'long' })
                   : '—'],
+                ['Age at Death', selected.deceased?.age_at_death != null ? `${selected.deceased.age_at_death} yrs` : '—'],
                 ['Place of Death', selected.deceased?.place_of_death ?? '—'],
                 ['Death Certificate #', selected.deceased?.death_certificate_no ?? 'Not provided'],
                 ['Applicant', selected.person?.full_name ?? '—'],
@@ -290,6 +301,40 @@ export default function ReceivedDocuments() {
                   <span className="text-sm text-white font-medium text-right max-w-[55%]">{value}</span>
                 </div>
               ))}
+
+              {/* Burial Requirements Links */}
+              <div className="pt-2">
+                <span className="text-xs text-slate-500 uppercase font-bold tracking-wide block mb-3">Uploaded Requirements</span>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Death Certificate (PSA)', url: selected.doc_death_cert_url },
+                    { label: 'Medical Certificate', url: selected.doc_medical_cert_url },
+                    { label: 'Certificate of Embalming', url: selected.doc_embalming_cert_url },
+                    { label: 'Valid ID (Next of Kin)', url: selected.doc_valid_id_url },
+                    { label: 'Proof of Relationship', url: selected.doc_proof_relationship_url },
+                  ].map(req => req.url ? (
+                    <a
+                      key={req.label}
+                      href={req.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors group"
+                    >
+                      <span className="flex items-center gap-2 text-sm text-slate-300 group-hover:text-white transition-colors">
+                        <FileText size={16} className="text-blue-400" /> {req.label}
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded">View</span>
+                    </a>
+                  ) : (
+                    <div key={req.label} className="flex items-center justify-between p-2.5 rounded-lg border border-white/5 bg-transparent opacity-50">
+                      <span className="flex items-center gap-2 text-sm text-slate-500">
+                        <XCircle size={16} /> {req.label}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">N/A</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {selected.indigent_assistance_record?.[0]?.digital_cert_of_guarantee_url && (
                 <a

@@ -13,23 +13,10 @@ type UnifiedApplication = {
   date: string
   details?: string
   priority?: string
-  raw?: any
+  raw?: Record<string, unknown>
 }
 
-const STATUS_BADGE: Record<string, 'warning' | 'success' | 'danger' | 'info'> = {
-  open: 'info',
-  pending: 'warning',
-  under_review: 'warning',
-  triaged: 'warning',
-  assigned: 'info',
-  in_progress: 'info',
-  approved: 'success',
-  confirmed: 'success',
-  resolved: 'success',
-  completed: 'success',
-  closed: 'success',
-  rejected: 'danger',
-}
+
 
 const MODULE_COLORS: Record<string, { bg: string, text: string }> = {
   burial: { bg: 'rgba(167, 139, 250, 0.15)', text: '#a78bfa' },
@@ -76,19 +63,26 @@ export default function MyApplications() {
 
         // 1. Fetch Burial
         const { data: burials } = await supabase
-          .from('burial_applications')
-          .select('*')
-          .ilike('applicant_name', `%${user.full_name}%`)
+          .from('online_burial_application')
+          .select(`
+            application_id,
+            application_status,
+            submission_date,
+            deceased:deceased_id ( full_name )
+          `)
+          .eq('person_id', personId)
 
         if (burials) {
           burials.forEach(b => {
+            const deceasedRef = Array.isArray(b.deceased) ? b.deceased[0] : b.deceased
+            const decName = deceasedRef?.full_name || 'Unknown'
             consolidated.push({
               id: b.application_id,
               module: 'burial',
               typeLabel: 'Burial Application',
-              status: b.status,
-              date: b.created_at,
-              details: `For: ${b.deceased_name}`,
+              status: b.application_status,
+              date: b.submission_date,
+              details: `For: ${decName}`,
               raw: b
             })
           })
@@ -143,7 +137,7 @@ export default function MyApplications() {
         if (utilities) {
           utilities.forEach(u => {
             const rawType = (u.ticket_type as string) || ''
-            const meta = (UTILITY_TICKET_TYPES as any)[rawType]
+            const meta = (UTILITY_TICKET_TYPES as Record<string, { label: string }>)[rawType]
             const label = meta?.label ?? rawType.replace('_', ' ')
             consolidated.push({
               id: u.ticket_id,
@@ -163,9 +157,9 @@ export default function MyApplications() {
         if (!cancelled) {
           setApps(consolidated)
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(err?.message || 'Failed to load your applications.')
+          setError(err instanceof Error ? err.message : 'Failed to load your applications.')
         }
       } finally {
         if (!cancelled) {
@@ -265,7 +259,7 @@ export default function MyApplications() {
           <select
             className="input-field pl-9 transition-colors"
             value={moduleFilter}
-            onChange={e => setModuleFilter(e.target.value as any)}
+            onChange={e => setModuleFilter(e.target.value as 'all' | 'burial' | 'parks' | 'barangay' | 'utility')}
           >
             <option value="all">All Modules</option>
             <option value="burial">Burial & Cemetery</option>
@@ -371,7 +365,7 @@ export default function MyApplications() {
                     <User size={13} /> Applicant
                   </div>
                   <div className="text-sm font-medium text-foreground">
-                    {selectedApp.raw?.applicant_name || selectedApp.raw?.requester_name || user.full_name}
+                    {(selectedApp.raw?.applicant_name as string) || (selectedApp.raw?.requester_name as string) || user.full_name}
                   </div>
                 </div>
                 <div className="bg-muted/40 rounded-xl p-3 border border-border-subtle">
@@ -408,7 +402,7 @@ export default function MyApplications() {
                     <div key={idx} className="relative flex items-start mb-4 last:mb-0">
                       <div className={`relative z-10 flex items-center justify-center w-6 h-6 rounded-full border shadow-sm ${bgClass} ${colorClass}`}>
                         {step.done ? (
-                          <CheckCircle2 size={12} className="stroke-[3]" />
+                          <CheckCircle2 size={12} className="stroke-3" />
                         ) : (
                           <Clock size={12} className={step.active ? 'animate-pulse' : ''} />
                         )}
