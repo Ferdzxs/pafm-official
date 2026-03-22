@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import {
   Loader2, PenTool, CheckCircle2, FileCheck, ShieldCheck,
-  Eye, Stamp, X, Download, Building2, Calendar
+  Eye, Stamp, Download, Building2, Calendar
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import toast from 'react-hot-toast'
 import { Pagination } from '@/components/ui/pagination'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { DialogPremiumInner, premiumDialogShellClasses } from '@/components/ui/dialog-premium'
 
 interface SigningApp {
   application_id: string
@@ -30,6 +32,8 @@ export default function ApprovalsSigning() {
   const [loading, setLoading] = useState(true)
   const [signing, setSigning] = useState<string | null>(null)
   const [selected, setSelected] = useState<SigningApp | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [printData, setPrintData] = useState<Record<string, any> | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [issuedPage, setIssuedPage] = useState(1)
   const itemsPerPage = 8
@@ -56,10 +60,10 @@ export default function ApprovalsSigning() {
           .order('date_created', { ascending: false }),
       ])
       if (qErr) throw qErr
-      setQueue((queueData as any) || [])
+      setQueue((queueData as unknown as SigningApp[]) || [])
       setIssued(issuedData || [])
-    } catch (err: any) {
-      toast.error('Failed to load signing queue: ' + err.message)
+    } catch (err: unknown) {
+      toast.error('Failed to load signing queue: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setLoading(false)
     }
@@ -68,17 +72,17 @@ export default function ApprovalsSigning() {
   async function handleSign(app: SigningApp) {
     setSigning(app.application_id)
     try {
-      // 1. Approve the application
-      const { error: appError } = await supabase
-        .from('online_burial_application')
-        .update({ application_status: 'approved' })
-        .eq('application_id', app.application_id)
-      if (appError) throw appError
-
-      // 2. Generate and record the digital burial permit
+      // 1. Generate and record the digital burial permit
       const serial = app.application_id.split('-')[1] ?? Math.random().toString(36).substr(2, 6).toUpperCase()
       const permitId = `DDOC-${serial}-${Date.now().toString().substr(-4)}`
       const permitRefNo = `BP-${new Date().getFullYear()}-${serial}`
+
+      // 2. Approve the application and link the permit
+      const { error: appError } = await supabase
+        .from('online_burial_application')
+        .update({ application_status: 'approved', permit_document_id: permitId })
+        .eq('application_id', app.application_id)
+      if (appError) throw appError
 
       const { error: docError } = await supabase
         .from('digital_document')
@@ -96,10 +100,80 @@ export default function ApprovalsSigning() {
       toast.success(`✅ Burial Permit ${permitRefNo} digitally signed and issued.`)
       setSelected(null)
       fetchData()
-    } catch (err: any) {
-      toast.error('Signing failed: ' + err.message)
+    } catch (err: unknown) {
+      toast.error('Signing failed: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setSigning(null)
+    }
+  }
+
+  async function handlePrint(doc: IssuedPermit) {
+    const loadingToast = toast.loading('Readying permit for print...')
+    try {
+      // Fetch linked application details needed for the permit
+      let { data: obApp } = await supabase
+        .from('online_burial_application')
+        .select(`
+           or_number,
+           person:person_id(full_name),
+           deceased:deceased_id(full_name, date_of_death, cause_of_death)
+        `)
+        .eq('permit_document_id', doc.document_id)
+        .single()
+      
+      // Fallback for older permits without permit_document_id
+      if (!obApp && doc.reference_no) {
+        const serialParts = doc.reference_no.split('-')
+        const serial = serialParts.length >= 3 ? serialParts[2] : null
+        
+        if (serial) {
+            const { data: fallbackApp } = await supabase
+              .from('online_burial_application')
+              .select(`
+                or_number,
+                person:person_id(full_name),
+                deceased:deceased_id(full_name, date_of_death, cause_of_death)
+              `)
+              .ilike('application_id', `%${serial}%`)
+              .limit(1)
+            
+            if (fallbackApp && fallbackApp.length > 0) {
+                obApp = fallbackApp[0]
+            }
+        }
+      }
+
+      if (!obApp) throw new Error('Linked details not found (might be an older permit).')
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const personData = obApp.person as any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const deceasedData = obApp.deceased as any
+
+      const applicant = Array.isArray(personData) ? personData[0]?.full_name : personData?.full_name
+      const deceased = Array.isArray(deceasedData) ? deceasedData[0] : deceasedData
+      
+      const validUntilDate = new Date(doc.date_created)
+      validUntilDate.setFullYear(validUntilDate.getFullYear() + 5)
+
+      setPrintData({
+         ...doc,
+         deceasedName: deceased?.full_name || '—',
+         dateOfDeath: deceased?.date_of_death || '—',
+         causeOfDeath: deceased?.cause_of_death || '—',
+         applicantName: applicant || '—',
+         orNumber: obApp.or_number || 'Pending / N/A',
+         validUntil: validUntilDate.toISOString().split('T')[0]
+      })
+
+      // Allow state to render the hidden print div, then trigger browser print
+      setTimeout(() => {
+        window.print()
+      }, 500)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      toast.dismiss(loadingToast)
     }
   }
 
@@ -208,7 +282,7 @@ export default function ApprovalsSigning() {
                         <button
                           onClick={() => handleSign(app)}
                           disabled={signing === app.application_id}
-                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all disabled:opacity-60"
+                          className="w-full py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all disabled:opacity-60"
                         >
                           {signing === app.application_id ? (
                             <Loader2 size={14} className="animate-spin mx-auto" />
@@ -255,7 +329,11 @@ export default function ApprovalsSigning() {
                       <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border text-[9px]">{doc.status}</Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <button className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
+                      <button 
+                        onClick={() => handlePrint(doc)}
+                        className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
+                        title="Print Permit"
+                      >
                         <Download size={14} />
                       </button>
                     </td>
@@ -275,68 +353,180 @@ export default function ApprovalsSigning() {
         )}
       </div>
 
-      {/* Review Modal */}
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="glass rounded-2xl w-full max-w-lg animate-fade-in border border-white/10 shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/3">
+      {/* Review Modal — premium card (centered via shared Dialog) */}
+      <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}>
+        <DialogContent className={premiumDialogShellClasses('max-w-lg')}>
+          <DialogPremiumInner className="flex flex-col p-0">
+            <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-6 pb-4 pt-2 pr-12">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400">
                   <PenTool size={24} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">Final Review</h2>
-                  <p className="text-xs font-mono text-slate-500">{selected.application_id}</p>
+                  <h2 className="font-display text-lg font-bold text-foreground">Final Review</h2>
+                  <p className="font-mono text-xs text-muted-foreground">{selected?.application_id}</p>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"><X size={18} /></button>
             </div>
-            <div className="p-6 space-y-3">
-              {[
-                ['Deceased', selected.deceased?.full_name ?? '—'],
-                ['Date of Death', selected.deceased?.date_of_death ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'long' }) : '—'],
-                ['Death Certificate #', selected.deceased?.death_certificate_no ?? 'Not on file'],
-                ['Applicant / Relative', selected.person?.full_name ?? '—'],
-                ['Submitted', new Date(selected.submission_date).toLocaleDateString('en-PH', { dateStyle: 'long' })],
-                ['Case Type', 'Burial Application'],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between py-2 border-b border-white/5">
-                  <span className="text-xs text-slate-500 uppercase font-bold tracking-wide">{label}</span>
-                  <span className="text-sm text-white font-medium text-right max-w-[55%]">{value}</span>
-                </div>
-              ))}
+            <div className="space-y-1 px-6 py-5">
+              {selected &&
+                [
+                  ['Deceased', selected.deceased?.full_name ?? '—'],
+                  [
+                    'Date of Death',
+                    selected.deceased?.date_of_death
+                      ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'long' })
+                      : '—',
+                  ],
+                  ['Death Certificate #', selected.deceased?.death_certificate_no ?? 'Not on file'],
+                  ['Applicant / Relative', selected.person?.full_name ?? '—'],
+                  [
+                    'Submitted',
+                    new Date(selected.submission_date).toLocaleDateString('en-PH', { dateStyle: 'long' }),
+                  ],
+                  ['Case Type', 'Burial Application'],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="flex justify-between gap-3 border-b border-border/50 py-2.5 last:border-0"
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
+                    <span className="max-w-[58%] text-right text-sm font-medium text-foreground">{value}</span>
+                  </div>
+                ))}
 
-              {/* Completed Milestones */}
-              <div className="pt-2">
+              <div className="admin-box mt-4 border-purple-500/20 bg-muted/20">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Workflow
+                </p>
                 {[
                   { icon: FileCheck, label: 'Documents Validated', done: true },
                   { icon: Stamp, label: 'Data Verified', done: true },
                   { icon: PenTool, label: 'Awaiting Signature', done: false },
                 ].map(({ icon: Icon, label, done }) => (
                   <div key={label} className="flex items-center gap-2 py-1.5">
-                    <Icon size={14} className={done ? 'text-emerald-400' : 'text-purple-400'} />
-                    <span className={`text-xs font-medium ${done ? 'text-emerald-400 line-through decoration-emerald-400/50' : 'text-purple-300 font-bold'}`}>{label}</span>
-                    {done && <CheckCircle2 size={12} className="text-emerald-400 ml-auto" />}
+                    <Icon size={14} className={done ? 'text-emerald-600 dark:text-emerald-400' : 'text-purple-600 dark:text-purple-400'} />
+                    <span
+                      className={`text-xs font-medium ${done ? 'text-emerald-700 line-through decoration-emerald-600/50 dark:text-emerald-400' : 'font-bold text-purple-700 dark:text-purple-300'}`}
+                    >
+                      {label}
+                    </span>
+                    {done && <CheckCircle2 size={12} className="ml-auto text-emerald-600 dark:text-emerald-400" />}
                   </div>
                 ))}
               </div>
             </div>
-            <div className="p-6 pt-0 flex gap-2">
-              <button onClick={() => setSelected(null)} className="btn-secondary flex-1 justify-center">Close</button>
+            <div className="flex gap-2 border-t border-border/60 bg-muted/20 px-6 py-4">
               <button
-                onClick={() => handleSign(selected)}
-                disabled={signing === selected.application_id}
-                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-widest shadow-lg shadow-purple-500/20 transition-all"
+                type="button"
+                onClick={() => setSelected(null)}
+                className="btn-secondary flex-1 justify-center"
               >
-                {signing === selected.application_id ? <Loader2 size={14} className="animate-spin mx-auto" /> : '✍ Sign & Issue Permit'}
+                Close
               </button>
+              <button
+                type="button"
+                onClick={() => selected && handleSign(selected)}
+                disabled={!selected || signing === selected.application_id}
+                className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-2.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-purple-500/25 transition-all hover:opacity-95 disabled:opacity-50 dark:from-purple-500 dark:to-indigo-500"
+              >
+                {selected && signing === selected.application_id ? (
+                  <Loader2 size={14} className="mx-auto animate-spin" />
+                ) : (
+                  '✍ Sign & Issue Permit'
+                )}
+              </button>
+            </div>
+          </DialogPremiumInner>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden layout specifically for printing */}
+      {printData && (
+        <div className="hidden print:block fixed inset-0 z-9999 bg-white text-black w-full h-full p-12 custom-print-wrapper">
+          <style>{`
+            @media print {
+              @page { margin: 0; size: letter; }
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
+              nav, aside, header { display: none !important; }
+            }
+          `}</style>
+          
+          <div className="max-w-3xl mx-auto border-4 border-double border-slate-900 p-10 h-full relative">
+            <div className="text-center mb-10 pb-6 border-b-2 border-slate-900">
+              <h1 className="text-xl font-bold uppercase tracking-widest text-slate-800">Republic of the Philippines</h1>
+              <h2 className="text-lg font-semibold uppercase tracking-widest text-slate-700 mt-1">Quezon City</h2>
+              <h3 className="text-3xl font-black mt-6 mb-2 text-slate-900 uppercase tracking-tighter">Civil Registration Office</h3>
+              <div className="inline-block bg-slate-900 text-white px-6 py-2 text-xl font-bold tracking-widest uppercase">
+                Burial Permit
+              </div>
+            </div>
+
+            <div className="flex justify-between items-end mb-8">
+              <div>
+                <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Permit Number</p>
+                <p className="text-2xl font-mono font-bold text-slate-900">{printData.reference_no}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Date Issued</p>
+                <p className="text-lg font-bold text-slate-900">{new Date(printData.date_created).toLocaleDateString('en-PH', { dateStyle: 'long' })}</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Name of Deceased</p>
+                <p className="text-2xl font-bold uppercase text-slate-900 border-b border-slate-300 pb-1">{printData.deceasedName}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div>
+                  <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Date of Death</p>
+                  <p className="text-lg font-bold text-slate-900 border-b border-slate-300 pb-1">
+                    {printData.dateOfDeath !== '—' ? new Date(printData.dateOfDeath).toLocaleDateString('en-PH', { dateStyle: 'long' }) : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Cause of Death</p>
+                  <p className="text-lg font-bold text-slate-900 border-b border-slate-300 pb-1">{printData.causeOfDeath}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Applicant / Next of Kin</p>
+                <p className="text-lg font-bold text-slate-900 border-b border-slate-300 pb-1">{printData.applicantName}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8">
+                <div>
+                  <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Official Receipt (OR) Number</p>
+                  <p className="text-lg font-mono font-bold text-slate-900 border-b border-slate-300 pb-1">{printData.orNumber}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-1">Valid Until</p>
+                  <p className="text-lg font-bold text-slate-900 border-b border-slate-300 pb-1">
+                    {new Date(printData.validUntil).toLocaleDateString('en-PH', { dateStyle: 'long' })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute bottom-10 right-10 w-64 text-center">
+              <div className="border-b border-slate-900 pb-2 mb-2">
+                {/* Space for signature */}
+                <div className="h-16 flex items-center justify-center">
+                  <span className="font-mono text-purple-900 italic transform -rotate-2 opacity-50">DIGITALLY SIGNED</span>
+                </div>
+              </div>
+              <p className="text-sm font-bold text-slate-900 uppercase">Authorized Officer</p>
+              <p className="text-xs text-slate-500 uppercase tracking-widest mt-0.5">Civil Registration Office</p>
+            </div>
+            
+            <div className="absolute bottom-10 left-10 w-32 h-32 border-[6px] border-double border-red-900/20 rounded-full flex items-center justify-center transform -rotate-12 opacity-80">
+                <div className="text-center">
+                    <p className="text-[10px] font-black text-red-900/40 uppercase tracking-widest mt-1">OFFICIAL</p>
+                    <p className="text-[10px] font-black text-red-900/40 uppercase tracking-widest">SEAL</p>
+                </div>
             </div>
           </div>
         </div>

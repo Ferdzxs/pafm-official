@@ -50,6 +50,43 @@ export const UTILITY_TICKET_TYPES = {
   },
 } as const
 
+/** Resolve DB `service_tickets.ticket_type` → spec for requirements / uploads (handles legacy values). */
+export function resolveUtilityTicketMeta(ticketTypeKey: string): {
+  category: ServiceCategory
+  waterSubtype: WaterSubtype
+  leakSubtype: LeakSubtype
+} {
+  const row = UTILITY_TICKET_TYPES[ticketTypeKey as keyof typeof UTILITY_TICKET_TYPES]
+  if (row) {
+    if (row.category === 'water_connection') {
+      return {
+        category: 'water_connection',
+        waterSubtype: (row.subtype ?? 'no_existing_water') as WaterSubtype,
+        leakSubtype: 'owner',
+      }
+    }
+    if (row.category === 'leak_report') {
+      return {
+        category: 'leak_report',
+        waterSubtype: 'no_existing_water',
+        leakSubtype: (row.subtype ?? 'owner') as LeakSubtype,
+      }
+    }
+    return { category: 'drainage', waterSubtype: 'no_existing_water', leakSubtype: 'owner' }
+  }
+  const k = ticketTypeKey.toLowerCase()
+  if (k.includes('drainage')) return { category: 'drainage', waterSubtype: 'no_existing_water', leakSubtype: 'owner' }
+  if (k.includes('leak') || k === 'leak_report')
+    return { category: 'leak_report', waterSubtype: 'no_existing_water', leakSubtype: 'owner' }
+  if (k.startsWith('water') || k.includes('connection'))
+    return {
+      category: 'water_connection',
+      waterSubtype: k.includes('additional') ? 'additional_meter' : 'no_existing_water',
+      leakSubtype: 'owner',
+    }
+  return { category: 'water_connection', waterSubtype: 'no_existing_water', leakSubtype: 'owner' }
+}
+
 export const UTILITY_REQUEST_TYPES = {
   water_connection: {
     label: 'New Water Supply',
@@ -86,13 +123,26 @@ export const SERVICE_TICKET_STATUSES = [
   'open',
   'under_review',
   'incomplete',
+  'triaged',
+  'documents_validated',
+  'hcdrd_pending',
+  'hcdrd_cleared',
   'validated',
   'assigned',
   'for_inspection',
   'inspected',
+  'excavation_pending',
+  'excavation_cleared',
+  'materials_pending',
+  'materials_ready',
   'for_implementation',
   'for_payment',
+  'awaiting_treasury',
+  'order_of_payment_issued',
+  'payment_settled',
+  'for_installation',
   'in_progress',
+  'pending_activation',
   'resolved',
   'completed',
   'closed',
@@ -101,19 +151,32 @@ export const SERVICE_TICKET_STATUSES = [
 
 export type ServiceTicketStatus = (typeof SERVICE_TICKET_STATUSES)[number]
 
-/** Map internal status to citizen-facing timeline step (0–3). */
+/** Map internal status to citizen-facing timeline step (0–3) — coarse legacy strip. Prefer utilityCitizenWorkflow for detail. */
 export const CITIZEN_STEP_MAP: Record<string, number> = {
   submitted: 0,
   open: 0,
   under_review: 1,
   incomplete: 1,
+  triaged: 1,
+  documents_validated: 1,
+  hcdrd_pending: 1,
+  hcdrd_cleared: 1,
   validated: 1,
   assigned: 1,
   for_inspection: 2,
   inspected: 2,
+  excavation_pending: 2,
+  excavation_cleared: 2,
+  materials_pending: 2,
+  materials_ready: 2,
   for_implementation: 2,
+  awaiting_treasury: 2,
+  order_of_payment_issued: 2,
+  payment_settled: 2,
+  for_installation: 2,
   for_payment: 2,
   in_progress: 2,
+  pending_activation: 2,
   resolved: 3,
   completed: 3,
   closed: 3,

@@ -1,256 +1,308 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
-import { TrendingUp, TrendingDown, Clock, CheckCircle, Package, AlertTriangle } from 'lucide-react'
 import {
-    PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-} from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  CheckCircle,
+  Package,
+  AlertTriangle,
+  Zap,
+  Activity,
+  ChevronRight,
+  RefreshCw,
+} from 'lucide-react'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { getHelpdeskStats, getRecentUtilityActivity, type TicketsByTypeStat } from '@/lib/serviceTickets'
+import { EmojiIcon } from '@/components/ui/emoji-icon'
+import { cn } from '@/lib/utils'
 
 const PIE_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))']
 
 const QUICK_ACTIONS = [
-    { label: 'View Tickets', emoji: '🎫', path: '/utility/tickets' },
-    { label: 'Triage Queue', emoji: '📋', path: '/utility/triage' },
+  { label: 'View Tickets', emoji: '🎫', path: '/utility/tickets' },
+  { label: 'Triage Queue', emoji: '📋', path: '/utility/triage' },
 ]
 
 const STATUS_BADGE: Record<string, 'warning' | 'success' | 'destructive' | 'secondary'> = {
-    pending: 'warning',
-    approved: 'success',
+  pending: 'warning',
+  approved: 'success',
 }
 
 function getGreeting() {
-    const h = new Date().getHours()
-    if (h < 12) return 'morning'
-    if (h < 17) return 'afternoon'
-    return 'evening'
+  const h = new Date().getHours()
+  if (h < 12) return 'morning'
+  if (h < 17) return 'afternoon'
+  return 'evening'
 }
 
 export default function UtilityHelpdeskDashboard() {
-    const { user } = useAuth()
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [openTickets, setOpenTickets] = useState(0)
-    const [triagedToday, setTriagedToday] = useState(0)
-    const [pendingAssign, setPendingAssign] = useState(0)
-    const [byType, setByType] = useState<TicketsByTypeStat[]>([])
-    const [activity, setActivity] = useState<
-        { id: string; action: string; subject: string; time: string; status: string }[]
-    >([])
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [openTickets, setOpenTickets] = useState(0)
+  const [triagedToday, setTriagedToday] = useState(0)
+  const [pendingAssign, setPendingAssign] = useState(0)
+  const [byType, setByType] = useState<TicketsByTypeStat[]>([])
+  const [activity, setActivity] = useState<
+    { id: string; action: string; subject: string; time: string; status: string }[]
+  >([])
 
-    useEffect(() => {
-        let cancelled = false
-        const load = async () => {
-            setLoading(true)
-            setError(null)
-            try {
-                const stats = await getHelpdeskStats()
-                const recent = await getRecentUtilityActivity()
-                if (cancelled) return
-                setOpenTickets(stats.kpis.openCount)
-                setTriagedToday(stats.kpis.triagedToday)
-                setPendingAssign(stats.kpis.pendingAssignment)
-                setByType(stats.byType)
-                setActivity(
-                    recent.map(item => ({
-                        id: item.reference_id,
-                        action: item.message,
-                        subject: item.reference_id,
-                        time: new Date(item.sent_at).toLocaleTimeString('en-PH', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        }),
-                        status: 'pending',
-                    })),
-                )
-            } catch (err: any) {
-                if (!cancelled) {
-                    setError(err?.message || 'Failed to load utility helpdesk statistics.')
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false)
-                }
-            }
-        }
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const stats = await getHelpdeskStats()
+      const recent = await getRecentUtilityActivity()
+      setOpenTickets(stats.kpis.openCount)
+      setTriagedToday(stats.kpis.triagedToday)
+      setPendingAssign(stats.kpis.pendingAssignment)
+      setByType(stats.byType)
+      setActivity(
+        recent.map(item => ({
+          id: item.reference_id,
+          action: item.message,
+          subject: item.reference_id,
+          time: new Date(item.sent_at).toLocaleTimeString('en-PH', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          status: 'pending',
+        })),
+      )
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load utility helpdesk statistics.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-        load()
-        return () => {
-            cancelled = true
-        }
-    }, [])
+  useEffect(() => {
+    void loadDashboard()
+  }, [loadDashboard])
 
-    if (!user) return null
+  if (!user) return null
 
-    const meta = ROLE_META[user.role]
+  const meta = ROLE_META[user.role]
 
-    const KPI_DATA = [
-        { label: 'Open Tickets', value: openTickets, change: 0, icon: Clock, tone: 'warning' as const },
-        { label: 'Triaged Today', value: triagedToday, change: 0, icon: CheckCircle, tone: 'success' as const },
-        { label: 'Pending Assign', value: pendingAssign, change: 0, icon: AlertTriangle, tone: 'danger' as const },
-        {
-            label: 'Utility Status',
-            value: openTickets + triagedToday + pendingAssign,
-            change: 0,
-            icon: Package,
-            tone: 'info' as const,
-        },
-    ]
+  const KPI_DATA = [
+    { label: 'Open Tickets', value: openTickets, change: 0, icon: Clock, variant: 'warning' as const },
+    { label: 'Triaged Today', value: triagedToday, change: 0, icon: CheckCircle, variant: 'success' as const },
+    { label: 'Pending Assign', value: pendingAssign, change: 0, icon: AlertTriangle, variant: 'warning' as const },
+    {
+      label: 'Desk Load',
+      value: openTickets + triagedToday + pendingAssign,
+      change: 0,
+      icon: Package,
+      variant: 'info' as const,
+    },
+  ]
 
-    return (
-        <div className="px-4 py-4 sm:px-6 lg:px-8 max-w-6xl mx-auto animate-fade-in">
-            <div className="mb-8">
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="px-2.5 py-1 rounded-md text-xs font-semibold" style={{ background: meta.bgColor, color: meta.color }}>
-                        {meta.label}
-                    </span>
-                </div>
-                <h1 className="font-display text-2xl font-bold text-foreground">
-                    Good {getGreeting()}, {user.full_name.split(' ')[0]}! 👋
-                </h1>
-                <p className="text-muted-foreground text-sm mt-1">
-                    {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    {user.office && ` · ${user.office}`}
-                </p>
-            </div>
-
-            {error && (
-                <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-100">
-                    {error}
-                </div>
-            )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
-                {KPI_DATA.map((kpi, i) => {
-                    const Icon = kpi.icon
-                    const isPositive = kpi.change >= 0
-                    const toneClasses: Record<typeof kpi.tone, string> = {
-                        info: 'bg-state-info-soft text-state-info',
-                        warning: 'bg-state-warning-soft text-state-warning',
-                        success: 'bg-state-success-soft text-state-success',
-                        danger: 'bg-state-danger-soft text-state-danger',
-                    }
-                    return (
-                        <Card key={i} className="card-hover">
-                            <CardContent className="pt-5">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${toneClasses[kpi.tone]}`}>
-                                        <Icon size={18} />
-                                    </div>
-                                    {kpi.change !== 0 && (
-                                        <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-state-success' : 'text-state-danger'}`}>
-                                            {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                            {Math.abs(kpi.change)}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="text-2xl font-bold text-foreground mb-1">{kpi.value}</div>
-                                <div className="text-xs text-muted-foreground">{kpi.label}</div>
-                            </CardContent>
-                        </Card>
-                    )
-                })}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card className="lg:col-span-2">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Recent Activity</CardTitle>
-                            <span className="text-xs text-muted-foreground">Live updates</span>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-1">
-                            {activity.length === 0 && !loading && (
-                                <div className="px-3 py-3 text-xs text-muted-foreground">
-                                    No recent utility activity logged yet.
-                                </div>
-                            )}
-                            {activity.map(item => (
-                                <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                                    <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                        {item.id.slice(0, 2)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium text-foreground truncate">{item.action}</div>
-                                        <div className="text-xs text-muted-foreground truncate">{item.subject}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        <Badge variant={STATUS_BADGE[item.status] ?? 'secondary'} className="text-[10px] px-1.5 py-0.5">{item.status}</Badge>
-                                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <div className="space-y-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">Tickets by Type</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ResponsiveContainer width="100%" height={160}>
-                                <PieChart>
-                                    <Pie
-                                        data={
-                                            byType.length === 0
-                                                ? [
-                                                    { ticket_type: 'water_connection', count: 0 },
-                                                    { ticket_type: 'leak_report', count: 0 },
-                                                    { ticket_type: 'drainage', count: 0 },
-                                                    { ticket_type: 'general', count: 0 },
-                                                ]
-                                                : byType
-                                        }
-                                        dataKey="count"
-                                        nameKey="ticket_type"
-                                        cx="50%"
-                                        cy="50%"
-                                        outerRadius={55}
-                                        label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
-                                        labelLine={false}
-                                        fontSize={10}
-                                    >
-                                        {(byType.length === 0 ? [1, 2, 3, 4] : byType).map((_, idx) => (
-                                            <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        contentStyle={{
-                                            background: 'var(--color-card)',
-                                            border: '1px solid var(--color-border)',
-                                            borderRadius: 8,
-                                            fontSize: 12,
-                                            color: 'var(--color-text-primary)',
-                                        }}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm">Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-1.5">
-                                {QUICK_ACTIONS.map(qa => (
-                                    <a key={qa.label} href={qa.path} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-all border border-transparent hover:border-border">
-                                        <span>{qa.emoji}</span>
-                                        <span>{qa.label}</span>
-                                    </a>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+  return (
+    <div className="mx-auto max-w-(--breakpoint-2xl) animate-fade-in px-6 py-8 space-y-8">
+      <header className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between bg-card p-6 rounded-2xl border border-border shadow-xs">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="px-2 py-0.5 font-bold tracking-tighter" style={{ borderColor: meta.color, color: meta.color, backgroundColor: meta.bgColor }}>
+              {meta.label.toUpperCase()}
+            </Badge>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground items-center gap-1.5 hidden sm:flex">
+              <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> Helpdesk overview
+            </span>
+          </div>
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+            Good {getGreeting()}, {user.full_name.split(' ')[0]}
+          </h1>
+          <p className="text-muted-foreground text-sm max-w-[600px] font-medium italic">
+            {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {user.office && ` · ${user.office}`}
+          </p>
         </div>
-    )
+        <div className="flex items-center gap-2 self-start md:self-center">
+          <Button variant="outline" size="sm" onClick={() => void loadDashboard()} disabled={loading} className="shadow-xs border-border">
+            <RefreshCw className={cn('mr-2 h-3.5 w-3.5', loading && 'animate-spin')} />
+            Sync data
+          </Button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive flex items-center gap-2">
+          <span className="font-medium">{error}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {KPI_DATA.map((kpi, i) => {
+          const Icon = kpi.icon
+          const isPositive = kpi.change >= 0
+          const variant = kpi.variant
+          return (
+            <Card key={i} className="group overflow-hidden border-border shadow-xs hover:shadow-md transition-all duration-300 bg-card">
+              <CardContent className="p-6 relative">
+                <div className="absolute -top-2 -right-2 p-4 opacity-10 h-full flex items-center group-hover:scale-110 group-hover:opacity-20 transition-all duration-500 pointer-events-none">
+                  <Icon size={80} />
+                </div>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={cn(
+                        'inline-flex items-center justify-center p-2.5 rounded-xl transition-all duration-300',
+                        variant === 'warning'
+                          ? 'bg-amber-50 text-amber-600 group-hover:bg-amber-100'
+                          : variant === 'success'
+                            ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100'
+                            : variant === 'info'
+                              ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100'
+                              : 'bg-primary/20 text-primary group-hover:bg-primary/30',
+                      )}
+                    >
+                      <Icon size={20} />
+                    </span>
+                    {kpi.change !== 0 && (
+                      <div className={cn('flex items-center gap-1 text-xs font-semibold', isPositive ? 'text-emerald-500' : 'text-red-500')}>
+                        {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                        {Math.abs(kpi.change)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-3xl font-bold tracking-tighter">{kpi.value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 border-border shadow-sm bg-card overflow-hidden flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+            <div className="space-y-1">
+              <CardTitle className="text-lg leading-tight flex items-center gap-2">
+                <Activity size={18} className="text-primary" /> Utility stream
+              </CardTitle>
+              <CardDescription>Notifications and routing events from the helpdesk queue</CardDescription>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Live</span>
+          </CardHeader>
+          <CardContent className="flex-1 px-4">
+            {loading && activity.length === 0 ? (
+              <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground py-8">Synchronizing…</p>
+            ) : activity.length === 0 ? (
+              <div className="py-16 text-center text-sm text-muted-foreground border border-dashed rounded-xl flex flex-col items-center gap-2 bg-muted/40">
+                <Package size={24} className="opacity-20" /> No recent utility activity logged yet.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {activity.map(item => (
+                  <div key={item.id} className="group relative flex items-center justify-between p-3.5 rounded-xl transition-all hover:bg-muted/80 border border-transparent">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="h-10 w-10 shrink-0 rounded-xl bg-background border flex items-center justify-center shadow-xs">
+                        <span className="text-[10px] font-bold text-muted-foreground">{item.id.slice(0, 2)}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">{item.action}</p>
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-tight truncate">{item.subject}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant={STATUS_BADGE[item.status] ?? 'secondary'} className="text-[9px] font-bold uppercase tracking-tighter hidden md:flex">
+                        {item.status}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
+                      <ChevronRight size={14} className="text-muted-foreground opacity-40 hidden sm:block" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6">
+          <Card className="border-border shadow-sm bg-card overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-bold tracking-widest uppercase flex items-center gap-2 text-primary">
+                <Package size={14} /> Tickets by type
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie
+                    data={
+                      byType.length === 0
+                        ? [
+                            { ticket_type: 'water_connection', count: 0 },
+                            { ticket_type: 'leak_report', count: 0 },
+                            { ticket_type: 'drainage', count: 0 },
+                            { ticket_type: 'general', count: 0 },
+                          ]
+                        : byType
+                    }
+                    dataKey="count"
+                    nameKey="ticket_type"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={55}
+                    label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                    labelLine={false}
+                    fontSize={10}
+                  >
+                    {(byType.length === 0 ? [1, 2, 3, 4] : byType).map((_, idx) => (
+                      <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      background: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      color: 'hsl(var(--foreground))',
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border shadow-sm bg-card overflow-hidden">
+            <CardHeader className="pb-3 border-b bg-muted/40">
+              <CardTitle className="text-sm font-bold tracking-widest uppercase flex items-center gap-2 text-primary">
+                <Zap size={14} className="fill-primary" /> Quick actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="space-y-1">
+                {QUICK_ACTIONS.map(qa => (
+                  <NavLink
+                    key={qa.label}
+                    to={qa.path}
+                    className="flex items-center justify-between group px-3 py-3 rounded-xl hover:bg-muted transition-all border border-transparent hover:border-border mt-1.5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-background border flex items-center justify-center shadow-xs text-sm group-hover:scale-110 transition-transform">
+                        <EmojiIcon symbol={qa.emoji} className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm font-bold text-muted-foreground group-hover:text-foreground transition-colors">{qa.label}</span>
+                    </div>
+                    <ChevronRight size={14} className="text-muted-foreground opacity-30 group-hover:opacity-100 transition-all group-hover:translate-x-1" />
+                  </NavLink>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
 }

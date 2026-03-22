@@ -25,15 +25,12 @@ import CemeteryAssetRequestsPage from "@/pages/cemetery_office/asset-requests";
 // ─── Barangay Secretary ──────────────────────────────────────────────────────
 import BarangaySecretaryDashboard from "@/pages/barangay_secretary/dashboard";
 import BarangayReservationsPage from "@/pages/barangay_secretary/reservation-records";
-import BarangayOrdinancesPage from "@/pages/barangay_secretary/ordinance-references";
-import BarangayDocumentsPage from "@/pages/barangay_secretary/documents-filing";
-import BarangayRecordsPage from "@/pages/barangay_secretary/constituent-records";
-import BarangaySecretaryReports from "@/pages/barangay_secretary/reports";
-import PunongBarangayAssetRequestsPage from "@/pages/punong_barangay/asset-requests";
+import BarangaySecretaryIntake from "@/pages/barangay_secretary/pending-approvals";
+import BarangayBookingCalendar from "@/pages/barangay_secretary/booking-calendar";
 
 // ─── Punong Barangay ─────────────────────────────────────────────────────────
 import PunongBarangayPendingApprovals from "@/pages/punong_barangay/pending-approvals";
-import PBOrdinanceReferences from "@/pages/punong_barangay/ordinance-references";
+import PunongBarangayFacilityManagement from "@/pages/punong_barangay/facility-management";
 
 // ─── Role Dashboards ─────────────────────────────────────────────────────────
 import CemeteryOfficeDashboard from "@/pages/cemetery_office/dashboard";
@@ -72,7 +69,9 @@ import ConnectionStatusPage from "@/pages/utility_helpdesk/connection-status";
 import TicketTriagePage from "@/pages/utility_helpdesk/ticket-triage";
 
 // ─── Treasurer Module ────────────────────────────────────────────────────────
-import TreasurerTransactionsPage from "@/pages/treasurer/TransactionsPage";
+import CollectionsPage from "@/pages/treasurer/CollectionsPage";
+import TreasurerAuditLogsPage from "./pages/treasurer/audit-logs";
+import OfficialReceiptsPage from "./pages/treasurer/official-receipts";
 
 // ─── System Admin ────────────────────────────────────────────────────────────
 import UserManagementPage from "@/pages/system_admin/user-role-management";
@@ -82,6 +81,8 @@ import SystemAdminSettingsPage from "@/pages/system_admin/system-settings";
 import OfficeManagementPage from "@/pages/system_admin/office-management";
 import EmployeeMasterPage from "@/pages/system_admin/employee-master";
 import MyDocumentsPage from "./pages/citizen/my-documents";
+import PaymentHistoryPage from "./pages/citizen/payment-history";
+
 
 // ─── Parks Admin (detailed pages) ────────────────────────────────────────────
 import ParkVenues from "@/pages/parks_admin/park-venues";
@@ -225,6 +226,15 @@ function AssetsSubmissionsRoute() {
   );
 }
 
+/** Old shared URL — send each role to the correct BPMN queue. */
+function BarangayLegacyPendingRedirect() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === "punong_barangay") return <Navigate to="/barangay/pb/pending" replace />;
+  if (user.role === "barangay_secretary") return <Navigate to="/barangay/secretary/intake" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -363,7 +373,11 @@ function AppRoutes() {
         />
         <Route
           path="citizen/payments"
-          element={<PlaceholderPage title="Payment History" />}
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <PaymentHistoryPage />
+            </RoleRoute>
+          }
         />
         <Route path="citizen/documents" element={<MyDocumentsPage />} />
 
@@ -387,7 +401,7 @@ function AppRoutes() {
         <Route
           path="parks/usage-logs"
           element={
-            <RoleRoute allow={["parks_admin"]}>
+            <RoleRoute allow={["parks_admin", "reservation_officer"]}>
               <SiteUsageLogs />
             </RoleRoute>
           }
@@ -435,51 +449,34 @@ function AppRoutes() {
           }
         />
 
-        {/* ── Barangay (shared) ── */}
+        {/* ── Barangay ── */}
+        <Route path="barangay/pb/pending" element={<PunongBarangayPendingApprovals />} />
         <Route
-          path="barangay/pending"
-          element={<PunongBarangayPendingApprovals />}
+          path="barangay/pb/facilities"
+          element={
+            <RoleRoute allow={["punong_barangay"]}>
+              <PunongBarangayFacilityManagement />
+            </RoleRoute>
+          }
         />
-        <Route
-          path="barangay/ordinances"
-          element={<PBOrdinanceReferences />}
-        />
-        <Route
-          path="barangay/asset-requests"
-          element={<PunongBarangayAssetRequestsPage />}
-        />
+        <Route path="barangay/secretary/intake" element={<BarangaySecretaryIntake />} />
+        <Route path="barangay/secretary/calendar" element={<BarangayBookingCalendar />} />
+        <Route path="barangay/pending" element={<BarangayLegacyPendingRedirect />} />
+        <Route path="barangay/ordinances" element={<Navigate to="/barangay/pb/pending" replace />} />
+        <Route path="barangay/asset-requests" element={<Navigate to="/barangay/pb/facilities" replace />} />
 
         {/* ── Barangay Secretary ── */}
         <Route
           path="barangay/secretary/reservations"
           element={<BarangayReservationsPage />}
         />
-        <Route
-          path="barangay/secretary/records"
-          element={<BarangayRecordsPage />}
-        />
-        <Route
-          path="barangay/secretary/documents"
-          element={<BarangayDocumentsPage />}
-        />
-        <Route
-          path="barangay/secretary/ordinances"
-          element={<BarangayOrdinancesPage />}
-        />
-        <Route
-          path="barangay/secretary/reports"
-          element={<BarangaySecretaryReports />}
-        />
-        <Route path="barangay/records" element={<BarangayRecordsPage />} />
-        <Route path="barangay/documents" element={<BarangayDocumentsPage />} />
-        <Route
-          path="barangay/reports"
-          element={<PlaceholderPage title="Barangay Reports" />}
-        />
-        <Route
-          path="barangay/requests"
-          element={<PlaceholderPage title="Barangay Requests" />}
-        />
+        <Route path="barangay/secretary/records" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/secretary/documents" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/secretary/ordinances" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/secretary/reports" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/records" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/documents" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/reports" element={<Navigate to="/barangay/secretary/intake" replace />} />
 
         {/* ── Utility ── */}
         <Route path="utility/tickets" element={<ServiceTicketsPage />} />
@@ -499,27 +496,10 @@ function AppRoutes() {
         <Route path="assets/submissions" element={<AssetsSubmissionsRoute />} />
 
         {/* ── Payments / Treasurer ── */}
-        <Route path="payments" element={<TreasurerTransactionsPage />} />
-        <Route
-          path="treasurer/transactions"
-          element={<TreasurerTransactionsPage />}
-        />
-        <Route
-          path="treasurer/reconciliation"
-          element={<PlaceholderPage title="Reconciliation Queue" />}
-        />
-        <Route
-          path="treasurer/receipts"
-          element={<PlaceholderPage title="Official Receipts Management" />}
-        />
-        <Route
-          path="treasurer/revenue"
-          element={<PlaceholderPage title="Revenue Reports" />}
-        />
-        <Route
-          path="treasurer/audit"
-          element={<PlaceholderPage title="Audit Logs" />}
-        />
+        <Route path="payments" element={<Navigate to="/treasurer/collections" replace />} />
+        <Route path="treasurer/collections" element={<CollectionsPage />} />
+        <Route path="treasurer/receipts" element={<OfficialReceiptsPage />} />
+        <Route path="treasurer/audit" element={<TreasurerAuditLogsPage />} />
 
         {/* ── Reports ── */}
         <Route

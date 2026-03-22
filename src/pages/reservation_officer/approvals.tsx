@@ -1,9 +1,39 @@
+/**
+ * approvals.tsx — Reservation Officer overhauled for UI/UX
+ */
+
 import React, { useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/contexts/AuthContext"
 import { ROLE_META } from "@/config/rbac"
-import { AlertCircle, CheckCircle2, FileText, Search, Send, X } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { 
+  AlertCircle, 
+  CheckCircle2, 
+  ExternalLink, 
+  FileText, 
+  Search, 
+  Send, 
+  X, 
+  RefreshCw, 
+  ArrowLeftRight, 
+  BadgeCheck, 
+  Ban, 
+  Clock, 
+  Building2, 
+  User, 
+  MapPin, 
+  Calendar, 
+  ChevronRight,
+  Info,
+  Layers,
+  FileCheck
+} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 
 type Venue = {
   park_venue_id: string
@@ -24,6 +54,7 @@ type Row = {
   application_form_doc: string | null
   venue?: Venue | null
   person?: Person | null
+  application_form_url?: string | null
 }
 
 function normalizeParkStatus(s?: string | null) {
@@ -82,25 +113,32 @@ export default function ReservationApprovalsPage() {
 
       const venueIds = [...new Set((recs ?? []).map((r: any) => r.park_venue_id).filter(Boolean))] as string[]
       const personIds = [...new Set((recs ?? []).map((r: any) => r.applicant_person_id).filter(Boolean))] as string[]
+      const appDocIds = [...new Set((recs ?? []).map((r: any) => r.application_form_doc).filter(Boolean))] as string[]
 
-      const [{ data: venues }, { data: persons }] = await Promise.all([
+      const [{ data: venues }, { data: persons }, { data: appDocs }] = await Promise.all([
         venueIds.length
           ? supabase.from("park_venue").select("park_venue_id, park_venue_name").in("park_venue_id", venueIds)
           : Promise.resolve({ data: [] as any[] }),
         personIds.length
           ? supabase.from("person").select("person_id, full_name, contact_number").in("person_id", personIds)
           : Promise.resolve({ data: [] as any[] }),
+        appDocIds.length
+          ? supabase.from("digital_document").select("document_id, file_url").in("document_id", appDocIds)
+          : Promise.resolve({ data: [] as any[] }),
       ])
 
       const venueMap: Record<string, Venue> = {}
       const personMap: Record<string, Person> = {}
+      const appDocUrlMap: Record<string, string> = {}
       ;(venues ?? []).forEach((v: any) => (venueMap[v.park_venue_id] = v))
       ;(persons ?? []).forEach((p: any) => (personMap[p.person_id] = p))
+      ;(appDocs ?? []).forEach((d: any) => (appDocUrlMap[d.document_id] = d.file_url ?? ""))
 
       const merged = (recs ?? []).map((r: any) => ({
         ...r,
         venue: r.park_venue_id ? venueMap[r.park_venue_id] ?? null : null,
         person: r.applicant_person_id ? personMap[r.applicant_person_id] ?? null : null,
+        application_form_url: r.application_form_doc ? appDocUrlMap[r.application_form_doc] ?? null : null,
       })) as Row[]
 
       setRows(merged)
@@ -167,127 +205,192 @@ export default function ReservationApprovalsPage() {
   const meta = ROLE_META[user.role]
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-6">
-      <div className="mb-8">
-        <span className="px-3 py-1 rounded text-xs font-semibold" style={{ background: meta.bgColor, color: meta.color }}>
-          {meta.label}
-        </span>
-        <h1 className="text-2xl font-bold mt-2">Approvals (Desk)</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Parks &amp; Recreation Scheduling — BPMN Steps 7 · 8 · 9
-        </p>
-      </div>
+    <div className="mx-auto max-w-(--breakpoint-2xl) animate-fade-in px-6 py-8 space-y-8">
+      {/* HEADER */}
+      <header className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+             <Badge variant="outline" className="px-2 py-0.5 font-bold tracking-tighter" style={{ borderColor: meta.color, color: meta.color, backgroundColor: meta.bgColor }}>
+               {meta.label.toUpperCase()}
+             </Badge>
+             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground items-center gap-1.5 hidden sm:flex">
+               <Layers className="h-3.5 w-3.5 text-primary" /> Application Workflow
+             </span>
+          </div>
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground md:text-4xl">Approvals Queue</h1>
+          <p className="text-muted-foreground text-sm font-medium italic">
+            Parks & Recreation Management — Application Validation
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => loadData()} disabled={loading} className="shadow-xs border-border">
+              <RefreshCw className={cn("mr-2 h-3.5 w-3.5", loading && "animate-spin")} />
+              Sync Queue
+            </Button>
+        </div>
+      </header>
 
       {error && (
-        <div className="mb-4 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-          <AlertCircle size={15} className="shrink-0" />
-          <span className="font-medium">{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-700">
+        <div className="rounded-xl border border-destructive bg-destructive/10 p-4 flex gap-3 text-sm text-destructive items-center shadow-xs">
+          <AlertCircle size={16} className="shrink-0" />
+          <p className="font-medium">{error}</p>
+          <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto hover:bg-destructive/20 text-destructive" onClick={() => setError(null)}>
             <X size={14} />
-          </button>
+          </Button>
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-4">
+      {/* TOOLBAR */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between bg-card border border-border rounded-2xl p-4 shadow-xs">
         <div className="relative flex-1 max-w-md">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <input
-            className="input-field pl-9"
-            placeholder="Search by ID, venue, applicant…"
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            className="pl-10 h-10 border-border bg-background focus:bg-background transition-all shadow-xs"
+            placeholder="Search by ID, venue, or applicant name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="text-xs text-muted-foreground">
-          Queue: <span className="font-semibold text-foreground">{filtered.length}</span>
+        <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          <div className="flex items-center gap-2">
+             <span className="h-2 w-2 rounded-full bg-primary" />
+             Awaiting Action: <span className="text-foreground ml-1">{filtered.length}</span>
+          </div>
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileText size={16} /> Application Form Workflow
-          </CardTitle>
+      {/* QUEUE RECORDS */}
+      <Card className="border-border shadow-sm overflow-hidden bg-card">
+        <CardHeader className="pb-3 bg-muted border-b">
+           <CardTitle className="text-base flex items-center gap-2 font-bold tracking-tight">
+             <FileCheck size={18} className="text-primary" /> Pending Officer Validation
+           </CardTitle>
+           <CardDescription>Issue and validate digital application forms</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {loading && <div className="text-sm text-muted-foreground">Loading…</div>}
-          {!loading && filtered.length === 0 && (
-            <div className="text-sm text-muted-foreground">No records awaiting action.</div>
-          )}
+        <CardContent className="p-0">
+          {loading ? (
+             <div className="py-24 flex flex-col items-center justify-center gap-4 text-center">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary opacity-40" />
+                <p className="text-[11px] font-bold tracking-widest uppercase text-muted-foreground">Synchronizing Workflow States...</p>
+             </div>
+          ) : filtered.length === 0 ? (
+             <div className="py-24 text-center space-y-4">
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground opacity-30">
+                   <Layers size={24} />
+                </div>
+                <div className="space-y-1">
+                   <p className="font-bold text-foreground">All Clear!</p>
+                   <p className="text-xs text-muted-foreground">No records matching your current filter are awaiting action.</p>
+                </div>
+             </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {filtered.map((r) => {
+                const s = normalizeParkStatus(r.status)
+                const canIssue = s === "admin_approved"
+                const canValidate = s === "application_submitted" || s === "application_incomplete"
+                const canReturn = s === "application_submitted"
+                
+                return (
+                  <div key={r.reservation_id} className="group flex flex-col md:flex-row md:items-center justify-between p-6 hover:bg-muted transition-all gap-6">
+                    <div className="space-y-3 flex-1 min-w-0">
+                      <div className="flex items-start gap-4">
+                        <div className="h-10 w-10 shrink-0 rounded-xl bg-background border border-border flex flex-col items-center justify-center shadow-xs group-hover:border-primary transition-colors">
+                           <p className="text-[9px] font-bold uppercase text-muted-foreground italic tracking-tighter">REF</p>
+                           <p className="text-xs font-bold font-mono text-foreground leading-none">{r.reservation_id.slice(-4)}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-foreground flex items-center gap-2 group-hover:text-primary transition-colors truncate">
+                             {r.reservation_id}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[11px] font-medium text-muted-foreground">
+                             <span className="flex items-center gap-1.5"><MapPin size={12} className="opacity-50" /> {r.venue?.park_venue_name || 'System Site'}</span>
+                             <span className="flex items-center gap-1.5"><Calendar size={12} className="opacity-50" /> {r.reservation_date}</span>
+                             <span className="flex items-center gap-1.5"><User size={12} className="opacity-50" /> {r.person?.full_name || 'Unknown Applicant'}</span>
+                          </div>
+                        </div>
+                      </div>
 
-          {!loading &&
-            filtered.map((r) => {
-              const s = normalizeParkStatus(r.status)
-              const canIssue = s === "admin_approved"
-              const canValidate = s === "application_submitted" || s === "application_incomplete"
-              const canReturn = s === "application_submitted"
-              return (
-                <div key={r.reservation_id} className="rounded-xl border border-border-subtle bg-card px-4 py-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-foreground">
-                        {r.reservation_id} · {r.venue?.park_venue_name ?? "—"}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {r.person?.full_name ?? "Unknown applicant"} · {r.reservation_date}
-                      </div>
-                      <div className="mt-2 text-[11px] text-muted-foreground">
-                        Current status: <span className="font-semibold text-foreground">{s}</span>
-                        {r.application_form_doc ? " · Application form attached" : ""}
+                      <div className="flex items-center gap-4 pl-14">
+                         <div className="flex items-center gap-2">
+                           <Badge variant={s.includes("rejected") ? "destructive" : s.includes("approved") ? "success" : "warning"} className="text-[9px] font-bold uppercase tracking-tight h-5 px-2 py-0 border-none">
+                              {s.replace(/_/g, ' ')}
+                           </Badge>
+                         </div>
+                         {r.application_form_url && (
+                           <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold uppercase tracking-widest gap-2 bg-background border-border shadow-xs" asChild>
+                             <a href={r.application_form_url} target="_blank" rel="noopener noreferrer">
+                               <FileText size={12} className="text-primary" /> View Form <ExternalLink size={10} className="opacity-30" />
+                             </a>
+                           </Button>
+                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      <button
-                        className="btn-secondary"
+                    <div className="flex items-center gap-3 shrink-0 flex-wrap md:justify-end pl-14 md:pl-0">
+                      <Button 
+                        size="sm" 
+                        variant="secondary"
                         disabled={!canIssue || actionLoading === r.reservation_id}
-                        onClick={() =>
-                          updateStatus(r, "application_form_issued", {
-                            type: "application_form_issued",
-                            msg: `Your park reservation ${r.reservation_id} was approved. Please complete the application form.`,
-                          })
-                        }
-                        title="BPMN Step 7 — Issue digital application form"
+                        onClick={() => updateStatus(r, "application_form_issued", {
+                          type: "application_form_issued",
+                          msg: `Your park reservation ${r.reservation_id} was approved. Please complete the application form.`,
+                        })}
+                        title="Issue digital application form"
+                        className="h-9 px-4 text-xs font-bold uppercase tracking-widest gap-2 shadow-xs"
                       >
-                        <Send size={14} />
-                        {actionLoading === r.reservation_id ? "Saving…" : "Issue Form"}
-                      </button>
+                         {actionLoading === r.reservation_id ? <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground"/> : <Send size={14} className="text-primary"/>}
+                         Issue Form
+                      </Button>
 
-                      <button
-                        className="btn-secondary"
-                        disabled={!canReturn || actionLoading === r.reservation_id}
-                        onClick={() =>
-                          updateStatus(r, "application_incomplete", {
+                      {canReturn && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          disabled={actionLoading === r.reservation_id}
+                          onClick={() => updateStatus(r, "application_incomplete", {
                             type: "application_incomplete",
                             msg: `Your application for ${r.reservation_id} is incomplete. Please correct and resubmit.`,
-                          })
-                        }
-                        title="BPMN Step 9 — Return for correction"
-                      >
-                        Return for Correction
-                      </button>
+                          })}
+                          title="Return for correction"
+                          className="h-9 px-4 text-xs font-bold uppercase tracking-widest border-red-500 text-red-600 hover:bg-red-500 hover:text-white shadow-xs"
+                        >
+                          <Ban size={14} className="mr-1.5" /> Return
+                        </Button>
+                      )}
 
-                      <button
-                        className="btn-primary"
+                      <Button 
+                        size="sm" 
                         disabled={!canValidate || actionLoading === r.reservation_id}
-                        onClick={() =>
-                          updateStatus(r, "application_validated", {
-                            type: "application_validated",
-                            msg: `Your application for ${r.reservation_id} was validated. Payment processing may proceed if fees apply.`,
-                          })
-                        }
-                        title="BPMN Step 9 — Mark complete"
+                        onClick={() => updateStatus(r, "application_validated", {
+                          type: "application_validated",
+                          msg: `Your application for ${r.reservation_id} was validated. Payment processing may proceed if fees apply.`,
+                        })}
+                        title="Mark complete"
+                        className="h-9 px-4 text-xs font-bold uppercase tracking-widest gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
                       >
-                        <CheckCircle2 size={14} />
-                        Validate Complete
-                      </button>
+                        {actionLoading === r.reservation_id ? <RefreshCw className="h-3 w-3 animate-spin"/> : <BadgeCheck size={14} />}
+                        Validate
+                      </Button>
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* FOOTER CALLOUT */}
+      <footer className="rounded-2xl border border-blue-500 bg-blue-50 p-4 flex gap-4 items-start md:items-center shadow-xs">
+         <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+           <Info size={18} />
+         </div>
+         <p className="text-[11px] text-blue-700/80 dark:text-blue-400 font-medium leading-relaxed max-w-2xl">
+           <strong className="text-blue-900 dark:text-blue-300 uppercase tracking-tighter mr-1.5 font-bold italic">Operational Guideline:</strong> 
+           Validation marks the transition to payment processing. After Validate, the reservation is routed to the Treasurer to compute fees and generate Order of Payment. Citizen pays; Treasurer processes payment and issues OR; then release the permit in Permits & Payments.
+         </p>
+      </footer>
     </div>
   )
 }

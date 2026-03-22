@@ -2,6 +2,15 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import type { AuthUser, UserRole, NotificationLog } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { logAudit } from '@/lib/admin'
+import {
+    EXTERNAL_AUTH_PASSWORD_PLACEHOLDER,
+    EXTERNAL_SESSION_STORAGE_KEY,
+    externalCitizenSupabase,
+    loginAndSyncExternalCitizen,
+    persistExternalCitizenSessionFromClient,
+    verifyCitizenPortalPassword,
+} from '@/lib/externalCitizenPortal'
+import { syncExternalProfileIntoBpmPerson } from '@/lib/citizenProfileDisplay'
 
 // ─── Mock demo users for the UI dropdown ───────────────────────────────────────
 export const DEMO_USERS: Record<string, { role: UserRole, password: string }> = {
@@ -100,11 +109,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         }
                     })
                 } else {
-                    void supabase.from('system_users').select('is_active').eq('user_id', parsed.id).maybeSingle().then(({ data }) => {
-                        if (data && !data.is_active) {
+                    void Promise.all([
+                        supabase.from('system_users').select('is_active').eq('user_id', parsed.id).maybeSingle(),
+                        supabase.from('employee').select('employee_id').eq('system_user_id', parsed.id).maybeSingle()
+                    ]).then(([{ data: sysData }, { data: empData }]) => {
+                        if (sysData && !sysData.is_active) {
                             setUser(null)
                             localStorage.removeItem('bpm_user')
                         } else {
+                            if (empData?.employee_id) {
+                                setUser(prev => prev ? { ...prev, employee_id: empData.employee_id } : null)
+                            }
                             setNotifications([])
                         }
                     })
@@ -180,13 +195,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     }
                 })()
 
+                // Fetch employee_id if exists
+                const { data: empData } = await supabase
+                    .from('employee')
+                    .select('employee_id')
+                    .eq('system_user_id', sysUser.user_id)
+                    .maybeSingle()
+
                 const safeUser: AuthUser = {
                     id: sysUser.user_id,
                     email: sysUser.email,
                     role: normalizedRole as any,
                     full_name: sysUser.full_name,
                     is_citizen: false,
-                    office: sysUser.department
+                    office: sysUser.department,
+                    employee_id: empData?.employee_id
                 }
                 setUser(safeUser)
                 setNotifications([])
@@ -198,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     status: 'success',
                     subject: safeUser.id,
                     performed_by: safeUser.email,
-                    details: { role: safeUser.role, is_citizen: false },
+                    details: { role: safeUser.role, is_citizen: false, employee_id: safeUser.employee_id },
                 })
                 return {}
             }
@@ -212,8 +235,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             if (citAcc) {
                 const storedHash = citAcc.password_hash
+                const isExternalLinked = storedHash === EXTERNAL_AUTH_PASSWORD_PLACEHOLDER
                 const isSeedData = storedHash?.startsWith('$2b$')
-                if (isSeedData) {
+                if (isExternalLinked) {
+                    // Validate in citizen portal, persist session, mirror `profiles` → BPM `person` for this account.
+                    const portalOk = await verifyCitizenPortalPassword(email, password)
+                    if (!portalOk) {
+                        setIsLoading(false)
+                        void logAudit({
+                            action: 'login_failed',
+                            module: 'auth',
+                            status: 'error',
+                            subject: citAcc.account_id,
+                            performed_by: email,
+                            details: { reason: 'invalid_external_password', is_citizen: true },
+                        })
+                        return { error: 'Invalid password.' }
+                    }
+                    await persistExternalCitizenSessionFromClient()
+                    if (externalCitizenSupabase) {
+                        const { data: sessionData } = await externalCitizenSupabase.auth.getSession()
+                        if (sessionData?.session?.access_token && sessionData?.session?.refresh_token) {
+                            localStorage.setItem(
+                                EXTERNAL_SESSION_STORAGE_KEY,
+                                JSON.stringify({
+                                    access_token: sessionData.session.access_token,
+                                    refresh_token: sessionData.session.refresh_token,
+                                })
+                            )
+                        }
+                    }
+                    if (externalCitizenSupabase && citAcc.person_id) {
+                        const {
+                            data: { user: extAuthUser },
+                        } = await externalCitizenSupabase.auth.getUser()
+                        if (extAuthUser?.id) {
+                            const { data: portalProfile } = await externalCitizenSupabase
+                                .from('profiles')
+                                .select('*')
+                                .eq('id', extAuthUser.id)
+                                .maybeSingle()
+                            await syncExternalProfileIntoBpmPerson(supabase, {
+                                personId: citAcc.person_id as string,
+                                accountId: citAcc.account_id as string,
+                                externalUserId: extAuthUser.id,
+                                profile: portalProfile as Record<string, unknown> | null,
+                            })
+                        }
+                    }
+                } else if (isSeedData) {
                     if (password !== 'citizen123' && password !== 'admin123' && password !== 'password') {
                         setIsLoading(false)
                         void logAudit({
@@ -254,12 +324,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     return { error: `Your account is ${citAcc.verification_status}. Please contact the administrator.` }
                 }
 
-                // If citizen_account doesn't embed `person` easily based on the type definition vs real db
+                // Prefer freshly mirrored BPM `person` after portal login; else embedded join.
                 let fullName = 'Citizen'
-                if (citAcc.person && !Array.isArray(citAcc.person)) {
-                    fullName = (citAcc.person as any).full_name || 'Citizen'
-                } else if (Array.isArray(citAcc.person) && citAcc.person.length > 0) {
-                    fullName = (citAcc.person as any)[0].full_name || 'Citizen'
+                if (storedHash === EXTERNAL_AUTH_PASSWORD_PLACEHOLDER && citAcc.person_id) {
+                    const { data: pFresh } = await supabase
+                        .from('person')
+                        .select('full_name')
+                        .eq('person_id', citAcc.person_id as string)
+                        .maybeSingle()
+                    if (pFresh?.full_name && String(pFresh.full_name).trim()) {
+                        fullName = String(pFresh.full_name).trim()
+                    }
+                }
+                if (fullName === 'Citizen') {
+                    if (citAcc.person && !Array.isArray(citAcc.person)) {
+                        fullName = (citAcc.person as any).full_name || 'Citizen'
+                    } else if (Array.isArray(citAcc.person) && citAcc.person.length > 0) {
+                        fullName = (citAcc.person as any)[0].full_name || 'Citizen'
+                    }
                 }
 
                 const safeUser: AuthUser = {
@@ -280,6 +362,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     subject: safeUser.id,
                     performed_by: safeUser.email,
                     details: { role: safeUser.role, is_citizen: true },
+                })
+                return {}
+            }
+
+            // Fallback: try citizen login from external citizen portal,
+            // then sync a local mirror in citizen_account/person.
+            const externalSynced = await loginAndSyncExternalCitizen(email, password, supabase)
+            if (externalSynced) {
+                const fullName =
+                    externalSynced.profile?.full_name ??
+                    externalSynced.profile?.name ??
+                    email.split('@')[0] ??
+                    'Citizen'
+
+                const safeUser: AuthUser = {
+                    id: externalSynced.localAccountId,
+                    email,
+                    role: 'citizen',
+                    full_name: fullName,
+                    is_citizen: true
+                }
+
+                setUser(safeUser)
+                setNotifications(await fetchCitizenNotifications(safeUser.id))
+                localStorage.setItem('bpm_user', JSON.stringify(safeUser))
+                if (externalSynced.externalSession) {
+                    localStorage.setItem(EXTERNAL_SESSION_STORAGE_KEY, JSON.stringify(externalSynced.externalSession))
+                }
+                setIsLoading(false)
+                void logAudit({
+                    action: 'login',
+                    module: 'auth',
+                    status: 'success',
+                    subject: safeUser.id,
+                    performed_by: safeUser.email,
+                    details: {
+                        role: safeUser.role,
+                        is_citizen: true,
+                        source: 'external_citizen_portal',
+                        external_user_id: externalSynced.externalUserId
+                    },
                 })
                 return {}
             }
@@ -367,6 +490,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setNotifications([])
         localStorage.removeItem('bpm_user')
+        localStorage.removeItem(EXTERNAL_SESSION_STORAGE_KEY)
     }
 
     const markNotifRead = (id: string) => {

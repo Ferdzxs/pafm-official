@@ -4,6 +4,7 @@ import { ROLE_META } from '@/config/rbac'
 import { TrendingUp, TrendingDown, Clock, CheckCircle, Users, FileText } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { supabase } from '@/lib/supabase'
 
 const KPI_DATA = [
     { label: 'Pending Certificates', value: 5, change: 2, icon: Clock, color: '#fbbf24' },
@@ -12,10 +13,13 @@ const KPI_DATA = [
     { label: 'Approvals Pending', value: 2, change: 0, icon: Users, color: '#a78bfa' },
 ]
 
-const RECENT_ACTIVITY = [
-    { id: 'DC-2024-099', action: 'Certificate Submitted', subject: 'Pascual, Rodrigo', time: '15 min ago', status: 'pending' },
-    { id: 'DC-2024-098', action: 'Certificate Verified', subject: 'Torres, Elena', time: '1 hr ago', status: 'approved' },
-]
+export interface RecentAct {
+    id: string
+    action: string
+    subject: string
+    time: string
+    status: string
+}
 
 const QUICK_ACTIONS = [
     { label: 'Verify Certificates', emoji: '📋', path: '/death/verify' },
@@ -38,6 +42,56 @@ function getGreeting() {
 
 export default function DeathRegistrationDashboard() {
     const { user } = useAuth()
+    const [recentActivity, setRecentActivity] = React.useState<RecentAct[]>([])
+
+    React.useEffect(() => {
+        async function fetchRecent() {
+            const { data } = await supabase
+                .from('online_burial_application')
+                .select(`
+                    application_id,
+                    document_validation_status,
+                    application_status,
+                    submission_date,
+                    person:person_id ( full_name )
+                `)
+                .order('submission_date', { ascending: false })
+                .limit(5)
+
+            if (data) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const formatted = data.map((item: any) => {
+                    const applicant = Array.isArray(item.person) ? item.person[0]?.full_name : item.person?.full_name
+                    const subDate = new Date(item.submission_date as string)
+                    const diffMs = new Date().getTime() - subDate.getTime()
+                    const diffMins = Math.floor(diffMs / 60000)
+                    const diffHrs = Math.floor(diffMins / 60)
+                    const diffDays = Math.floor(diffHrs / 24)
+
+                    let timeStr = 'Just now'
+                    if (diffMins < 60 && diffMins > 0) timeStr = `${diffMins} min ago`
+                    else if (diffHrs < 24 && diffHrs > 0) timeStr = `${diffHrs} hr ago`
+                    else if (diffDays > 0) timeStr = `${diffDays} days ago`
+
+                    let actionLabel = 'Application Submitted'
+                    const renderStatus = item.document_validation_status || 'pending'
+                    if (item.document_validation_status === 'validated') actionLabel = 'Documents Validated'
+                    if (item.application_status === 'approved') actionLabel = 'Application Approved'
+
+                    return {
+                        id: item.application_id,
+                        action: actionLabel,
+                        subject: applicant || 'Unknown Applicant',
+                        time: timeStr,
+                        status: renderStatus
+                    }
+                })
+                setRecentActivity(formatted)
+            }
+        }
+        fetchRecent()
+    }, [])
+
     if (!user) return null
 
     const meta = ROLE_META[user.role]
@@ -95,10 +149,10 @@ export default function DeathRegistrationDashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-1">
-                            {RECENT_ACTIVITY.map(item => (
+                            {recentActivity.length > 0 ? recentActivity.map(item => (
                                 <div key={item.id} className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-accent transition-colors cursor-pointer">
                                     <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                        {item.id.slice(0, 2)}
+                                        {item.id.slice(0, 2).toUpperCase()}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-sm font-medium text-foreground truncate">{item.action}</div>
@@ -109,7 +163,9 @@ export default function DeathRegistrationDashboard() {
                                         <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-xs text-muted-foreground py-4 text-center">No recent activity</div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

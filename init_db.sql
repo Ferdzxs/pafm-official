@@ -378,10 +378,25 @@ CREATE TABLE person (
     contact_number  TEXT,
     valid_id_type   TEXT,
     valid_id_number TEXT,
-    account_id      TEXT
+    account_id      TEXT,
+    -- Citizen portal / external sync (ProfilePage PERSON_SELECT)
+    first_name      TEXT,
+    middle_name     TEXT,
+    last_name       TEXT,
+    suffix          TEXT,
+    birth_date      DATE,
+    gender          TEXT,
+    civil_status    TEXT,
+    barangay        TEXT,
+    city            TEXT,
+    province        TEXT,
+    postal_code     TEXT,
+    street_address  TEXT
 );
 
-INSERT INTO person VALUES
+INSERT INTO person (
+    person_id, full_name, address, contact_number, valid_id_type, valid_id_number, account_id
+) VALUES
 ('PER-001','Juan Santos Dela Cruz','Blk 4 Lot 2, Purok 1, Brgy 123','09171234567','PhilSys','1234-5678-9012',NULL),
 ('PER-002','Maria Isabel Reyes','Blk 7 Lot 5, Purok 2, Brgy 123','09281234567','Voter ID','VID-20220001',NULL),
 ('PER-003','Pedro Santiago Bautista','Corner P. Florentino, Purok 1','09501234567','UMID','UMID-3344556',NULL),
@@ -397,6 +412,53 @@ INSERT INTO person VALUES
 ('PER-013','Ricardo Castillo','QC Ave, Zone 4','09182222100','Driver License','DL-20190115',NULL),
 ('PER-014','Norma Dela Vega','P. Florentino St.','09193333100','Voter ID','VID-20210055',NULL),
 ('PER-015','Manuel Soriano','Scout Barrio, QC','09126666100','PhilSys','5678-9012-3456',NULL);
+
+-- Auto-compute full_name and address when name/address parts are provided (INSERT-safe: seed rows keep explicit full_name/address)
+CREATE OR REPLACE FUNCTION public.person_compute_full_name_and_address()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_full TEXT;
+    v_addr TEXT;
+BEGIN
+    v_full := trim(concat_ws(' ',
+        nullif(trim(coalesce(NEW.first_name, '')), ''),
+        nullif(trim(coalesce(NEW.middle_name, '')), ''),
+        nullif(trim(coalesce(NEW.last_name, '')), ''),
+        nullif(trim(coalesce(NEW.suffix, '')), '')
+    ));
+    IF v_full <> '' THEN
+        NEW.full_name := v_full;
+    ELSIF TG_OP = 'UPDATE' AND (NEW.full_name IS NULL OR btrim(NEW.full_name) = '') THEN
+        NEW.full_name := OLD.full_name;
+    END IF;
+
+    v_addr := trim(concat_ws(', ',
+        nullif(trim(coalesce(NEW.street_address, '')), ''),
+        nullif(trim(coalesce(NEW.barangay, '')), ''),
+        nullif(trim(coalesce(NEW.city, '')), ''),
+        nullif(trim(coalesce(NEW.postal_code, '')), ''),
+        nullif(trim(coalesce(NEW.province, '')), '')
+    ));
+    IF v_addr <> '' THEN
+        NEW.address := v_addr;
+    ELSIF TG_OP = 'UPDATE' AND (NEW.address IS NULL OR btrim(coalesce(NEW.address, '')) = '') THEN
+        NEW.address := OLD.address;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS person_compute_full_name_address_trigger ON public.person;
+CREATE TRIGGER person_compute_full_name_address_trigger
+    BEFORE INSERT OR UPDATE OF first_name, middle_name, last_name, suffix, street_address, barangay, city, postal_code, province
+    ON public.person
+    FOR EACH ROW
+    EXECUTE PROCEDURE public.person_compute_full_name_and_address();
+
+-- Realtime (optional, existing Supabase project): if you use postgres_changes on person/citizen_account:
+--   ALTER PUBLICATION supabase_realtime ADD TABLE public.person;
+--   ALTER PUBLICATION supabase_realtime ADD TABLE public.citizen_account;
 
 -- ── Government Office ─────────────────────────────────────────────────
 CREATE TABLE government_office (
@@ -724,10 +786,15 @@ CREATE TABLE park_reservation_record (
     received_by_employee    TEXT REFERENCES employee(employee_id),
     approved_by_employee    TEXT REFERENCES employee(employee_id),
     payment_id              TEXT REFERENCES digital_payment(payment_id),
-    digital_permit_url      TEXT
+    digital_permit_url      TEXT,
+    created_at              TIMESTAMPTZ DEFAULT NOW()
 );
 
-INSERT INTO park_reservation_record VALUES
+INSERT INTO park_reservation_record (
+    reservation_id, park_venue_id, applicant_person_id, letter_of_intent_doc, application_form_doc,
+    reservation_date, time_slot, status, processed_by_admin, received_by_employee, approved_by_employee,
+    payment_id, digital_permit_url
+) VALUES
 ('PRR-001','PV-002','PER-001',NULL,NULL,'2024-03-15','09:00-17:00','approved','ADM-001','EMP-003','EMP-003','PAY-004','https://storage.bpm.gov/parks/PRR-001-permit.pdf'),
 ('PRR-002','PV-003','PER-001',NULL,NULL,'2024-03-10','06:00-20:00','approved','ADM-001','EMP-003','EMP-003','PAY-003','https://storage.bpm.gov/parks/PRR-002-permit.pdf'),
 ('PRR-003','PV-001','PER-006',NULL,NULL,'2024-03-08','14:00-19:00','completed','ADM-001','EMP-003','EMP-003',NULL,'https://storage.bpm.gov/parks/PRR-003-permit.pdf'),

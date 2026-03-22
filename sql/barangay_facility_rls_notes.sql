@@ -1,0 +1,16 @@
+-- Barangay facility reservation — RLS notes (Supabase)
+--
+-- This app uses custom login (citizen_account / system_users) and the anon key for
+-- many writes, similar to parks and burial modules. If you enable RLS on
+-- `barangay_reservation_record`, `barangay_facility`, `digital_document`, or
+-- `digital_payment`, add policies that allow:
+--   - Citizens: insert/update own rows (by applicant_person_id / person link)
+--   - barangay_secretary: update statuses for intake and permit issuance
+--   - punong_barangay: update for PB approval fields
+--   - treasurer: update digital_payment and related reservation payment_id
+--
+-- Reuse the pattern from `sql/supabase_storage_parks_docs.sql` (anon-friendly)
+-- for storage uploads to `parks-docs` used for valid ID files on barangay apply.
+--
+-- Run `sql/barangay_facility_status_migration.sql` once to migrate legacy
+-- `pending` / `confirmed` status values.

@@ -1,254 +1,214 @@
-import React, { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useRole } from '@/contexts/AuthContext'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import React, { useEffect, useState, useMemo } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Package, ClipboardList, CheckSquare, Microscope, FileText, ArrowRight } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Search, Filter, Eye, Layers, XCircle, MapPin, Calendar } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { toast } from 'react-hot-toast'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 
-const MOCK_ASSETS = [
-  { id: 'ASSET-001', name: 'City Hall Generator', location: 'City Hall', status: 'Operational', condition: 'Good' },
-  { id: 'ASSET-002', name: 'Park Lighting (East Park)', location: 'East Park', status: 'Needs Repair', condition: 'Fair' },
-  { id: 'ASSET-003', name: 'Cemetery Mower', location: 'Cemetery Grounds', status: 'In Use', condition: 'Good' },
-  { id: 'ASSET-004', name: 'Barangay Hall Tables', location: 'Barangay Hall', status: 'Operational', condition: 'Fair' },
-]
+export default function FamcdInventoryAssets() {
+ const [searchTerm, setSearchTerm] = useState('')
+ const [properties, setProperties] = useState<any[]>([])
+ const [selectedProperty, setSelectedProperty] = useState<any | null>(null)
+ const [isLoading, setIsLoading] = useState(true)
 
-const MOCK_INSPECTIONS = [
-  { id: 'INSP-001', asset: 'Park Lighting (East Park)', due: '2024-03-15', status: 'Pending' },
-  { id: 'INSP-002', asset: 'Cemetery Mower', due: '2024-03-21', status: 'In Progress' },
-  { id: 'INSP-003', asset: 'City Hall Generator', due: '2024-04-01', status: 'Pending' },
-]
+ useEffect(() => {
+ fetchProperties()
+ }, [])
 
-const ROLE_REQUEST_PATH: Record<string, string | undefined> = {
-  cemetery_office: '/burial/asset-requests',
-  parks_admin: '/parks/asset-requests',
-  punong_barangay: '/barangay/asset-requests',
-}
+ const fetchProperties = async () => {
+ setIsLoading(true)
+ const { data, error } = await supabase
+  .from('property')
+  .select(`
+    property_id,
+    property_name,
+    property_type,
+    location,
+    asset_condition,
+    acquisition_date,
+    area_size,
+    government_office!managing_office (
+     office_name
+    )
+   `)
+  .order('property_name', { ascending: true })
 
-export default function AssetInventoryPage() {
-  const navigate = useNavigate()
-  const role = useRole()
+ if (error) {
+  console.error('Error fetching properties:', error)
+  toast.error('Failed to load assets.')
+ } else {
+  setProperties(data || [])
+ }
+ setIsLoading(false)
+ }
 
-  const header = useMemo(() => {
-    switch (role) {
-      case 'cgsd_management':
-        return {
-          title: 'Inventory & Asset Management',
-          description: 'View and manage all city-owned assets. Approve requests, track inspections, and generate reports.',
-        }
-      case 'famcd':
-        return {
-          title: 'Asset Inspection & Submission',
-          description: 'Track assets that need inspection and submit your inspection findings for approval.',
-        }
-      default:
-        return {
-          title: 'Asset Inventory',
-          description: 'This module provides read-only information about city assets. Use Asset Requests to request new items or changes.',
-        }
-    }
-  }, [role])
+ const filtered = useMemo(() =>
+ properties.filter(p =>
+  p.property_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  p.location?.toLowerCase().includes(searchTerm.toLowerCase())
+ ), [properties, searchTerm])
 
-  const stats = useMemo(() => {
-    const total = MOCK_ASSETS.length
-    const needsRepair = MOCK_ASSETS.filter((a) => a.status.toLowerCase().includes('needs')).length
-    const good = MOCK_ASSETS.filter((a) => a.condition === 'Good').length
-    return { total, needsRepair, good }
-  }, [])
+ const getConditionBadge = (condition: string) => {
+ switch (condition?.toLowerCase()) {
+  case 'excellent': return <Badge variant="success" className="text-[10px] uppercase">Excellent</Badge>
+  case 'good': return <Badge variant="success" className="text-[10px] uppercase">Good</Badge>
+  case 'fair': return <Badge variant="warning" className="text-[10px] uppercase">Fair</Badge>
+  case 'poor': return <Badge variant="destructive" className="text-[10px] uppercase">Poor</Badge>
+  default: return <Badge variant="secondary" className="text-[10px] uppercase">{condition || 'Unknown'}</Badge>
+ }
+ }
 
-  const requestPath = role ? ROLE_REQUEST_PATH[role] : undefined
+ return (
+ <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
+  {/* Header */}
+  <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+  <div>
+   <h1 className="font-display text-2xl font-bold text-foreground">Inventory & Assets</h1>
+   <p className="text-muted-foreground text-sm mt-1">
+   Read-only reference of city-owned properties. Condition updates flow through your inspection reports.
+   </p>
+  </div>
+  </div>
 
-  return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto animate-fade-in">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{header.title}</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>{header.description}</p>
+  {/* Search */}
+  <Card className="mb-6 shadow-sm border-border">
+  <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-card">
+   <div className="relative w-full sm:w-96">
+   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+   <Input
+    placeholder="Search by name or location..."
+    value={searchTerm}
+    onChange={e => setSearchTerm(e.target.value)}
+    className="pl-10 h-10 w-full bg-background"
+   />
+   </div>
+   <Button variant="outline" className="w-full sm:w-auto gap-2" onClick={fetchProperties}>
+   <Filter size={16} /> Refresh
+   </Button>
+  </CardContent>
+  </Card>
+
+  {/* Table */}
+  <Card className="shadow-sm border-border overflow-hidden bg-card">
+  <div className="overflow-x-auto">
+   <div className="max-h-[60vh] overflow-y-auto">
+   <table className="w-full text-left border-collapse">
+    <thead>
+    <tr className="border-b border-border bg-muted/50">
+     <th className="p-4 text-xs font-semibold text-muted-foreground w-1/3">Asset</th>
+     <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Type</th>
+     <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Condition</th>
+     <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Managing Office</th>
+     <th className="p-4 text-xs font-semibold text-muted-foreground text-right">Details</th>
+    </tr>
+    </thead>
+    <tbody className="divide-y divide-border">
+    {isLoading ? (
+     <tr><td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">Loading asset registry...</td></tr>
+    ) : filtered.length === 0 ? (
+     <tr><td colSpan={5} className="p-8 text-center text-muted-foreground text-sm">No assets found.</td></tr>
+    ) : filtered.map(property => (
+     <tr key={property.property_id} className="hover:bg-accent/50 transition-colors">
+     <td className="p-4">
+      <div className="flex items-center gap-3">
+      <div className="w-10 h-10 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-600 shrink-0">
+       <Layers size={18} />
+      </div>
+      <div>
+       <div className="font-semibold text-sm text-foreground">{property.property_name}</div>
+       <div className="text-xs text-muted-foreground truncate max-w-[200px]">{property.location || '—'}</div>
+      </div>
+      </div>
+     </td>
+     <td className="p-4 text-sm text-foreground capitalize">{property.property_type || '—'}</td>
+     <td className="p-4">{getConditionBadge(property.asset_condition)}</td>
+     <td className="p-4 text-sm text-muted-foreground">
+      {(property as any).government_office?.office_name || 'Unassigned'}
+     </td>
+     <td className="p-4 text-right">
+      <Button variant="ghost" size="sm" onClick={() => setSelectedProperty(property)}>
+      <Eye size={16} className="mr-2" /> View
+      </Button>
+     </td>
+     </tr>
+    ))}
+    </tbody>
+   </table>
+   </div>
+  </div>
+  </Card>
+
+  {/* Read-Only Detail Modal */}
+  <Dialog open={!!selectedProperty} onOpenChange={(open) => !open && setSelectedProperty(null)}>
+   <DialogContent className="max-w-lg p-0 overflow-hidden border-none bg-transparent shadow-none w-full">
+    {selectedProperty && (
+     <div className="card-premium mx-auto w-full animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col sidebar-scrollbar">
+      <DialogHeader className="mb-6 space-y-1 text-left shrink-0">
+       <div className="flex items-center gap-2 mb-2">
+        <Badge variant="outline" className="text-[10px] font-bold tracking-widest border-border bg-background">ID: {selectedProperty.property_id}</Badge>
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight border bg-slate-100 text-slate-600 border-slate-200">
+         {selectedProperty.property_type || 'Asset'}
+        </span>
+       </div>
+       <DialogTitle className="font-display text-2xl font-extrabold tracking-tight text-foreground leading-tight flex items-center gap-2">
+        <Layers className="text-slate-500 h-6 w-6" /> Asset Details
+       </DialogTitle>
+       <DialogDescription className="font-medium text-muted-foreground/80 mt-1">
+        Read-only information about this property.
+       </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-6 overflow-y-auto flex-1 sidebar-scrollbar pb-2">
+       {/* Read-only fields */}
+       <div className="grid grid-cols-1 gap-4">
+        <div className="bg-background border border-border/50 p-4 rounded-xl shadow-sm">
+         <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Asset Name</div>
+         <div className="text-sm font-bold text-foreground">{selectedProperty.property_name}</div>
         </div>
-        {role === 'cgsd_management' && (
-          <Button onClick={() => navigate('/assets/requests')} className="inline-flex items-center gap-2">
-            <Package size={16} /> Review Requests
-          </Button>
-        )}
-        {role === 'famcd' && (
-          <Button onClick={() => navigate('/assets/submissions')} className="inline-flex items-center gap-2">
-            <FileText size={16} /> View Submissions
-          </Button>
-        )}
-        {requestPath && role && role !== 'cgsd_management' && role !== 'famcd' && (
-          <Button onClick={() => navigate(requestPath)} className="inline-flex items-center gap-2">
-            <Package size={16} /> Go to Asset Requests
-          </Button>
-        )}
+        <div className="bg-background border border-border/50 p-4 rounded-xl shadow-sm">
+         <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><MapPin size={12} /> Location</div>
+         <div className="text-sm font-semibold text-foreground">{selectedProperty.location || '—'}</div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+         <div className="bg-background border border-border/50 p-4 rounded-xl shadow-sm">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Type</div>
+          <div className="text-sm capitalize font-semibold text-foreground">{selectedProperty.property_type || '—'}</div>
+         </div>
+         <div className="bg-background border border-border/50 p-4 rounded-xl shadow-sm">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Condition</div>
+          <div className="mt-0.5">{getConditionBadge(selectedProperty.asset_condition)}</div>
+         </div>
+         <div className="bg-background border border-border/50 p-4 rounded-xl shadow-sm">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Area (sq.m)</div>
+          <div className="text-sm font-semibold text-foreground">{selectedProperty.area_size || '—'}</div>
+         </div>
+         <div className="bg-background border border-border/50 p-4 rounded-xl shadow-sm">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Calendar size={12} /> Acquired</div>
+          <div className="text-sm font-semibold text-foreground">{selectedProperty.acquisition_date || '—'}</div>
+         </div>
+        </div>
+        <div className="bg-background border border-border/50 p-4 rounded-xl shadow-sm">
+         <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Managing Office</div>
+         <div className="text-sm font-semibold text-foreground">{(selectedProperty as any).government_office?.office_name || 'Unassigned'}</div>
+        </div>
+       </div>
+
+       {/* Info note */}
+       <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 text-[11px] font-medium text-blue-600/90 leading-relaxed shadow-sm">
+        To update the condition of this asset, submit an Ocular Inspection report. Conditions are updated automatically upon CGSD approval.
+       </div>
       </div>
 
-      {role === 'cgsd_management' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Total Assets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">All registered city-owned assets</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Needs Repair</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.needsRepair}</div>
-              <div className="text-xs text-muted-foreground">Assets flagged for maintenance</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Good Condition</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.good}</div>
-              <div className="text-xs text-muted-foreground">Assets in good working order</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {role === 'famcd' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Upcoming Inspections</h2>
-                <p className="text-xs text-muted-foreground">Assets that require inspection or status updates.</p>
-              </div>
-              <Badge variant="secondary">{MOCK_INSPECTIONS.length} items</Badge>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {MOCK_INSPECTIONS.map((insp) => (
-                <div key={insp.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition">
-                  <div>
-                    <p className="font-medium">{insp.asset}</p>
-                    <p className="text-xs text-muted-foreground">Due: {insp.due}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={insp.status === 'Pending' ? 'warning' : insp.status === 'In Progress' ? 'secondary' : 'success'}>
-                      {insp.status}
-                    </Badge>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/assets/submissions')}>
-                      <Microscope size={14} /> Submit
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Quick Actions</h2>
-                <p className="text-xs text-muted-foreground">Common tasks for inspection teams.</p>
-              </div>
-              <Badge variant="secondary">3</Badge>
-            </div>
-
-            <div className="mt-4 grid gap-2">
-              <Button variant="outline" onClick={() => navigate('/assets/inspections')}>
-                <Microscope size={16} /> Start Inspection
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/assets/reports')}>
-                <FileText size={16} /> View Reports
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/assets/requests')}>
-                <ClipboardList size={16} /> Track Requests
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {role === 'cgsd_management' && (
-        <div className="bg-white dark:bg-[#1a1c23] rounded-2xl overflow-hidden border border-gray-100 dark:border-gray-800">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20">
-                  <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">Asset ID</th>
-                  <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">Name</th>
-                  <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">Location</th>
-                  <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">Status</th>
-                  <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">Condition</th>
-                  <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {MOCK_ASSETS.map((asset) => (
-                  <tr key={asset.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/20 transition-colors">
-                    <td className="px-6 py-4 font-medium text-blue-600 dark:text-blue-400">{asset.id}</td>
-                    <td className="px-6 py-4 text-gray-900 dark:text-white">{asset.name}</td>
-                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{asset.location}</td>
-                    <td className="px-6 py-4">
-                      <Badge variant={asset.status === 'Needs Repair' ? 'destructive' : 'secondary'}>
-                        {asset.status}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4">{asset.condition}</td>
-                    <td className="px-6 py-4 text-right">
-                      <Button size="sm" variant="outline" onClick={() => navigate('/assets/inspections')}>
-                        <Microscope size={14} /> Inspect
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {role && role !== 'cgsd_management' && role !== 'famcd' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Need to Request a New Asset?</h2>
-                <p className="text-xs text-muted-foreground mt-1">Submit a request and track its approval status in the Asset Requests module.</p>
-              </div>
-              <Package className="text-muted-foreground" size={24} />
-            </div>
-            <div className="mt-6">
-              {requestPath ? (
-                <Button onClick={() => navigate(requestPath)} className="inline-flex items-center gap-2">
-                  <ArrowRight size={16} /> Go to Asset Requests
-                </Button>
-              ) : (
-                <p className="text-sm text-muted-foreground">No asset request page assigned for your role.</p>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Asset Inventory View</h2>
-                <p className="text-xs text-muted-foreground mt-1">This is a read-only view of current asset data for transparency and planning.</p>
-              </div>
-              <ClipboardList className="text-muted-foreground" size={24} />
-            </div>
-            <div className="mt-6">
-              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                <li>Check existing asset status</li>
-                <li>Submit a request when an asset needs repair or replacement</li>
-                <li>Track request progress via the Asset Requests page</li>
-              </ol>
-            </div>
-          </Card>
-        </div>
-      )}
-    </div>
-  )
+      <div className="mt-8 pt-6 border-t border-border/10 flex justify-end shrink-0">
+       <button onClick={() => setSelectedProperty(null)} className="h-11 rounded-xl px-8 w-full sm:w-auto border border-border bg-background text-[11px] font-extrabold uppercase tracking-widest text-foreground hover:bg-muted transition-all shadow-sm">Close</button>
+      </div>
+     </div>
+    )}
+   </DialogContent>
+  </Dialog>
+ </div>
+ )
 }

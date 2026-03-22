@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import { resolveCitizenDisplayIdentity } from "@/lib/citizenProfileDisplay";
 import { ROLE_NAV, ROLE_META } from "@/config/rbac";
 import {
   Sun,
@@ -17,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 // ─── Mock badge counts ──────────────────────────────────────────────────────
 const INITIAL_BADGE_COUNTS: Record<string, number> = {
@@ -24,10 +27,12 @@ const INITIAL_BADGE_COUNTS: Record<string, number> = {
   pending_assistance: 3,
   pending_certs: 5,
   pending_park_res: 4,
-  pending_bar_res: 0, // Will be fetched
+  pending_bar_res: 0,
+  barangay_intake_queue: 0,
   assigned_tickets: 9,
   open_tickets: 12,
   pending_reconciliation: 6,
+  pending_payments: 0,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -36,10 +41,11 @@ const INITIAL_BADGE_COUNTS: Record<string, number> = {
 interface TopBarProps {
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  onCloseSidebar: () => void;
 }
 
-export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
-  const { user, unreadCount, notifications, markNotifRead, logout } = useAuth();
+export function TopBar({ sidebarCollapsed, onToggleSidebar, onCloseSidebar }: TopBarProps) {
+  const { user, unreadCount, notifications, markNotifRead, logout, updateSessionUser } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showNotifs, setShowNotifs] = useState(false);
@@ -47,6 +53,30 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
   const [searchVal, setSearchVal] = useState("");
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!user?.is_citizen) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const resolved = await resolveCitizenDisplayIdentity(supabase, {
+          accountId: user.id,
+          email: user.email,
+          sessionFullName: user.full_name,
+        });
+        if (cancelled) return;
+        const next = resolved.full_name?.trim();
+        if (next && next !== user.full_name) {
+          updateSessionUser({ full_name: next });
+        }
+      } catch {
+        /* keep session name */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.is_citizen, user?.email, user?.full_name, updateSessionUser]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -61,7 +91,12 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
 
   return (
     <header
-      className="shrink-0 flex items-center gap-3 px-3 sm:px-5 h-[60px] bg-surface-subtle border-b border-border-subtle sticky top-0 z-40"
+      className="relative shrink-0 flex items-center gap-3 px-3 sm:px-5 h-[60px] bg-surface-subtle border-b border-border-subtle sticky top-0 z-20"
+      onMouseDown={() => {
+        if (!sidebarCollapsed && window.matchMedia("(max-width: 767px)").matches) {
+          onCloseSidebar();
+        }
+      }}
     >
       {/* ── Sidebar toggle (left) ── */}
       <button
@@ -84,7 +119,7 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
             placeholder="Search anything across the system…"
             value={searchVal}
             onChange={(e) => setSearchVal(e.target.value)}
-            className="w-full rounded-md border border-[color:var(--color-sidebar-border)] bg-[color:var(--color-bg-hover)] px-3 sm:px-4 py-2 pl-9 text-xs sm:text-sm text-[color:var(--color-text-primary)] placeholder:text-[color:var(--color-sidebar-sub)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface-base)] transition-colors"
+            className="w-full rounded-md border border-[color:var(--color-sidebar-border)] bg-[color:var(--color-bg-hover)] px-3 sm:px-4 py-2 pl-10 text-xs sm:text-sm text-[color:var(--color-text-primary)] placeholder:text-[color:var(--color-sidebar-sub)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface-base)] transition-colors"
           />
           {searchVal && (
             <button
@@ -140,86 +175,46 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
           </button>
 
           {showNotifs && (
-            <div
-              className="absolute top-full right-0 mt-2 rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
-              style={{
-                width: "320px",
-                maxHeight: "400px",
-                zIndex: 1000,
-                background: "var(--color-popup-bg)",
-                border: "1px solid var(--color-popup-border)",
-              }}
-            >
-              <div
-                className="px-4 py-3 flex items-center justify-between"
-                style={{
-                  borderBottom: "1px solid var(--color-sidebar-border)",
-                }}
-              >
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  Notifications
-                </span>
-                <span className="text-xs text-blue-500">
-                  {unreadCount} unread
-                </span>
+            <div className="absolute top-full right-0 mt-2 w-[340px] z-[1100] bg-popover text-popover-foreground rounded-xl border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-border bg-muted/20">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notifications</span>
+                {unreadCount > 0 && (
+                  <Badge variant="info" className="text-[9px] px-1.5 h-4 font-bold">
+                    {unreadCount} NEW
+                  </Badge>
+                )}
               </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "340px" }}>
+              <div className="overflow-y-auto sidebar-scrollbar max-h-[350px]">
                 {notifications.length === 0 ? (
-                  <div
-                    className="px-4 py-6 text-center text-sm"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
-                    No notifications
+                  <div className="px-6 py-10 text-center flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                      <Bell size={20} className="opacity-20" />
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">No updates right now</span>
                   </div>
                 ) : (
                   notifications.map((n) => (
                     <div
                       key={n.notif_id}
                       onClick={() => markNotifRead(n.notif_id)}
-                      className="px-4 py-3 cursor-pointer transition-colors"
-                      style={{
-                        background: n.is_read
-                          ? "transparent"
-                          : "rgba(59,130,246,0.05)",
-                        borderBottom: "1px solid var(--color-sidebar-border)",
-                      }}
-                      onMouseEnter={(e) =>
-                        ((e.currentTarget as HTMLElement).style.background =
-                          "var(--color-popup-item-hover)")
-                      }
-                      onMouseLeave={(e) =>
-                        ((e.currentTarget as HTMLElement).style.background =
-                          n.is_read ? "transparent" : "rgba(59,130,246,0.05)")
-                      }
+                      className={cn(
+                        "px-4 py-3.5 cursor-pointer transition-colors border-b border-border/50 hover:bg-accent/50 group relative text-left",
+                        !n.is_read && "bg-primary/[0.03]"
+                      )}
                     >
-                      <div className="flex items-start gap-2">
-                        <div
-                          className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-                          style={{
-                            background: n.is_read ? "transparent" : "#3b82f6",
-                          }}
-                        />
-                        <div>
-                          <div
-                            className="text-xs font-semibold"
-                            style={{ color: "var(--color-text-primary)" }}
-                          >
+                      <div className="flex items-start gap-3">
+                        {!n.is_read && <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1 shrink-0" />}
+                        <div className="flex-1 space-y-0.5">
+                          <p className={cn("text-xs font-semibold leading-tight", !n.is_read ? "text-foreground" : "text-muted-foreground")}>
                             {n.title}
-                          </div>
-                          <div
-                            className="text-xs mt-0.5 leading-relaxed"
-                            style={{ color: "var(--color-popup-subtext)" }}
-                          >
+                          </p>
+                          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
                             {n.message}
-                          </div>
-                          <div
-                            className="text-[10px] mt-1"
-                            style={{ color: "var(--color-text-muted)" }}
-                          >
-                            {new Date(n.created_at).toLocaleString()}
+                          </p>
+                          <div className="flex items-center gap-1.5 pt-1 text-[9px] font-medium text-muted-foreground/60 uppercase tracking-tighter">
+                            <span>{new Date(n.created_at).toLocaleDateString()}</span>
+                            <span>•</span>
+                            <span>{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
                         </div>
                       </div>
@@ -227,6 +222,9 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
                   ))
                 )}
               </div>
+              <button className="w-full py-2.5 text-[10px] font-bold text-primary hover:bg-primary/5 transition-colors border-t border-border uppercase tracking-widest">
+                View All Notifications
+              </button>
             </div>
           )}
         </div>
@@ -243,20 +241,26 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
             className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] transition-colors"
           >
             <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shadow-sm">
-              {user?.full_name.charAt(0) ?? "U"}
+              {(user?.full_name?.trim() || "U").charAt(0)}
             </div>
-            <div className="hidden sm:block text-left">
+            <div className="hidden sm:block text-left min-w-0 max-w-[140px]">
               <div
-                className="text-xs font-semibold leading-tight"
+                className="text-xs font-semibold leading-tight truncate"
                 style={{ color: "var(--color-sidebar-user)" }}
+                title={user?.full_name || undefined}
               >
-                {user?.full_name.split(" ").slice(-1)[0]}
+                {user?.is_citizen
+                  ? (user.full_name?.trim() || user.email?.split("@")[0] || "Citizen")
+                  : (user?.full_name?.split(" ").slice(-1)[0] ?? "User")}
               </div>
               <div
-                className="text-[10px] leading-tight"
+                className="text-[10px] leading-tight truncate"
                 style={{ color: "var(--color-sidebar-email)" }}
+                title={user?.is_citizen ? user?.email : undefined}
               >
-                {user?.role.replace(/_/g, " ")}
+                {user?.is_citizen
+                  ? (user.email || "Citizen account")
+                  : (user?.role.replace(/_/g, " ") ?? "")}
               </div>
             </div>
             <ChevronRight
@@ -267,85 +271,49 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
           </button>
 
           {showUser && (
-            <div
-              className="absolute top-full right-0 mt-2 rounded-2xl shadow-2xl animate-fade-in overflow-hidden"
-              style={{
-                width: "200px",
-                zIndex: 1000,
-                background: "var(--color-popup-bg)",
-                border: "1px solid var(--color-popup-border)",
-              }}
-            >
-              {/* User info header */}
-              <div
-                className="px-4 py-3"
-                style={{
-                  borderBottom: "1px solid var(--color-sidebar-border)",
-                }}
-              >
-                <div
-                  className="text-xs font-semibold"
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  {user?.full_name}
+            <div className="absolute top-full right-0 mt-2 w-64 z-[1100] bg-popover text-popover-foreground rounded-xl border border-border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="px-4 py-4 border-b border-border bg-muted/20 flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-lg font-bold shadow-md mb-2">
+                  {(user?.full_name?.trim() || "U").charAt(0)}
                 </div>
-                <div
-                  className="text-[10px] mt-0.5 truncate"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  {user?.email}
-                </div>
+                <p className="text-sm font-bold text-foreground truncate w-full" title={user?.full_name || undefined}>
+                  {user?.full_name?.trim() || user?.email?.split("@")[0] || "User"}
+                </p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5 truncate w-full px-1">
+                  {user?.is_citizen ? (user.email || "Citizen") : (user?.role.replace(/_/g, " ") ?? "")}
+                </p>
               </div>
-              <NavLink
-                to="/profile"
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors"
-                style={{ color: "var(--color-popup-text)" }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background =
-                    "var(--color-popup-item-hover)")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background =
-                    "transparent")
-                }
-                onClick={() => setShowUser(false)}
-              >
-                <User size={14} /> My Profile
-              </NavLink>
-              <NavLink
-                to="/settings"
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors"
-                style={{ color: "var(--color-popup-text)" }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background =
-                    "var(--color-popup-item-hover)")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background =
-                    "transparent")
-                }
-                onClick={() => setShowUser(false)}
-              >
-                <Settings size={14} /> Settings
-              </NavLink>
-              <button
-                onClick={() => {
-                  logout();
-                  navigate("/login");
-                }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 transition-colors"
-                style={{ borderTop: "1px solid var(--color-sidebar-border)" }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background =
-                    "rgba(239,68,68,0.08)")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.background =
-                    "transparent")
-                }
-              >
-                <LogOut size={14} /> Logout
-              </button>
+              <div className="p-1.5 space-y-0.5">
+                <NavLink
+                  to="/profile"
+                  className="flex items-center gap-3 px-3.5 py-2.5 text-[11px] font-bold text-foreground/70 hover:text-primary hover:bg-primary/5 rounded-lg transition-all group"
+                  onClick={() => setShowUser(false)}
+                >
+                  <User size={15} className="group-hover:scale-110 transition-transform text-muted-foreground group-hover:text-primary" /> 
+                  <span className="tracking-wide">MY ACCOUNT</span>
+                </NavLink>
+                <NavLink
+                  to="/settings"
+                  className="flex items-center gap-3 px-3.5 py-2.5 text-[11px] font-bold text-foreground/70 hover:text-primary hover:bg-primary/5 rounded-lg transition-all group"
+                  onClick={() => setShowUser(false)}
+                >
+                  <Settings size={15} className="group-hover:rotate-45 transition-transform text-muted-foreground group-hover:text-primary" /> 
+                  <span className="tracking-wide">SETTINGS</span>
+                </NavLink>
+                
+                <div className="h-px bg-border/50 my-1 mx-2" />
+                
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate("/login");
+                  }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 text-[11px] font-bold text-red-500 hover:bg-red-500/5 rounded-lg transition-all group"
+                >
+                  <LogOut size={15} className="group-hover:translate-x-1 transition-transform" /> 
+                  <span className="tracking-wide uppercase">Sign Out</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -359,9 +327,10 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 interface SidebarProps {
   collapsed: boolean;
+  onCloseSidebar: () => void;
 }
 
-export default function Sidebar({ collapsed }: SidebarProps) {
+export default function Sidebar({ collapsed, onCloseSidebar }: SidebarProps) {
   const { user } = useAuth();
   const [badgeCounts, setBadgeCounts] = useState(INITIAL_BADGE_COUNTS);
   const navItems = user ? ROLE_NAV[user.role] : [];
@@ -372,19 +341,53 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
     const fetchCounts = async () => {
       // Only fetch if relevant for the current role
-      const isBrgyUser =
-        user.role === "punong_barangay" || user.role === "barangay_secretary";
       const isParksAdmin = user.role === "parks_admin";
       const isDesk = user.role === "reservation_officer";
+      const isTreasurer = user.role === "treasurer";
 
-      if (isBrgyUser) {
+      if (isTreasurer) {
+        const [{ count: parkC }, { count: barC }, { count: utilC }] = await Promise.all([
+          supabase
+            .from("park_reservation_record")
+            .select("*", { count: "exact", head: true })
+            .in("status", ["application_validated", "order_of_payment_issued"]),
+          supabase
+            .from("barangay_reservation_record")
+            .select("*", { count: "exact", head: true })
+            .in("status", ["awaiting_treasury", "order_of_payment_issued"]),
+          supabase
+            .from("service_tickets")
+            .select("*", { count: "exact", head: true })
+            .in("ticket_type", [
+              "water_connection:new",
+              "water_connection:additional_meter",
+              "water_connection",
+            ])
+            .in("status", ["awaiting_treasury", "order_of_payment_issued"]),
+        ])
+        const total = (parkC ?? 0) + (barC ?? 0) + (utilC ?? 0)
+        setBadgeCounts((prev) => ({ ...prev, pending_payments: total }))
+      }
+
+      if (user.role === "punong_barangay") {
         const { count, error } = await supabase
           .from("barangay_reservation_record")
           .select("*", { count: "exact", head: true })
-          .eq("status", "pending");
+          .eq("status", "pending_pb_approval")
 
         if (!error && count !== null) {
-          setBadgeCounts((prev) => ({ ...prev, pending_bar_res: count }));
+          setBadgeCounts((prev) => ({ ...prev, pending_bar_res: count }))
+        }
+      }
+
+      if (user.role === "barangay_secretary") {
+        const { count, error } = await supabase
+          .from("barangay_reservation_record")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "submitted")
+
+        if (!error && count !== null) {
+          setBadgeCounts((prev) => ({ ...prev, barangay_intake_queue: count }))
         }
       }
 
@@ -417,6 +420,14 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     const tables: string[] = [];
     if (user.role === "punong_barangay" || user.role === "barangay_secretary") tables.push("barangay_reservation_record");
     if (user.role === "parks_admin" || user.role === "reservation_officer") tables.push("park_reservation_record");
+    if (user.role === "treasurer") {
+      tables.push("park_reservation_record");
+      tables.push("barangay_reservation_record");
+      tables.push("digital_payment");
+      tables.push("service_tickets");
+      tables.push("installation_record");
+      tables.push("technical_assessment");
+    }
 
     const channel = supabase
       .channel("db-changes")
@@ -439,14 +450,25 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   return (
     <aside
       className={clsx(
-        "fixed inset-y-0 left-0 z-40 flex flex-col transition-transform duration-300 select-none shrink-0 md:static md:translate-x-0 shadow-sm bg-surface-subtle border-r border-border-subtle",
-        collapsed ? "-translate-x-full md:w-17]" : "translate-x-0 w-64 md:w-55",
+        "fixed inset-y-0 left-0 z-50 flex h-screen flex-col transition-transform duration-300 select-none shrink-0 md:sticky md:top-0 md:translate-x-0 shadow-sm bg-[color:var(--color-sidebar-bg)] border-r border-border-subtle opacity-100",
+        collapsed ? "-translate-x-full md:w-17" : "translate-x-0 w-64 md:w-55",
       )}
     >
       {/* ── Logo block ──────────────────────────────────────── */}
       <div
-        className="flex flex-col items-center justify-center py-6 px-3 border-b border-border-subtle bg-surface-subtle"
+        className="flex flex-col items-center justify-center py-6 px-3 border-b border-border-subtle bg-[color:var(--color-sidebar-bg)]"
       >
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={onCloseSidebar}
+            className="md:hidden absolute top-2 right-2 w-8 h-8 rounded-lg flex items-center justify-center text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] hover:text-[color:var(--color-text-primary)] transition-colors"
+            title="Close navigation"
+          >
+            <X size={16} />
+          </button>
+        )}
+
         {/* Large BPM logo mark */}
         <div
           className={clsx(
@@ -465,12 +487,13 @@ export default function Sidebar({ collapsed }: SidebarProps) {
               style={{ color: "var(--color-sidebar-title)" }}
             >
               Public Assets
+              &amp; Facilities Management
             </div>
             <div
               className="text-xs leading-snug"
               style={{ color: "var(--color-sidebar-sub)" }}
             >
-              &amp; Facilities Mgmt
+             
             </div>
           </div>
         )}
@@ -484,7 +507,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       )}
 
       {/* ── Nav items ─────────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto px-2 mt-3 space-y-0.5 pb-24 md:pb-4">
+      <nav className="sidebar-scrollbar flex-1 overflow-y-auto px-2 mt-3 space-y-0.5 pb-24 md:pb-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const badge = item.badgeKey ? badgeCounts[item.badgeKey] : 0;

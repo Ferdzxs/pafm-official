@@ -1,49 +1,12 @@
 /**
- * usage-logs.tsx — Parks Administrator
- * ─────────────────────────────────────────────────────────────────────
- * BPMN TO-BE MAPPING (Parks & Recreation Scheduling):
- *
- *  STEP 10 — Compute Fees            → payment amount_paid shown
- *  STEP 11 — Pay Fees                → payment record linked via reservation
- *  STEP 12 — Process Payment         → payment_status, OR no., method
- *  STEP 13 — Release Digital Permit  → permit_document (digital_document)
- *                                       + digital_permit_url from reservation
- *  STEP 14 — Conduct Event           → reservation date, venue, organizer
- *  STEP 15 — Monitor Event           → event_conducted_flag, remarks,
- *                                       monitored_by_office, compliance
- *  STEP 16 — Send Completion Notice  → BPMN note shown in UI footer
- *
- * DATABASE TABLES (all via Supabase — separate batch fetches):
- *  site_usage_log          — PK: usage_id
- *    ├─ reservation_id     → park_reservation_record
- *    ├─ permit_document    → digital_document
- *    ├─ monitored_by_office→ administration_office
- *    ├─ remarks
- *    └─ event_conducted_flag
- *
- *  park_reservation_record — joined by reservation_id
- *    ├─ park_venue_id      → park_venue
- *    ├─ applicant_person_id→ person
- *    ├─ payment_id         → digital_payment   ← BPMN Steps 10–12
- *    ├─ reservation_date, time_slot, status
- *    └─ digital_permit_url                     ← BPMN Step 13
- *
- *  park_venue              — park_venue_name, location, venue_type,
- *                            availability_status
- *  person                  — full_name, contact_number, address
- *  administration_office   — office_name, parent_department, location
- *  digital_document        — reference_no, file_url, document_type
- *                            (permit_document from site_usage_log)
- *  digital_payment         — amount_paid, payment_method,
- *                            transaction_ref_no, digital_or_no,
- *                            payment_status, payment_date
- * ─────────────────────────────────────────────────────────────────────
+ * usage-logs.tsx — Parks Administrator overhauled for UI/UX
  */
 
 import React, { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { ROLE_META } from "@/config/rbac"
 import { supabase } from "@/lib/supabase"
+import toast from "react-hot-toast"
 
 import {
   Search, Filter, Eye, RefreshCw, X,
@@ -51,76 +14,96 @@ import {
   Clock, UserCheck, AlignLeft, ExternalLink,
   FileText, ChevronDown, AlertCircle, ShieldCheck,
   ShieldAlert, ShieldX, CalendarCheck, CreditCard,
+  Building2, MoreVertical, Info, BadgeCheck, ClipboardCheck
 } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Select, SelectItem } from "@/components/ui/select"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 
-// ─────────────────────────────────────────────
-// TYPES — exact columns from DB
-// ─────────────────────────────────────────────
+// ─── TYPES ───
 interface UsageLog {
-  // site_usage_log columns
-  usage_id:             string
-  reservation_id:       string | null
-  permit_document:      string | null
-  monitored_by_office:  string | null
-  remarks:              string | null
+  usage_id: string
+  reservation_id: string | null
+  permit_document: string | null
+  monitored_by_office: string | null
+  remarks: string | null
   event_conducted_flag: boolean
-
-  // hydrated from joins
   reservation: {
-    reservation_date:    string
-    time_slot:           string | null
-    status:              string
-    digital_permit_url:  string | null
-    park_venue_id:       string | null
+    reservation_date: string
+    time_slot: string | null
+    status: string
+    digital_permit_url: string | null
+    park_venue_id: string | null
     applicant_person_id: string | null
-    payment_id:          string | null   // ← BPMN Steps 10–12
+    payment_id: string | null
   } | null
   venue: {
-    park_venue_name:     string
-    location:            string | null
-    venue_type:          string | null
-    availability_status: string          // ← was missing
+    park_venue_name: string
+    location: string | null
+    venue_type: string | null
+    availability_status: string
   } | null
   person: {
-    full_name:      string
+    full_name: string
     contact_number: string | null
-    address:        string | null        // ← was missing
+    address: string | null
   } | null
   office: {
-    office_name:       string
+    office_name: string
     parent_department: string | null
-    location:          string | null
+    location: string | null
   } | null
-  permit_doc: {                          // digital_document via permit_document FK
-    reference_no:  string | null
-    file_url:      string | null
+  permit_doc: {
+    reference_no: string | null
+    file_url: string | null
     document_type: string
   } | null
-  payment: {                             // digital_payment — BPMN Steps 10–12 (was missing)
-    payment_id:         string
-    amount_paid:        number | null
-    payment_date:       string | null
-    payment_method:     string | null
+  payment: {
+    payment_id: string
+    amount_paid: number | null
+    payment_date: string | null
+    payment_method: string | null
     transaction_ref_no: string | null
-    digital_or_no:      string | null
-    payment_status:     string | null
+    digital_or_no: string | null
+    payment_status: string | null
   } | null
 }
 
-// ─────────────────────────────────────────────
-// PARSE time_slot — "HH:MM-HH:MM | Event Name | Purpose: text"
-// ─────────────────────────────────────────────
 interface ParsedSlot {
-  time:      string
+  time: string
   eventName: string | null
-  purpose:   string | null
+  purpose: string | null
 }
+
+// ─── HELPERS ───
 function parseSlot(raw: string | null | undefined): ParsedSlot {
   if (!raw) return { time: "—", eventName: null, purpose: null }
   const parts = raw.split(" | ")
-  const time      = parts[0] ?? raw
+  const time = parts[0] ?? raw
   const eventName = parts[1] ?? null
   const purposePart = parts[2] ?? null
   const purpose = purposePart?.startsWith("Purpose: ")
@@ -129,508 +112,148 @@ function parseSlot(raw: string | null | undefined): ParsedSlot {
   return { time, eventName, purpose }
 }
 
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
+function complianceInfo(flag: boolean, remarks: string | null) {
+  if (!flag) return { label: "No Show", variant: "secondary" as const, Icon: ShieldX }
+  if (!remarks) return { label: "Compliant", variant: "success" as const, Icon: ShieldCheck }
+  const lower = remarks.toLowerCase()
+  if (lower.includes("major") || lower.includes("incident") || lower.includes("violation"))
+    return { label: "Incident", variant: "destructive" as const, Icon: ShieldAlert }
+  if (lower.includes("minor") || lower.includes("issue") || lower.includes("garbage"))
+    return { label: "Minor Issue", variant: "warning" as const, Icon: ShieldAlert }
+  return { label: "Compliant", variant: "success" as const, Icon: ShieldCheck }
+}
+
 function cap(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ")
 }
 
-function conductedBg(flag: boolean) {
-  return flag ? "bg-green-600" : "bg-slate-500"
-}
-function conductedLabel(flag: boolean) {
-  return flag ? "Conducted" : "Not Conducted"
-}
-
-function venueBg(s: string) {
-  if (s === "available")         return "bg-green-600"
-  if (s === "under_maintenance") return "bg-yellow-500"
-  return "bg-red-600"
-}
-
-function payBg(s: string | null) {
-  if (s === "settled") return "bg-green-600"
-  if (s === "pending") return "bg-yellow-500"
-  return "bg-red-600"
-}
-
-function reservationStatusBg(s: string) {
-  switch (s) {
-    case "approved":  return "bg-green-600"
-    case "completed": return "bg-blue-600"
-    case "rejected":  return "bg-red-600"
-    default:          return "bg-yellow-500"
-  }
-}
-
-// Derive compliance from event_conducted_flag + remarks text
-function complianceInfo(flag: boolean, remarks: string | null) {
-  if (!flag) return { label: "No Show / Cancelled", cls: "bg-slate-500",   Icon: ShieldX    }
-  if (!remarks)
-              return { label: "Conducted",           cls: "bg-green-600",  Icon: ShieldCheck }
-  const lower = remarks.toLowerCase()
-  if (
-    lower.includes("major")       || lower.includes("altercation") ||
-    lower.includes("incident")    || lower.includes("violation")
-  )           return { label: "Incident Reported",  cls: "bg-red-600",    Icon: ShieldAlert }
-  if (
-    lower.includes("minor")       || lower.includes("garbage") ||
-    lower.includes("slightly")    || lower.includes("issue")
-  )           return { label: "Minor Issue",         cls: "bg-yellow-500", Icon: ShieldAlert }
-  return      { label: "Compliant",                 cls: "bg-green-600",  Icon: ShieldCheck }
-}
-
-// ─────────────────────────────────────────────
-// MODAL WRAPPER (dark)
-// ─────────────────────────────────────────────
-function Modal({ title, onClose, children }: {
-  title: string; onClose: () => void; children: React.ReactNode
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-100 transition-colors">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="px-6 py-5 max-h-[82vh] overflow-y-auto">{children}</div>
-      </div>
-    </div>
-  )
-}
-
-function DRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between items-start py-2 border-b border-slate-800 last:border-0">
-      <span className="text-xs text-slate-500 shrink-0 w-44">{label}</span>
-      <span className="text-xs text-slate-100 text-right max-w-[55%] break-words">
-        {value ?? <span className="text-slate-700">—</span>}
-      </span>
-    </div>
-  )
-}
-
-function SLabel({ icon, children }: { icon: string; children: React.ReactNode }) {
-  return (
-    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-5 mb-1 flex items-center gap-1.5">
-      {icon} {children}
-    </p>
-  )
-}
-
-function Badge({ label, cls }: { label: string; cls: string }) {
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${cls}`}>
-      {label}
-    </span>
-  )
-}
-
-// ─────────────────────────────────────────────
-// DETAIL MODAL — full BPMN steps 10–16
-// ─────────────────────────────────────────────
-function DetailModal({ log, onClose }: { log: UsageLog; onClose: () => void }) {
-  const slot       = parseSlot(log.reservation?.time_slot)
-  const compliance = complianceInfo(log.event_conducted_flag, log.remarks)
-  const CompIcon   = compliance.Icon
-
-  return (
-    <Modal title={`Usage Log — ${log.usage_id}`} onClose={onClose}>
-
-      {/* Top status row */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <Badge label={conductedLabel(log.event_conducted_flag)} cls={conductedBg(log.event_conducted_flag)} />
-        <Badge label={compliance.label} cls={compliance.cls} />
-        <span className="text-[11px] text-slate-500 italic">BPMN Steps 14–15 — Event Monitoring Record</span>
-      </div>
-
-      {/* ── BPMN Step 14: Venue ── */}
-      <SLabel icon="🏛️">Venue (BPMN Step 14 — Event Location)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        <DRow label="Venue Name"    value={log.venue?.park_venue_name} />
-        <DRow label="Location"      value={log.venue?.location} />
-        <DRow label="Venue Type"    value={log.venue?.venue_type ? cap(log.venue.venue_type) : null} />
-        <DRow label="Venue Status"  value={
-          log.venue
-            ? <Badge
-                label={log.venue.availability_status.replace(/_/g, " ")}
-                cls={venueBg(log.venue.availability_status)}
-              />
-            : null
-        } />
-      </div>
-
-      {/* ── BPMN Step 14: Schedule & Event ── */}
-      <SLabel icon="📅">Schedule & Event (BPMN Step 14 — Conduct Event)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        <DRow label="Reservation ID"   value={
-          <span className="font-mono text-blue-400">{log.reservation_id}</span>
-        } />
-        <DRow label="Reservation Date" value={log.reservation?.reservation_date} />
-        <DRow label="Time Slot"        value={slot.time} />
-        {slot.eventName && (
-          <DRow label="Event Name" value={
-            <span className="font-medium text-slate-200">{slot.eventName}</span>
-          } />
-        )}
-        <DRow label="Booking Status"   value={
-          log.reservation?.status
-            ? <Badge label={cap(log.reservation.status)} cls={reservationStatusBg(log.reservation.status)} />
-            : null
-        } />
-      </div>
-
-      {/* ── Event Purpose ── */}
-      {slot.purpose && (
-        <>
-          <SLabel icon="📝">Event Purpose / Description</SLabel>
-          <div className="bg-slate-800 rounded-xl px-4 py-3">
-            <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">{slot.purpose}</p>
-          </div>
-        </>
-      )}
-
-      {/* ── BPMN Step 14: Applicant ── */}
-      <SLabel icon="👤">Applicant (BPMN Step 14 — Event Organizer)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        <DRow label="Full Name"   value={log.person?.full_name} />
-        <DRow label="Contact No." value={log.person?.contact_number} />
-        <DRow label="Address"     value={log.person?.address} />
-      </div>
-
-      {/* ── BPMN Steps 10–12: Payment ── */}
-      <SLabel icon="💰">Payment (BPMN Steps 10–12 — Fees & Collection)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        {log.payment ? (
-          <>
-            <DRow label="Payment ID"       value={
-              <span className="font-mono text-slate-300">{log.payment.payment_id}</span>
-            } />
-            <DRow label="Amount Paid"      value={
-              log.payment.amount_paid != null
-                ? <span className="font-semibold text-green-400">
-                    ₱{Number(log.payment.amount_paid).toLocaleString()}
-                  </span>
-                : null
-            } />
-            <DRow label="Payment Date"     value={log.payment.payment_date} />
-            <DRow label="Payment Method"   value={
-              log.payment.payment_method ? cap(log.payment.payment_method) : null
-            } />
-            <DRow label="Transaction Ref"  value={log.payment.transaction_ref_no} />
-            <DRow label="Official Receipt" value={log.payment.digital_or_no} />
-            <DRow label="Payment Status"   value={
-              log.payment.payment_status
-                ? <Badge label={cap(log.payment.payment_status)} cls={payBg(log.payment.payment_status)} />
-                : null
-            } />
-          </>
-        ) : (
-          <p className="text-xs text-slate-600 py-2">
-            No payment record linked to this reservation.
-          </p>
-        )}
-      </div>
-
-      {/* ── BPMN Step 13: Digital Permit ── */}
-      <SLabel icon="📜">Digital Permit (BPMN Step 13 — Permit Release)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-3 space-y-2">
-        {/* Permit doc from site_usage_log.permit_document → digital_document */}
-        {log.permit_doc ? (
-          <>
-            <div className="text-xs text-slate-400">
-              Type: <span className="text-slate-200">{cap(log.permit_doc.document_type)}</span>
-            </div>
-            {log.permit_doc.reference_no && (
-              <div className="text-xs text-slate-400">
-                Ref No: <span className="text-slate-200 font-mono">{log.permit_doc.reference_no}</span>
-              </div>
-            )}
-            {log.permit_doc.file_url && (
-              <a
-                href={log.permit_doc.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition font-medium"
-              >
-                <ExternalLink size={12} />
-                View Permit Document (DDOC)
-              </a>
-            )}
-          </>
-        ) : (
-          <p className="text-xs text-slate-600">No linked permit document (permit_document is null).</p>
-        )}
-
-        {/* Fallback: digital_permit_url from park_reservation_record */}
-        {log.reservation?.digital_permit_url && (
-          <a
-            href={log.reservation.digital_permit_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition font-medium"
-          >
-            <ExternalLink size={12} />
-            View Reservation Digital Permit (URL)
-          </a>
-        )}
-
-        {!log.permit_doc && !log.reservation?.digital_permit_url && (
-          <p className="text-xs text-slate-600">No permit document available for this log.</p>
-        )}
-      </div>
-
-      {/* ── BPMN Step 15: Monitoring ── */}
-      <SLabel icon="👀">Monitoring Info (BPMN Step 15 — Monitor Event)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        <DRow label="Monitoring Office"  value={log.office?.office_name} />
-        <DRow label="Department"         value={log.office?.parent_department} />
-        <DRow label="Office Location"    value={log.office?.location} />
-        <DRow label="Event Conducted"    value={
-          <Badge label={conductedLabel(log.event_conducted_flag)} cls={conductedBg(log.event_conducted_flag)} />
-        } />
-        <DRow label="Compliance Result"  value={
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${compliance.cls}`}>
-            <CompIcon size={10} />{compliance.label}
-          </span>
-        } />
-      </div>
-
-      {/* ── Monitor Remarks ── */}
-      {log.remarks && (
-        <>
-          <SLabel icon="📋">Monitor Remarks (BPMN Step 15)</SLabel>
-          <div className="bg-slate-800 rounded-xl px-4 py-3">
-            <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">{log.remarks}</p>
-          </div>
-        </>
-      )}
-
-      {/* BPMN Step 16 note */}
-      <div className="mt-5 px-3 py-2.5 rounded-lg text-[11px] text-slate-500 border border-slate-800">
-        <strong className="text-slate-400">BPMN Step 16 —</strong> After this log is recorded,
-        the Notification &amp; Alert System sends an event completion notice to the citizen/organizer.
-      </div>
-    </Modal>
-  )
-}
-
-// ─────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────
+// ─── MAIN COMPONENT ───
 export default function SiteUsageLogs() {
   const { user } = useAuth()
 
-  const [logs, setLogs]       = useState<UsageLog[]>([])
+  const [logs, setLogs] = useState<UsageLog[]>([])
   const [eligible, setEligible] = useState<any[]>([])
   const [adminOffices, setAdminOffices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const [search, setSearch]                   = useState("")
+  const [search, setSearch] = useState("")
   const [filterConducted, setFilterConducted] = useState<"all" | "true" | "false">("all")
   const [filterCompliance, setFilterCompliance] = useState<"all" | "compliant" | "issue" | "no_show">("all")
 
   const [viewLog, setViewLog] = useState<UsageLog | null>(null)
   const [createFor, setCreateFor] = useState<any | null>(null)
-  const [createRemarks, setCreateRemarks] = useState("")
-  const [createConducted, setCreateConducted] = useState(true)
-  const [createOfficeId, setCreateOfficeId] = useState("")
-  const [createSaving, setCreateSaving] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    remarks: "",
+    conducted: true,
+    officeId: ""
+  })
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => { void loadData() }, [])
+  useEffect(() => { loadData() }, [])
 
-  // ═══════════════════════════════════════════════════════════════
-  // LOAD — 6 separate Supabase batch fetches (avoids FK alias bugs)
-  // Tables: site_usage_log → reservation → venue + person + payment
-  //         + administration_office + digital_document
-  // ═══════════════════════════════════════════════════════════════
   async function loadData() {
     setLoading(true)
     setError(null)
     try {
-      // ── 1. site_usage_log (BPMN Step 15 main table) ───────────
+      // Step 1: Fetch raw logs
       const { data: rawLogs, error: e1 } = await supabase
         .from("site_usage_log")
-        .select(
-          "usage_id, reservation_id, permit_document, " +
-          "monitored_by_office, remarks, event_conducted_flag"
-        )
+        .select("usage_id, reservation_id, permit_document, monitored_by_office, remarks, event_conducted_flag")
         .order("usage_id", { ascending: false })
 
-      if (e1) throw new Error(`Usage logs: ${e1.message}`)
+      if (e1) throw e1
       const safeLogs = rawLogs ?? []
-      if (safeLogs.length === 0) setLogs([])
 
-      // ── 2. Collect unique FKs from site_usage_log ─────────────
-      const reservationIds = [...new Set(safeLogs.map((l: any) => l.reservation_id).filter(Boolean))]  as string[]
-      const officeIds      = [...new Set(safeLogs.map((l: any) => l.monitored_by_office).filter(Boolean))] as string[]
-      const permitDocIds   = [...new Set(safeLogs.map((l: any) => l.permit_document).filter(Boolean))]  as string[]
+      // Step 2: Extract FKs
+      const resIds = [...new Set(safeLogs.map((l: any) => l.reservation_id).filter(Boolean))] as string[]
+      const offIds = [...new Set(safeLogs.map((l: any) => l.monitored_by_office).filter(Boolean))] as string[]
+      const docIds = [...new Set(safeLogs.map((l: any) => l.permit_document).filter(Boolean))] as string[]
 
-      // ── 3. park_reservation_record (BPMN Steps 13–14) ─────────
-      // Note: payment_id column needed for BPMN Steps 10–12
-      const { data: reservations } = reservationIds.length
-        ? await supabase
-            .from("park_reservation_record")
-            .select(
-              "reservation_id, reservation_date, time_slot, status, " +
-              "digital_permit_url, park_venue_id, applicant_person_id, payment_id"
-            )
-            .in("reservation_id", reservationIds)
+      // Step 3: Fetch Reservations
+      const { data: reservations } = resIds.length
+        ? await supabase.from("park_reservation_record").select("*").in("reservation_id", resIds)
         : { data: [] }
 
-      // ── 4. Collect venue + person + payment IDs from reservations
-      const venueIds   = [...new Set((reservations ?? []).map((r: any) => r.park_venue_id).filter(Boolean))]        as string[]
-      const personIds  = [...new Set((reservations ?? []).map((r: any) => r.applicant_person_id).filter(Boolean))]  as string[]
-      const paymentIds = [...new Set((reservations ?? []).map((r: any) => r.payment_id).filter(Boolean))]           as string[]
+      // Step 4: Extract sub-FKs from Reservations
+      const venueIds = [...new Set((reservations ?? []).map((r: any) => r.park_venue_id).filter(Boolean))] as string[]
+      const personIds = [...new Set((reservations ?? []).map((r: any) => r.applicant_person_id).filter(Boolean))] as string[]
+      const paymentIds = [...new Set((reservations ?? []).map((r: any) => r.payment_id).filter(Boolean))] as string[]
 
-      // ── 5. Parallel batch fetches ──────────────────────────────
-      const [
-        { data: venues },
-        { data: persons },
-        { data: offices },
-        { data: permitDocs },
-        { data: payments },
-      ] = await Promise.all([
-        // park_venue — includes availability_status (BPMN Step 3 context)
-        venueIds.length
-          ? supabase
-              .from("park_venue")
-              .select("park_venue_id, park_venue_name, location, venue_type, availability_status")
-              .in("park_venue_id", venueIds)
-          : Promise.resolve({ data: [] }),
-
-        // person — includes address (was missing before)
-        personIds.length
-          ? supabase
-              .from("person")
-              .select("person_id, full_name, contact_number, address")
-              .in("person_id", personIds)
-          : Promise.resolve({ data: [] }),
-
-        // administration_office — BPMN Step 15 monitoring office
-        officeIds.length
-          ? supabase
-              .from("administration_office")
-              .select("admin_office_id, office_name, parent_department, location")
-              .in("admin_office_id", officeIds)
-          : Promise.resolve({ data: [] }),
-
-        // digital_document — permit_document FK from site_usage_log (BPMN Step 13)
-        permitDocIds.length
-          ? supabase
-              .from("digital_document")
-              .select("document_id, reference_no, file_url, document_type")
-              .in("document_id", permitDocIds)
-          : Promise.resolve({ data: [] }),
-
-        // digital_payment — via payment_id on reservation (BPMN Steps 10–12)
-        // amount_paid (NOT "amount"), payment_date, method, ref, OR no., status
-        paymentIds.length
-          ? supabase
-              .from("digital_payment")
-              .select(
-                "payment_id, amount_paid, payment_date, payment_method, " +
-                "transaction_ref_no, digital_or_no, payment_status"
-              )
-              .in("payment_id", paymentIds)
-          : Promise.resolve({ data: [] }),
+      // Step 5: Batch Hydration
+      const [vRes, pRes, oRes, dRes, pyRes] = await Promise.all([
+        venueIds.length ? supabase.from("park_venue").select("*").in("park_venue_id", venueIds) : Promise.resolve({ data: [] }),
+        personIds.length ? supabase.from("person").select("*").in("person_id", personIds) : Promise.resolve({ data: [] }),
+        offIds.length ? supabase.from("administration_office").select("*").in("admin_office_id", offIds) : Promise.resolve({ data: [] }),
+        docIds.length ? supabase.from("digital_document").select("*").in("document_id", docIds) : Promise.resolve({ data: [] }),
+        paymentIds.length ? supabase.from("digital_payment").select("*").in("payment_id", paymentIds) : Promise.resolve({ data: [] }),
       ])
 
-      // ── 6. Build lookup maps ───────────────────────────────────
-      const resMap:     Record<string, any> = {}
-      const venueMap:   Record<string, any> = {}
-      const personMap:  Record<string, any> = {}
-      const officeMap:  Record<string, any> = {}
-      const permitMap:  Record<string, any> = {}
-      const paymentMap: Record<string, any> = {}
+      // Step 6: Map building
+      const resMap: any = {}; (reservations ?? []).forEach(r => resMap[r.reservation_id] = r)
+      const vMap: any = {}; (vRes.data ?? []).forEach(v => vMap[v.park_venue_id] = v)
+      const pMap: any = {}; (pRes.data ?? []).forEach(p => pMap[p.person_id] = p)
+      const oMap: any = {}; (oRes.data ?? []).forEach(o => oMap[o.admin_office_id] = o)
+      const dMap: any = {}; (dRes.data ?? []).forEach(d => dMap[d.document_id] = d)
+      const pyMap: any = {}; (pyRes.data ?? []).forEach(py => pyMap[py.payment_id] = py)
 
-      ;(reservations ?? []).forEach((r: any) => { resMap[r.reservation_id]       = r })
-      ;(venues       ?? []).forEach((v: any) => { venueMap[v.park_venue_id]       = v })
-      ;(persons      ?? []).forEach((p: any) => { personMap[p.person_id]          = p })
-      ;(offices      ?? []).forEach((o: any) => { officeMap[o.admin_office_id]    = o })
-      ;(permitDocs   ?? []).forEach((d: any) => { permitMap[d.document_id]        = d })
-      ;(payments     ?? []).forEach((p: any) => { paymentMap[p.payment_id]        = p })
-
-      // ── 7. Merge all data into each log ───────────────────────
       const merged: UsageLog[] = safeLogs.map((l: any) => {
-        const res = resMap[l.reservation_id] ?? null
+        const r = resMap[l.reservation_id] || null
         return {
           ...l,
-          reservation: res,
-          venue:      res ? (venueMap[res.park_venue_id]        ?? null) : null,
-          person:     res ? (personMap[res.applicant_person_id] ?? null) : null,
-          office:     officeMap[l.monitored_by_office]          ?? null,
-          permit_doc: permitMap[l.permit_document]              ?? null,
-          payment:    res ? (paymentMap[res.payment_id]         ?? null) : null,  // ← BPMN 10–12
+          reservation: r,
+          venue: r ? (vMap[r.park_venue_id] || null) : null,
+          person: r ? (pMap[r.applicant_person_id] || null) : null,
+          office: oMap[l.monitored_by_office] || null,
+          permit_doc: dMap[l.permit_document] || null,
+          payment: r ? (pyMap[r.payment_id] || null) : null,
         }
       })
-
       setLogs(merged)
 
-      // ── 8. Eligible reservations without monitoring log (BPMN Step 15 input) ──
+      // Step 7: Queue for monitoring (Released permits needing logs)
       const today = new Date().toISOString().split("T")[0]
-      const { data: rel, error: e8 } = await supabase
+      const { data: eligibleRes } = await supabase
         .from("park_reservation_record")
-        .select("reservation_id, reservation_date, time_slot, status, park_venue(park_venue_name), person:applicant_person_id(full_name), applicant_person_id")
-        .in("status", ["permit_released"])
+        .select(`*, park_venue(park_venue_name), person:applicant_person_id(full_name)`)
+        .eq("status", "permit_released")
         .lte("reservation_date", today)
         .order("reservation_date", { ascending: false })
-      if (e8) throw new Error(e8.message)
-      const loggedSet = new Set(reservationIds)
-      setEligible((rel ?? []).filter((r: any) => !loggedSet.has(r.reservation_id)))
+      
+      const loggedResIds = new Set(resIds)
+      setEligible((eligibleRes ?? []).filter((r: any) => !loggedResIds.has(r.reservation_id)))
 
-      // ── 9. Admin offices for monitoring office selection ───────────────────
-      const { data: adminOfficesData, error: e9 } = await supabase
-        .from("administration_office")
-        .select("admin_office_id, office_name, parent_department, location")
-        .order("office_name")
-      if (e9) throw new Error(e9.message)
-      setAdminOffices(adminOfficesData ?? [])
-      if (!createOfficeId && (adminOfficesData?.[0]?.admin_office_id)) {
-        setCreateOfficeId(adminOfficesData[0].admin_office_id)
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load usage logs.")
+      // Step 8: Offices for dropdown
+      const { data: offices } = await supabase.from("administration_office").select("*").order("office_name")
+      setAdminOffices(offices ?? [])
+      if (offices?.[0] && !createForm.officeId) setCreateForm(f => ({ ...f, officeId: offices[0].admin_office_id }))
+
+    } catch (err: any) {
+      setError(err.message || "Failed to sync system usage logs.")
     } finally {
       setLoading(false)
     }
   }
 
-  async function createLog() {
-    if (!createFor) return
-    if (!createOfficeId) {
-      setError("Please select monitoring office.")
-      return
-    }
-    setCreateSaving(true)
-    setError(null)
+  async function handleCreateLog() {
+    if (!createFor || !createForm.officeId) return
+    setSaving(true)
     try {
       const usageId = `SUL-${Date.now()}`
-      const { error: e1 } = await supabase.from("site_usage_log").insert({
+      const { error: insErr } = await supabase.from("site_usage_log").insert({
         usage_id: usageId,
         reservation_id: createFor.reservation_id,
-        permit_document: null,
-        monitored_by_office: createOfficeId,
-        remarks: createRemarks || null,
-        event_conducted_flag: createConducted,
+        monitored_by_office: createForm.officeId,
+        remarks: createForm.remarks || null,
+        event_conducted_flag: createForm.conducted,
       })
-      if (e1) throw new Error(e1.message)
+      if (insErr) throw insErr
 
-      if (createConducted) {
-        await supabase
-          .from("park_reservation_record")
-          .update({ status: "completed" })
-          .eq("reservation_id", createFor.reservation_id)
-
-        const { data: acct } = await supabase
-          .from("citizen_account")
-          .select("account_id")
-          .eq("person_id", createFor.applicant_person_id)
-          .maybeSingle()
+      if (createForm.conducted) {
+        // Complete reservation and notify
+        await supabase.from("park_reservation_record").update({ status: "completed" }).eq("reservation_id", createFor.reservation_id)
+        
+        const { data: acct } = await supabase.from("citizen_account").select("account_id").eq("person_id", createFor.applicant_person_id).maybeSingle()
         if (acct?.account_id) {
           await supabase.from("notification_log").insert({
             notif_id: `NLOG-${Date.now()}`,
@@ -638,485 +261,437 @@ export default function SiteUsageLogs() {
             module_reference: "parks",
             reference_id: createFor.reservation_id,
             notif_type: "reservation_completed",
-            message: `Your park reservation ${createFor.reservation_id} has been marked completed.`,
+            message: `Your park reservation ${createFor.reservation_id} has been marked completed. Thank you for using our parks.`,
           })
         }
       }
 
+      toast.success("Event monitoring log recorded.")
       setCreateFor(null)
-      setCreateRemarks("")
-      setCreateConducted(true)
+      setCreateForm({ remarks: "", conducted: true, officeId: adminOffices[0]?.admin_office_id || "" })
       await loadData()
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create monitoring log.")
+    } catch (err: any) {
+      toast.error(err.message)
     } finally {
-      setCreateSaving(false)
+      setSaving(false)
     }
   }
 
-  // ── Filtering ─────────────────────────────────────────────────
   const filtered = logs.filter((l) => {
-    const q    = search.toLowerCase()
-    const slot = parseSlot(l.reservation?.time_slot)
-    const matchSearch = !q ||
-      l.usage_id.toLowerCase().includes(q) ||
-      (l.reservation_id  ?? "").toLowerCase().includes(q) ||
-      (l.venue?.park_venue_name   ?? "").toLowerCase().includes(q) ||
-      (l.person?.full_name        ?? "").toLowerCase().includes(q) ||
-      (slot.eventName             ?? "").toLowerCase().includes(q) ||
-      (l.remarks                  ?? "").toLowerCase().includes(q) ||
-      (l.office?.office_name      ?? "").toLowerCase().includes(q)
-
-    const matchConducted =
-      filterConducted === "all" ||
-      (filterConducted === "true"  &&  l.event_conducted_flag) ||
-      (filterConducted === "false" && !l.event_conducted_flag)
-
+    const q = search.toLowerCase()
+    const match = !q || l.usage_id.toLowerCase().includes(q) || 
+                  (l.reservation_id ?? "").toLowerCase().includes(q) ||
+                  (l.venue?.park_venue_name ?? "").toLowerCase().includes(q) ||
+                  (l.person?.full_name ?? "").toLowerCase().includes(q)
+    
+    const matchCond = filterConducted === "all" || (filterConducted === "true" ? l.event_conducted_flag : !l.event_conducted_flag)
+    
     const ci = complianceInfo(l.event_conducted_flag, l.remarks)
-    const matchCompliance =
-      filterCompliance === "all" ||
-      (filterCompliance === "compliant" && ci.label === "Compliant") ||
-      (filterCompliance === "issue"     && (ci.label === "Minor Issue" || ci.label === "Incident Reported")) ||
-      (filterCompliance === "no_show"   && ci.label === "No Show / Cancelled")
+    const matchComp = filterCompliance === "all" || 
+                     (filterCompliance === "compliant" && ci.label === "Compliant") ||
+                     (filterCompliance === "issue" && (ci.label === "Minor Issue" || ci.label === "Incident")) ||
+                     (filterCompliance === "no_show" && ci.label === "No Show")
 
-    return matchSearch && matchConducted && matchCompliance
+    return match && matchCond && matchComp
   })
-
-  // ── KPI counts ────────────────────────────────────────────────
-  const conductedCount = logs.filter(l => l.event_conducted_flag).length
-  const incidentCount  = logs.filter(l => complianceInfo(l.event_conducted_flag, l.remarks).label === "Incident Reported").length
-  const minorCount     = logs.filter(l => complianceInfo(l.event_conducted_flag, l.remarks).label === "Minor Issue").length
-  const compliantCount = logs.filter(l => complianceInfo(l.event_conducted_flag, l.remarks).label === "Compliant").length
-  const paidCount      = logs.filter(l => l.payment?.payment_status === "settled").length
 
   if (!user) return null
   const meta = ROLE_META[user.role]
 
-  // ─────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6">
-
-      {/* PAGE HEADER */}
-      <div className="mb-8">
-        <span
-          className="px-3 py-1 rounded text-xs font-semibold"
-          style={{ background: meta.bgColor, color: meta.color }}
-        >
-          {meta.label}
-        </span>
-        <h1 className="text-2xl font-bold mt-2">Site Usage Logs</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Parks &amp; Recreation Scheduling — BPMN Steps 10 · 11 · 12 · 13 · 14 · 15 · 16
-        </p>
-      </div>
-
-      {/* ERROR BANNER */}
-      {error && (
-        <div className="mb-4 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-          <AlertCircle size={15} className="shrink-0" />
-          <span className="font-medium">{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-700">
-            <X size={13} />
-          </button>
+    <div className="mx-auto max-w-(--breakpoint-2xl) animate-fade-in px-6 py-8 space-y-8">
+      {/* HEADER */}
+      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <Badge variant="outline" className="px-2 py-0.5" style={{ borderColor: meta.color, color: meta.color, backgroundColor: meta.bgColor }}>
+            {meta.label}
+          </Badge>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Site Usage Logs</h1>
+          <p className="text-muted-foreground text-sm">Review event history and monitor venue compliance.</p>
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => loadData()}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Sync Records
+          </Button>
+        </div>
+      </header>
 
-      {/* CREATE QUEUE — BPMN Step 15 */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle>Monitoring Queue (Create Usage Log)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {eligible.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No released permits awaiting monitoring logs.</p>
-          ) : (
-            <div className="space-y-2">
-              {eligible.slice(0, 8).map((r: any) => (
-                <div
-                  key={r.reservation_id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-border-subtle bg-card px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-foreground">
-                      {r.reservation_id} · {r.park_venue?.park_venue_name ?? "—"}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {r.person?.full_name ?? "Unknown"} · {r.reservation_date} · {r.time_slot ?? "—"}
+      {/* MONITORING QUEUE (CAROUSEL-LIKE LIST) */}
+      {eligible.length > 0 && (
+        <Card className="border-primary bg-primary/10 shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 border-b bg-primary/10">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" /> 
+              Monitoring Queue
+              <Badge variant="secondary" className="ml-2 font-mono h-5 px-1.5 text-[10px]">{eligible.length} Awaiting Log</Badge>
+            </CardTitle>
+            <CardDescription className="text-primary">Recently occurred events requiring post-conduct monitoring verification.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-primary/20 max-h-64 overflow-y-auto">
+              {eligible.map((r: any) => (
+                <div key={r.reservation_id} className="flex items-center justify-between p-4 hover:bg-primary/20 transition-all group">
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-sm font-bold truncate tracking-tight">{r.park_venue?.park_venue_name || 'Generic Venue'}</p>
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground lowercase">
+                      <span className="font-mono text-[9px] uppercase tracking-tighter opacity-80">#{r.reservation_id.slice(-8)}</span>
+                      <Separator orientation="vertical" className="h-2" />
+                      <span>{r.person?.full_name || 'Guest'}</span>
+                      <Separator orientation="vertical" className="h-2" />
+                      <span>{r.reservation_date}</span>
                     </div>
                   </div>
-                  <button className="btn-primary shrink-0" onClick={() => setCreateFor(r)}>
-                    Create log
-                  </button>
+                  <Button size="sm" className="h-8 text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary hover:bg-primary hover:text-white border-none shadow-none" onClick={() => setCreateFor(r)}>
+                    Generate Log
+                  </Button>
                 </div>
               ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <CalendarCheck size={18} className="text-blue-500" />
+      {/* KPI GRID */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { label: "Total Recorded", value: logs.length, icon: CalendarCheck, variant: "secondary" },
+          { label: "Successfully Conducted", value: logs.filter(l => l.event_conducted_flag).length, icon: CheckCircle2, variant: "success" },
+          { label: "Full Compliance", value: logs.filter(l => complianceInfo(l.event_conducted_flag, l.remarks).label === 'Compliant' && l.event_conducted_flag).length, icon: ShieldCheck, variant: "success" },
+          { label: "Incidents Recorded", value: logs.filter(l => complianceInfo(l.event_conducted_flag, l.remarks).variant === 'destructive').length, icon: AlertTriangle, variant: "destructive" },
+          { label: "Settled Payments", value: logs.filter(l => l.payment?.payment_status === 'settled').length, icon: CreditCard, variant: "info" },
+        ].map((kpi, i) => (
+          <Card key={i} className="border-border shadow-xs p-4 flex flex-col justify-between h-24">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</span>
+              <kpi.icon className="h-4 w-4 opacity-80" />
             </div>
-            <div className="text-2xl font-bold">{logs.length}</div>
-            <div className="text-xs text-muted-foreground">Total Logs</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <CheckCircle2 size={18} className="text-green-500" />
-            </div>
-            <div className="text-2xl font-bold">{conductedCount}</div>
-            <div className="text-xs text-muted-foreground">Events Conducted</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <ShieldCheck size={18} className="text-emerald-500" />
-            </div>
-            <div className="text-2xl font-bold">{compliantCount}</div>
-            <div className="text-xs text-muted-foreground">Fully Compliant</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <AlertTriangle size={18} className="text-red-500" />
-            </div>
-            <div className="text-2xl font-bold">{incidentCount + minorCount}</div>
-            <div className="text-xs text-muted-foreground">Issues / Incidents</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-3">
-              <CreditCard size={18} className="text-violet-500" />
-            </div>
-            <div className="text-2xl font-bold">{paidCount}</div>
-            <div className="text-xs text-muted-foreground">Payments Settled</div>
-          </CardContent>
-        </Card>
+            <p className="text-2xl font-bold tracking-tighter">{kpi.value}</p>
+          </Card>
+        ))}
       </div>
 
-      {/* TOOLBAR */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <input
-            className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-            placeholder="Search log ID, venue, applicant, event…"
+      {/* FILTERS */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input 
+            placeholder="Search log ID, venue, or applicant..." 
+            className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-
-        <div className="relative">
-          <Filter size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <div className="flex items-center gap-2">
           <select
-            className="appearance-none pl-8 pr-8 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring outline-none"
             value={filterConducted}
             onChange={(e) => setFilterConducted(e.target.value as any)}
           >
-            <option value="all">All Events</option>
+            <option value="all">Conduction: All</option>
             <option value="true">Conducted</option>
             <option value="false">Not Conducted</option>
           </select>
-          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-        </div>
-
-        <div className="relative">
-          <ShieldCheck size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <select
-            className="appearance-none pl-8 pr-8 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring outline-none"
             value={filterCompliance}
             onChange={(e) => setFilterCompliance(e.target.value as any)}
           >
-            <option value="all">All Compliance</option>
+            <option value="all">Compliance: All</option>
             <option value="compliant">Compliant</option>
-            <option value="issue">Issues / Incidents</option>
+            <option value="issue">Issue/Incident</option>
             <option value="no_show">No Show</option>
           </select>
-          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          {(search || filterConducted !== 'all' || filterCompliance !== 'all') && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilterConducted('all'); setFilterCompliance('all') }}>
+              <X className="mr-2 h-3.5 w-3.5" /> Clear
+            </Button>
+          )}
         </div>
-
-        <div className="flex-1" />
-        <span className="text-xs text-muted-foreground">{filtered.length} of {logs.length} logs</span>
-        <button
-          onClick={() => void loadData()}
-          className="p-2 rounded-md border text-muted-foreground hover:bg-muted transition"
-          title="Refresh from Supabase"
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-        </button>
       </div>
 
       {/* LOGS TABLE */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCheck size={16} />
-            Event Monitoring Records
-            <span className="text-xs font-normal text-muted-foreground ml-1">
-              ({filtered.length} of {logs.length}) — BPMN Step 15
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
-              <RefreshCw size={15} className="animate-spin mr-2" />
-              Loading from Supabase…
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <FileText size={30} className="mb-2 opacity-25" />
-              <p className="text-sm">No usage logs found.</p>
-              {(search || filterConducted !== "all" || filterCompliance !== "all") && (
-                <button
-                  onClick={() => { setSearch(""); setFilterConducted("all"); setFilterCompliance("all") }}
-                  className="mt-2 text-xs text-primary hover:underline"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
-                <thead>
-                  <tr className="border-b text-left">
-                    {[
-                      "Log ID",
-                      "Venue",
-                      "Event / Date",
-                      "Applicant",
-                      "Monitoring Office",
-                      "Payment",           // BPMN Steps 10–12
-                      "Conducted",
-                      "Compliance",
-                      "Remarks",
-                      "",
-                    ].map(h => (
-                      <th key={h} className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filtered.map((l) => {
-                    const slot = parseSlot(l.reservation?.time_slot)
-                    const ci   = complianceInfo(l.event_conducted_flag, l.remarks)
-                    const CIcon = ci.Icon
-                    return (
-                      <tr
-                        key={l.usage_id}
-                        className="group hover:bg-muted/30 transition cursor-pointer"
-                        onClick={() => setViewLog(l)}
-                      >
-                        {/* Log ID */}
-                        <td className="px-4 py-3">
-                          <span className="text-xs font-mono text-blue-500">{l.usage_id}</span>
-                          {l.reservation_id && (
-                            <div className="text-[10px] text-muted-foreground/50 font-mono">{l.reservation_id}</div>
-                          )}
-                        </td>
-
-                        {/* Venue */}
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium max-w-[150px] truncate">
-                            {l.venue?.park_venue_name ?? "—"}
-                          </div>
-                          {l.venue?.location && (
-                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
-                              <MapPin size={9} />{l.venue.location}
-                            </div>
-                          )}
-                          {l.venue?.availability_status && (
-                            <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold text-white ${venueBg(l.venue.availability_status)}`}>
-                              {l.venue.availability_status.replace(/_/g, " ")}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Event / Date */}
-                        <td className="px-4 py-3">
-                          {slot.eventName && (
-                            <div className="text-sm font-medium max-w-[140px] truncate">
-                              🎉 {slot.eventName}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                            <Calendar size={10} />
-                            {l.reservation?.reservation_date ?? "—"}
-                          </div>
-                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <Clock size={9} />{slot.time}
-                          </div>
-                        </td>
-
-                        {/* Applicant */}
-                        <td className="px-4 py-3">
-                          <div className="text-sm text-slate-200">{l.person?.full_name ?? "—"}</div>
-                          {l.person?.contact_number && (
-                            <div className="text-[11px] text-muted-foreground">{l.person.contact_number}</div>
-                          )}
-                        </td>
-
-                        {/* Monitoring Office */}
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-slate-300 max-w-[130px] truncate">
-                            {l.office?.office_name ?? "—"}
-                          </div>
-                          {l.office?.parent_department && (
-                            <div className="text-[11px] text-muted-foreground">{l.office.parent_department}</div>
-                          )}
-                        </td>
-
-                        {/* Payment — BPMN Steps 10–12 */}
-                        <td className="px-4 py-3">
-                          {l.payment ? (
-                            <div>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold text-white ${payBg(l.payment.payment_status)}`}>
-                                {l.payment.payment_status ? cap(l.payment.payment_status) : "—"}
-                              </span>
-                              {l.payment.amount_paid != null && (
-                                <div className="text-xs text-green-500 font-medium mt-0.5">
-                                  ₱{Number(l.payment.amount_paid).toLocaleString()}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground/40">No payment</span>
-                          )}
-                        </td>
-
-                        {/* Conducted */}
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${conductedBg(l.event_conducted_flag)}`}>
-                            {conductedLabel(l.event_conducted_flag)}
-                          </span>
-                        </td>
-
-                        {/* Compliance */}
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${ci.cls}`}>
-                            <CIcon size={9} />{ci.label}
-                          </span>
-                        </td>
-
-                        {/* Remarks snippet */}
-                        <td className="px-4 py-3 max-w-[160px]">
-                          {l.remarks ? (
-                            <div className="flex items-start gap-1 text-xs text-muted-foreground">
-                              <AlignLeft size={10} className="mt-0.5 shrink-0" />
-                              <span className="line-clamp-2">{l.remarks}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground/30">—</span>
-                          )}
-                        </td>
-
-                        {/* View */}
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <button
-                            onClick={() => setViewLog(l)}
-                            className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition opacity-0 group-hover:opacity-100"
-                            title="View full details"
-                          >
-                            <Eye size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
+      <Card className="border-border shadow-xs overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted">
+            <TableRow>
+              <TableHead className="w-[100px]">Log</TableHead>
+              <TableHead>Event Details</TableHead>
+              <TableHead className="hidden lg:table-cell">Monitoring</TableHead>
+              <TableHead className="hidden md:table-cell">Fees</TableHead>
+              <TableHead>Outcome</TableHead>
+              <TableHead className="w-[80px] text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-48 text-center animate-pulse text-muted-foreground">
+                  Synchronizing monitoring database...
+                </TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
+                  No monitoring records found matched those parameters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((l) => {
+                const slot = parseSlot(l.reservation?.time_slot)
+                const comp = complianceInfo(l.event_conducted_flag, l.remarks)
+                return (
+                  <TableRow key={l.usage_id} className="group hover:bg-muted transition-colors">
+                    <TableCell>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-[10px] text-primary font-bold">#{l.usage_id.slice(-6)}</span>
+                        <span className="text-[9px] text-muted-foreground opacity-80 uppercase tracking-tighter font-bold">REGISTRY ITEM</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-sm truncate max-w-[200px] leading-tight text-foreground">
+                          {l.venue?.park_venue_name || 'System Site'}
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium">
+                          <span className="flex items-center gap-1"><Calendar className="h-2.5 w-2.5" /> {l.reservation?.reservation_date || 'N/A'}</span>
+                          <Separator orientation="vertical" className="h-2" />
+                          <span className="truncate max-w-[100px]">{l.person?.full_name || 'Guest'}</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="flex flex-col gap-0.5 max-w-[150px]">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">{l.office?.office_name || 'LGU OFFICE'}</p>
+                        <p className="text-[10px] text-muted-foreground italic truncate leading-tight">
+                          {l.remarks || 'No specific oversight notes.'}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {l.payment ? (
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-bold text-foreground leading-none">₱{Number(l.payment.amount_paid).toLocaleString()}</p>
+                          <Badge variant="outline" className="text-[9px] h-4 border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10 uppercase font-bold tracking-tighter shadow-none">SETTLED</Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50 italic">Not Linked</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant={l.event_conducted_flag ? 'outline' : 'secondary'} className={cn("text-[9px] font-bold h-5 shadow-none", l.event_conducted_flag && "border-green-500 text-green-700 bg-green-50 dark:bg-green-900/10 dark:text-green-400")}>
+                          {l.event_conducted_flag ? 'CONDUCTED' : 'NOT CONDUCTED'}
+                        </Badge>
+                        <div className={cn("flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider", comp.variant === 'destructive' ? 'text-red-600' : comp.variant === 'warning' ? 'text-yellow-600' : 'text-emerald-600')}>
+                          <comp.Icon className="h-3 w-3" /> {comp.label}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setViewLog(l)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
       </Card>
 
-      {/* BPMN Step 16 footer note */}
-      <div className="mt-4 px-4 py-3 rounded-xl text-xs text-muted-foreground flex items-start gap-2 border">
-        <AlertCircle size={13} className="text-blue-400 shrink-0 mt-0.5" />
-        <span>
-          <strong className="text-foreground">BPMN Step 16 —</strong> After an event is logged as
-          completed and monitored here, the <strong className="text-foreground">Citizen Information &amp; Engagement
-          — Notification &amp; Alert System</strong> sends an event completion notice to the applicant
-          and the funeral home (if applicable). This table is the source of truth for that trigger.
-        </span>
-      </div>
-
       {/* DETAIL MODAL */}
-      {viewLog && (
-        <DetailModal log={viewLog} onClose={() => setViewLog(null)} />
-      )}
+      <Dialog open={!!viewLog} onOpenChange={(open) => !open && setViewLog(null)}>
+        <DialogContent className="max-w-xl p-0 overflow-hidden border-none bg-transparent shadow-none">
+          {viewLog && (
+            <div className="card-premium mx-auto w-full animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto sidebar-scrollbar">
+              <DialogHeader className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge variant={viewLog.event_conducted_flag ? 'success' : 'secondary'} className="font-bold uppercase tracking-wider text-[10px]">
+                    {viewLog.event_conducted_flag ? 'Conducted' : 'No Show'}
+                  </Badge>
+                  <span className="text-[10px] font-mono text-muted-foreground opacity-60">ID: {viewLog.usage_id}</span>
+                </div>
+                <DialogTitle className="font-display text-2xl font-extrabold tracking-tight text-foreground leading-tight">
+                   {viewLog.venue?.park_venue_name || 'Event Performance Review'}
+                </DialogTitle>
+                <DialogDescription className="font-medium text-muted-foreground/80 mt-1">
+                   Registry Monitoring Archive record for current period.
+                </DialogDescription>
+              </DialogHeader>
 
-      {/* CREATE LOG MODAL */}
-      {createFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-              <h2 className="text-sm font-semibold text-slate-100">
-                Create Usage Log — {createFor.reservation_id}
-              </h2>
-              <button onClick={() => setCreateFor(null)} className="text-slate-500 hover:text-slate-100 transition-colors">
-                <X size={16} />
-              </button>
+              <div className="space-y-6">
+                <div className={cn(
+                  "surface-box border relative overflow-hidden",
+                  complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).variant === 'destructive' ? 'border-red-500/30 bg-red-500/5' : 
+                  complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).variant === 'warning' ? 'border-yellow-500/30 bg-yellow-500/5' : 
+                  'border-emerald-500/30 bg-emerald-500/5'
+                )}>
+                  <div className="flex gap-4 items-start relative z-10">
+                    <div className={cn(
+                      "h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner",
+                      complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).variant === 'destructive' ? 'bg-red-500/20 text-red-500' : 
+                      complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).variant === 'warning' ? 'bg-yellow-500/20 text-yellow-500' : 
+                      'bg-emerald-500/20 text-emerald-500'
+                    )}>
+                      {React.createElement(complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).Icon, { className: "h-6 w-6" })}
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <p className={cn(
+                        "text-xs font-extrabold tracking-widest uppercase",
+                        complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).variant === 'destructive' ? 'text-red-600' : 
+                        complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).variant === 'warning' ? 'text-yellow-600' : 
+                        'text-emerald-600'
+                      )}>
+                        Compliance: {complianceInfo(viewLog.event_conducted_flag, viewLog.remarks).label}
+                      </p>
+                      <p className="text-sm text-foreground/90 font-medium leading-relaxed italic border-l-2 border-border/20 pl-3">
+                        "{viewLog.remarks || 'The event proceeded smoothly according to monitoring standards.'}"
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div className="surface-box group border border-border/20">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <UserCheck className="h-3.5 w-3.5" /> Organizer
+                      </p>
+                      <p className="text-sm font-bold text-foreground truncate">{viewLog.person?.full_name || '—'}</p>
+                   </div>
+                   <div className="surface-box group border border-border/20">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <CalendarCheck className="h-3.5 w-3.5" /> Date Recorded
+                      </p>
+                      <p className="text-sm font-bold text-foreground">{viewLog.reservation?.reservation_date || 'N/A'}</p>
+                   </div>
+                </div>
+
+                <div className="admin-box mt-2 group">
+                  <Building2 className="absolute top-4 right-4 h-12 w-12 text-primary/5 transition-transform group-hover:scale-110 duration-500" />
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                      <Building2 className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Monitoring Authority</span>
+                  </div>
+                  <div className="text-sm font-bold text-foreground px-1">
+                    {viewLog.office?.office_name || 'Parks Monitoring Unit'}
+                  </div>
+                  <div className="sep mt-4">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium italic">
+                      <MapPin className="h-3 w-3 text-primary/40" />
+                      {viewLog.office?.location || 'Operational Site Presence'}
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter className="mt-8 pt-6 border-t border-border/10 flex items-center justify-end">
+                  <Button size="sm" variant="secondary" onClick={() => setViewLog(null)} className="rounded-xl h-11 px-8 font-bold text-[11px] uppercase tracking-widest">
+                    Close Archive
+                  </Button>
+                </DialogFooter>
+              </div>
             </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-                  Monitoring office
-                </label>
-                <select className="input-field" value={createOfficeId} onChange={(e) => setCreateOfficeId(e.target.value)}>
-                  <option value="">Select office…</option>
-                  {adminOffices.map((o: any) => (
-                    <option key={o.admin_office_id} value={o.admin_office_id}>
-                      {o.office_name}
-                    </option>
-                  ))}
-                </select>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* CREATE LOG DIALOG */}
+      <Dialog open={!!createFor} onOpenChange={(open) => !open && setCreateFor(null)}>
+        <DialogContent className="max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none">
+          {createFor && (
+            <div className="card-premium mx-auto w-full animate-in slide-in-from-bottom-4 duration-300">
+              <DialogHeader className="mb-6">
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-4 shadow-inner">
+                  <BadgeCheck size={24} />
+                </div>
+                <DialogTitle className="font-display text-2xl font-extrabold tracking-tight text-foreground leading-tight">
+                  Log Event Completion
+                </DialogTitle>
+                <DialogDescription className="font-medium text-muted-foreground/80 mt-1 space-y-1.5">
+                  <p>Conducting monitoring for reservation <strong className="text-primary font-mono font-bold font-mono">#{createFor.reservation_id.slice(-8)}</strong>.</p>
+                  <p className="text-[10px] uppercase font-bold tracking-widest bg-muted/50 py-1 px-2 rounded-lg border border-border/20 inline-block">
+                    {createFor.park_venue?.park_venue_name} · {createFor.reservation_date}
+                  </p>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                <div className="surface-box border border-border/40 space-y-2">
+                  <Label htmlFor="create-office" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Monitoring Office</Label>
+                  <select
+                    id="create-office"
+                    className="flex h-11 w-full rounded-xl border border-border/40 bg-background/50 px-4 py-2 text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                    value={createForm.officeId}
+                    onChange={(e) => setCreateForm(f => ({ ...f, officeId: e.target.value }))}
+                  >
+                    <option value="">Select monitoring body…</option>
+                    {adminOffices.map((o: any) => (
+                      <option key={o.admin_office_id} value={o.admin_office_id}>{o.office_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="surface-box border border-border/40 bg-muted/30 flex items-center justify-between p-5">
+                  <div className="space-y-1">
+                    <Label htmlFor="conducted" className="font-bold text-sm">Conduction Status</Label>
+                    <p className="text-[10px] text-muted-foreground font-medium italic">Confirmed successful venue utilization.</p>
+                  </div>
+                  <Switch 
+                    id="conducted" 
+                    checked={createForm.conducted} 
+                    onCheckedChange={(checked) => setCreateForm(f => ({ ...f, conducted: checked }))} 
+                    className="data-[state=checked]:bg-green-600"
+                  />
+                </div>
+
+                <div className="surface-box border border-border/40 space-y-2">
+                  <Label htmlFor="remarks" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <AlignLeft className="h-3 w-3" /> Field Observer Remarks
+                  </Label>
+                  <Textarea 
+                    id="remarks" 
+                    placeholder="Document compliance, venue condition, or any incidents reported (Registry Item 15)..." 
+                    className="min-h-[120px] rounded-xl border-border/40 bg-background/50 focus:ring-2 focus:ring-primary/20 resize-none font-medium text-sm leading-relaxed"
+                    value={createForm.remarks}
+                    onChange={(e) => setCreateForm(f => ({ ...f, remarks: e.target.value }))}
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-sm text-slate-200">
-                <input type="checkbox" checked={createConducted} onChange={(e) => setCreateConducted(e.target.checked)} />
-                Event conducted as scheduled
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-                  Monitoring remarks
-                </label>
-                <textarea
-                  rows={4}
-                  className="input-field"
-                  placeholder="Notes, compliance issues, incidents, cleanup, etc."
-                  value={createRemarks}
-                  onChange={(e) => setCreateRemarks(e.target.value)}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button className="btn-secondary" onClick={() => setCreateFor(null)} disabled={createSaving}>
-                  Cancel
-                </button>
-                <button className="btn-primary" onClick={createLog} disabled={createSaving}>
-                  {createSaving ? "Saving…" : "Save log"}
-                </button>
-              </div>
+              <DialogFooter className="mt-8 flex items-center justify-end gap-3 pt-6 border-t border-border/10">
+                <Button variant="ghost" size="sm" className="font-bold text-[11px] uppercase tracking-widest h-11 px-6 hover:bg-muted" onClick={() => setCreateFor(null)} disabled={loading}>
+                  Discard
+                </Button>
+                <Button 
+                  size="sm" 
+                  className="rounded-xl font-extrabold text-[11px] h-11 px-10 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-95"
+                  onClick={handleCreateLog}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    'AUTHORIZE ENTRY'
+                  )}
+                </Button>
+              </DialogFooter>
             </div>
-          </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* SYSTEM FOOTNOTE */}
+      <footer className="rounded-xl border border-border bg-muted p-4 flex gap-4 items-start md:items-center">
+        <div className="h-10 w-10 flex items-center justify-center rounded-full bg-background border shadow-xs shrink-0">
+          <Info className="h-5 w-5 text-blue-500" />
         </div>
-      )}
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">System Governance:</strong> Recording monitoring logs triggers the <strong className="text-foreground">Event Completion Workflow</strong>, where the system automatically issues a completion certificate and feedback request. This data also feeds into the annual venue utilization reporting.
+        </p>
+      </footer>
     </div>
   )
 }

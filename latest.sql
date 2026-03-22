@@ -474,6 +474,7 @@ CREATE TABLE public.park_reservation_record (
   approved_by_employee text,
   payment_id text,
   digital_permit_url text,
+  created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT park_reservation_record_pkey PRIMARY KEY (reservation_id),
   CONSTRAINT park_reservation_record_park_venue_id_fkey FOREIGN KEY (park_venue_id) REFERENCES public.park_venue(park_venue_id),
   CONSTRAINT park_reservation_record_applicant_person_id_fkey FOREIGN KEY (applicant_person_id) REFERENCES public.person(person_id),

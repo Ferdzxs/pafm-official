@@ -128,6 +128,23 @@ export interface BarangayFacility {
     status: 'active' | 'maintenance' | 'closed'
 }
 
+/** BPMN-aligned statuses on `barangay_reservation_record.status` — see barangayCitizenWorkflow.ts */
+export type BarangayReservationStatus =
+    | 'submitted'
+    | 'returned_incomplete'
+    | 'availability_failed'
+    | 'awaiting_treasury'
+    | 'order_of_payment_issued'
+    | 'payment_pending'
+    | 'pending_pb_approval'
+    | 'pb_rejected'
+    | 'pb_approved'
+    | 'permit_issued'
+    | 'completed'
+    | 'pending'
+    | 'confirmed'
+    | 'rejected'
+
 export interface BarangayReservationRecord {
     reservation_id: string
     facility_id: string
@@ -135,7 +152,7 @@ export interface BarangayReservationRecord {
     applicant_name: string
     event_date: string
     purpose: string
-    status: ApplicationStatus
+    status: BarangayReservationStatus | ApplicationStatus
     approved_by?: string
     created_at: string
 }
@@ -151,10 +168,29 @@ export type TicketStatus =
     | 'under_review'
     | 'incomplete'
     | 'triaged'
+    | 'documents_validated'
+    | 'hcdrd_pending'
+    | 'hcdrd_cleared'
+    | 'validated'
     | 'assigned'
+    | 'for_inspection'
+    | 'inspected'
+    | 'excavation_pending'
+    | 'excavation_cleared'
+    | 'materials_pending'
+    | 'materials_ready'
+    | 'for_implementation'
+    | 'for_payment'
+    | 'awaiting_treasury'
+    | 'order_of_payment_issued'
+    | 'payment_settled'
+    | 'for_installation'
     | 'in_progress'
+    | 'pending_activation'
     | 'resolved'
+    | 'completed'
     | 'closed'
+    | 'rejected'
 
 export interface ServiceTicket {
     ticket_id: string

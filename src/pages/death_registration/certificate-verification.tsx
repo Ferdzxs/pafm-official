@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import {
-  Search, Loader2, CheckCircle2, X, Eye,
+  Search, Loader2, CheckCircle2, Eye,
   AlertCircle, Stamp, Info, ListChecks
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Badge } from '@/components/ui/badge'
 import toast from 'react-hot-toast'
 import { Pagination } from '@/components/ui/pagination'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { DialogPremiumInner, premiumDialogShellClasses } from '@/components/ui/dialog-premium'
 
 interface VerifyApp {
   application_id: string
@@ -210,99 +212,108 @@ export default function CertificateVerification() {
         </>
       )}
 
-      {/* Verification Modal */}
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="glass rounded-2xl w-full max-w-xl animate-fade-in border border-white/10 shadow-2xl max-h-[90vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/3 shrink-0">
+      {/* Verification Modal — premium card (centered via shared Dialog) */}
+      <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}>
+        <DialogContent className={premiumDialogShellClasses('max-w-xl')}>
+          <DialogPremiumInner className="flex max-h-[min(92vh,880px)] flex-col overflow-hidden p-0">
+            <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-muted/30 px-6 pb-4 pt-2 pr-12">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
                   <Stamp size={24} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white">{selected.deceased?.full_name}</h2>
-                  <p className="text-xs font-mono text-slate-500">{selected.application_id}</p>
+                  <h2 className="font-display text-lg font-bold text-foreground">{selected?.deceased?.full_name}</h2>
+                  <p className="font-mono text-xs text-muted-foreground">{selected?.application_id}</p>
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"><X size={18} /></button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1">
-              {/* Details */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-6">
-                {[
-                  ['Date of Death', selected.deceased?.date_of_death ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : '—'],
-                  ['Place of Death', selected.deceased?.place_of_death ?? '—'],
-                  ['Death Cert #', selected.deceased?.death_certificate_no ?? 'Not provided'],
-                  ['Applicant', selected.person?.full_name ?? '—'],
-                  ['Contact', selected.person?.contact_number ?? '—'],
-                ].map(([label, value]) => (
-                  <div key={label} className="flex flex-col">
-                    <span className="text-[10px] text-slate-500 uppercase font-bold">{label}</span>
-                    <span className="text-sm text-white font-medium">{value}</span>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sidebar-scrollbar">
+              {selected && (
+                <>
+                  <div className="mb-6 grid grid-cols-2 gap-x-4 gap-y-3">
+                    {[
+                      [
+                        'Date of Death',
+                        selected.deceased?.date_of_death
+                          ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'medium' })
+                          : '—',
+                      ],
+                      ['Place of Death', selected.deceased?.place_of_death ?? '—'],
+                      ['Death Cert #', selected.deceased?.death_certificate_no ?? 'Not provided'],
+                      ['Applicant', selected.person?.full_name ?? '—'],
+                      ['Contact', selected.person?.contact_number ?? '—'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold uppercase text-muted-foreground">{label}</span>
+                        <span className="text-sm font-medium text-foreground">{value}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {/* Verification Checklist */}
-              <div className="rounded-xl border border-indigo-500/15 bg-indigo-500/5 p-4 mb-4">
-                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                  <ListChecks size={13} /> Verification Checklist
-                </p>
-                <div className="space-y-2.5">
-                  {CHECKLIST.map(item => (
-                    <label key={item.id} className="flex items-center gap-3 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={!!checks[item.id]}
-                        onChange={e => setChecks(prev => ({ ...prev, [item.id]: e.target.checked }))}
-                        className="w-4 h-4 rounded accent-indigo-500"
-                      />
-                      <span className={`text-sm transition-colors ${checks[item.id] ? 'text-white' : 'text-slate-500 group-hover:text-slate-400'}`}>
-                        {item.label}
-                      </span>
-                      {checks[item.id] && <CheckCircle2 size={14} className="text-emerald-400 ml-auto shrink-0" />}
-                    </label>
-                  ))}
-                </div>
+                  <div className="mb-4 rounded-xl border border-indigo-500/25 bg-muted/30 p-4 dark:border-indigo-500/20">
+                    <p className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                      <ListChecks size={13} /> Verification Checklist
+                    </p>
+                    <div className="space-y-2.5">
+                      {CHECKLIST.map(item => (
+                        <label key={item.id} className="group flex cursor-pointer items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={!!checks[item.id]}
+                            onChange={e => setChecks(prev => ({ ...prev, [item.id]: e.target.checked }))}
+                            className="h-4 w-4 rounded accent-indigo-600 dark:accent-indigo-500"
+                          />
+                          <span
+                            className={`text-sm transition-colors ${checks[item.id] ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground/80'}`}
+                          >
+                            {item.label}
+                          </span>
+                          {checks[item.id] && (
+                            <CheckCircle2 size={14} className="ml-auto shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          )}
+                        </label>
+                      ))}
+                    </div>
 
-                <div className={`mt-3 p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all ${
-                  allChecked ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                }`}>
-                  {allChecked ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                  {allChecked ? 'All items verified — ready to approve.' : `${CHECKLIST.filter(c => !checks[c.id]).length} items remaining.`}
-                </div>
-              </div>
+                    <div
+                      className={`mt-3 flex items-center gap-2 rounded-lg border p-2.5 text-xs font-medium transition-all ${
+                        allChecked
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400'
+                          : 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-400'
+                      }`}
+                    >
+                      {allChecked ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                      {allChecked
+                        ? 'All items verified — ready to approve.'
+                        : `${CHECKLIST.filter(c => !checks[c.id]).length} items remaining.`}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Actions */}
-            <div className="p-6 pt-0 flex gap-2 shrink-0 border-t border-white/5">
+            <div className="flex shrink-0 gap-2 border-t border-border/60 bg-muted/20 px-6 py-4">
               <button
+                type="button"
                 disabled={!!verifying}
-                onClick={() => handleVerify(selected.application_id, 'rejected')}
-                className="flex-1 py-2.5 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all text-xs font-bold uppercase"
+                onClick={() => selected && handleVerify(selected.application_id, 'rejected')}
+                className="flex-1 rounded-xl border border-red-500/30 py-2.5 text-xs font-bold uppercase text-red-600 transition-all hover:bg-red-500/10 dark:text-red-400"
               >
                 Reject
               </button>
               <button
+                type="button"
                 disabled={!!verifying || !allChecked}
-                onClick={() => handleVerify(selected.application_id, 'verified')}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all disabled:opacity-40 text-xs font-bold uppercase"
+                onClick={() => selected && handleVerify(selected.application_id, 'verified')}
+                className="flex-1 rounded-xl border border-indigo-500/30 bg-indigo-500/10 py-2.5 text-xs font-bold uppercase text-indigo-700 transition-all hover:bg-indigo-500/15 disabled:opacity-40 dark:text-indigo-300"
               >
-                {verifying ? <Loader2 size={14} className="animate-spin mx-auto" /> : '✓ Approve Verification'}
+                {verifying ? <Loader2 size={14} className="mx-auto animate-spin" /> : '✓ Approve Verification'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </DialogPremiumInner>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

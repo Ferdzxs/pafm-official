@@ -97,7 +97,14 @@ type HelpdeskStats = {
  */
 export async function getHelpdeskStats(): Promise<HelpdeskStats> {
   // Open = early lifecycle states before triage/assignment
-  const openStatuses = ['submitted', 'open', 'under_review', 'incomplete']
+  const openStatuses = [
+    'submitted',
+    'open',
+    'under_review',
+    'incomplete',
+    'documents_validated',
+    'hcdrd_pending',
+  ]
 
   const [{ count: openCount }, { count: triagedToday }, { count: pendingAssign }, byTypeRows] =
     await Promise.all([

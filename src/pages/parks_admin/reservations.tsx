@@ -1,80 +1,102 @@
 /**
- * reservations.tsx — Parks Administrator
- * BPMN Steps: 2 · 3 · 4 · 5 · 10–12 · 13 · 15
- *
- * time_slot format from citizen form:
- *   "HH:MM-HH:MM | Event Name | Purpose: description text"
- * This file parses and displays all three parts separately.
+ * reservations.tsx — Parks Administrator overhauled for UI/UX
  */
 
 import React, { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { ROLE_META } from "@/config/rbac"
 import { supabase } from "@/lib/supabase"
+import toast from "react-hot-toast"
 
 import {
   Clock, CheckCircle, CheckCircle2,
   Eye, ThumbsUp, ThumbsDown,
   Search, ChevronDown, RefreshCw, X,
-  MapPin, Calendar, User, FileText,
+  MapPin, Calendar as CalendarIcon, User, FileText,
   ExternalLink, Filter, CreditCard,
   AlertCircle, BadgeCheck, Ban, AlignLeft,
+  MoreVertical, ArrowLeftRight, ShieldCheck
 } from "lucide-react"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Select, SelectItem } from "@/components/ui/select"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Separator } from "@/components/ui/separator"
+import { ParkReservationDocumentsViewer } from "@/components/parks/ParkReservationDocumentsViewer"
+import type { QmcParkApplicationPayload } from "@/lib/qmcParkApplicationForm"
+import { cn } from "@/lib/utils"
 
-// ─────────────────────────────────────────────
-// TYPES
-// ─────────────────────────────────────────────
+// ─── TYPES ───
 interface Venue {
-  park_venue_id:       string
-  park_venue_name:     string
-  location:            string | null
-  venue_type:          string | null
+  park_venue_id: string
+  park_venue_name: string
+  location: string | null
+  venue_type: string | null
   availability_status: string
 }
 interface Person {
-  person_id:      string
-  full_name:      string
-  address:        string | null
+  person_id: string
+  full_name: string
+  address: string | null
   contact_number: string | null
 }
 interface Payment {
-  payment_id:         string
-  amount_paid:        number | null
-  payment_method:     string | null
+  payment_id: string
+  amount_paid: number | null
+  payment_method: string | null
   transaction_ref_no: string | null
-  digital_or_no:      string | null
-  payment_status:     string | null
+  digital_or_no: string | null
+  payment_status: string | null
 }
 interface Reservation {
-  reservation_id:      string
-  park_venue_id:       string | null
+  reservation_id: string
+  park_venue_id: string | null
   applicant_person_id: string | null
-  reservation_date:    string
-  time_slot:           string | null
-  status:              string
-  digital_permit_url:  string | null
-  payment_id:          string | null
-  processed_by_admin:  string | null
-  venue:   Venue   | null
-  person:  Person  | null
+  reservation_date: string
+  time_slot: string | null
+  status: string
+  digital_permit_url: string | null
+  letter_of_intent_doc: string | null
+  application_form_doc: string | null
+  application_form_payload: QmcParkApplicationPayload | null
+  payment_id: string | null
+  processed_by_admin: string | null
+  venue: Venue | null
+  person: Person | null
   payment: Payment | null
+  letter_of_intent_url?: string | null
+  application_form_url?: string | null
 }
 
-// ─────────────────────────────────────────────
-// PARSE time_slot — format: "HH:MM-HH:MM | Event Name | Purpose: text"
-// ─────────────────────────────────────────────
 interface ParsedSlot {
-  time:       string        // "09:00-17:00"
-  eventName:  string | null // "Birthday ni Mama"
-  purpose:    string | null // "Family celebration with 30 guests"
+  time: string
+  eventName: string | null
+  purpose: string | null
 }
 
+// ─── HELPERS ───
 function parseTimeSlot(raw: string | null): ParsedSlot {
   if (!raw) return { time: "—", eventName: null, purpose: null }
   const parts = raw.split(" | ")
-  const time      = parts[0] ?? raw
+  const time = parts[0] ?? raw
   const eventName = parts[1] ?? null
   const purposePart = parts[2] ?? null
   const purpose = purposePart?.startsWith("Purpose: ")
@@ -83,49 +105,29 @@ function parseTimeSlot(raw: string | null): ParsedSlot {
   return { time, eventName, purpose }
 }
 
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
-function statusBg(s: string) {
-  switch (s) {
-    case "pending_loi":
-    case "desk_logged":
-    case "endorsed_to_admin":
-    case "pending":   return "bg-yellow-500" // legacy pending
-    case "admin_approved":
-    case "approved":  return "bg-green-600" // legacy approved
-    case "completed": return "bg-blue-600"
-    case "admin_rejected":
-    case "rejected":  return "bg-red-600"   // legacy rejected
-    default:          return "bg-slate-500"
-  }
-}
-function venueBg(s: string) {
-  if (s === "available")         return "bg-green-600"
-  if (s === "under_maintenance") return "bg-yellow-500"
-  return "bg-red-600"
-}
-function payBg(s: string | null) {
-  if (s === "settled") return "bg-green-600"
-  if (s === "pending") return "bg-yellow-500"
-  return "bg-red-600"
-}
-function cap(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ")
-}
-function bpmnLabel(status: string) {
+function getStatusBadge(status: string) {
+  const label = status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ")
   switch (status) {
-    case "pending_loi":       return "BPMN Step 1 — LOI submitted (awaiting desk processing)"
-    case "desk_logged":       return "BPMN Steps 2–3 — Desk pre-check & availability"
-    case "endorsed_to_admin": return "BPMN Step 4 — Endorsed to Parks Admin"
-    case "pending":           return "BPMN Step 4/5 — Legacy pending (treat as endorsed)"
+    case "pending":
+    case "endorsed_to_admin":
+    case "desk_logged":
+    case "pending_loi":
+      return <Badge variant="warning">{label}</Badge>
+    case "approved":
     case "admin_approved":
-    case "approved":          return "BPMN Step 5 ✓ — Admin approved"
-    case "completed": return "BPMN Step 15 — Event Monitored & Completed"
+      return <Badge variant="success">{label}</Badge>
+    case "completed":
+      return <Badge variant="info">{label}</Badge>
+    case "rejected":
     case "admin_rejected":
-    case "rejected":          return "BPMN Step 5 ✗ — Request Disapproved"
-    default:          return ""
+      return <Badge variant="destructive">{label}</Badge>
+    default:
+      return <Badge variant="secondary">{label}</Badge>
   }
+}
+
+function getStatusLabel(status: string) {
+  return status.replace(/_/g, " ").toUpperCase()
 }
 
 async function notifyCitizenByPersonId(params: {
@@ -151,223 +153,25 @@ async function notifyCitizenByPersonId(params: {
   })
 }
 
-// ─────────────────────────────────────────────
-// MODAL WRAPPER
-// ─────────────────────────────────────────────
-function Modal({ title, onClose, children, wide = false }: {
-  title: string; onClose: () => void; children: React.ReactNode; wide?: boolean
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className={`bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full overflow-hidden ${wide ? "max-w-2xl" : "max-w-lg"}`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-100 transition-colors">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="px-6 py-5 max-h-[82vh] overflow-y-auto">{children}</div>
-      </div>
-    </div>
-  )
-}
-function DRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between items-start py-2 border-b border-slate-800 last:border-0">
-      <span className="text-xs text-slate-500 shrink-0 w-40">{label}</span>
-      <span className="text-xs text-slate-100 text-right max-w-[55%] break-words">{value ?? <span className="text-slate-700">—</span>}</span>
-    </div>
-  )
-}
-function SLabel({ icon, children }: { icon: string; children: React.ReactNode }) {
-  return <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-5 mb-1 flex items-center gap-1.5">{icon} {children}</p>
-}
-function Badge({ label, cls }: { label: string; cls: string }) {
-  return <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold text-white ${cls}`}>{label}</span>
-}
-
-// ─────────────────────────────────────────────
-// DETAIL MODAL
-// ─────────────────────────────────────────────
-function DetailModal({ r, onClose, onApprove, onReject, loading }: {
-  r: Reservation; onClose: () => void
-  onApprove: (id: string) => void; onReject: (id: string) => void; loading: boolean
-}) {
-  const slot = parseTimeSlot(r.time_slot)
-
-  return (
-    <Modal title={`Reservation — ${r.reservation_id}`} onClose={onClose} wide>
-      {/* Status + BPMN */}
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <Badge label={cap(r.status)} cls={statusBg(r.status)} />
-        <span className="text-[11px] text-slate-500 italic">{bpmnLabel(r.status)}</span>
-      </div>
-
-      {/* BPMN Step 3: Venue */}
-      <SLabel icon="🏛️">Venue (BPMN Step 3 — Availability Check)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        <DRow label="Venue Name"   value={r.venue?.park_venue_name} />
-        <DRow label="Location"     value={r.venue?.location} />
-        <DRow label="Venue Type"   value={r.venue?.venue_type ? cap(r.venue.venue_type) : null} />
-        <DRow label="Availability" value={
-          r.venue
-            ? <Badge label={r.venue.availability_status.replace(/_/g, " ")} cls={venueBg(r.venue.availability_status)} />
-            : null
-        } />
-      </div>
-
-      {/* BPMN Step 1: Schedule + Event Info — PARSED from time_slot */}
-      <SLabel icon="📅">Schedule & Event (BPMN Step 1 — Letter of Intent)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        <DRow label="Reservation Date" value={r.reservation_date} />
-        <DRow label="Time Slot"        value={slot.time} />
-        {slot.eventName && (
-          <DRow label="Event Name" value={
-            <span className="font-medium text-slate-200">{slot.eventName}</span>
-          } />
-        )}
-      </div>
-
-      {/* Event Purpose/Description — NEWLY VISIBLE */}
-      {slot.purpose && (
-        <>
-          <SLabel icon="📝">Event Purpose / Description</SLabel>
-          <div className="bg-slate-800 rounded-xl px-4 py-3">
-            <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">{slot.purpose}</p>
-          </div>
-        </>
-      )}
-
-      {/* BPMN Step 1: Applicant */}
-      <SLabel icon="👤">Applicant (BPMN Step 1 — Citizen)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        <DRow label="Full Name"   value={r.person?.full_name} />
-        <DRow label="Contact No." value={r.person?.contact_number} />
-        <DRow label="Address"     value={r.person?.address} />
-      </div>
-
-      {/* BPMN Steps 10–12: Payment */}
-      <SLabel icon="💰">Payment (BPMN Steps 10–12)</SLabel>
-      <div className="bg-slate-800 rounded-xl px-4 py-1">
-        {r.payment_id ? (
-          <>
-            <DRow label="Payment ID"       value={r.payment_id} />
-            <DRow label="Amount Paid"      value={
-              r.payment?.amount_paid != null
-                ? <span className="font-semibold text-green-400">₱{Number(r.payment.amount_paid).toLocaleString()}</span>
-                : null
-            } />
-            <DRow label="Payment Method"   value={r.payment?.payment_method ? cap(r.payment.payment_method) : null} />
-            <DRow label="Transaction Ref"  value={r.payment?.transaction_ref_no} />
-            <DRow label="Official Receipt" value={r.payment?.digital_or_no} />
-            <DRow label="Payment Status"   value={
-              r.payment?.payment_status
-                ? <Badge label={cap(r.payment.payment_status)} cls={payBg(r.payment.payment_status)} />
-                : null
-            } />
-          </>
-        ) : (
-          <p className="text-xs text-slate-600 py-2">No payment record linked yet.</p>
-        )}
-      </div>
-
-      {/* BPMN Step 13: Digital Permit */}
-      {r.digital_permit_url && (
-        <>
-          <SLabel icon="📜">Digital Event Permit (BPMN Step 13)</SLabel>
-          <div className="bg-slate-800 rounded-xl px-4 py-3">
-            <a
-              href={r.digital_permit_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition font-medium"
-            >
-              <ExternalLink size={12} />
-              View / Download Digital Permit
-            </a>
-          </div>
-        </>
-      )}
-
-      {/* BPMN Step 5: Approve / Reject */}
-      {(r.status === "endorsed_to_admin" || r.status === "pending") && (
-        <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-800">
-          <button
-            onClick={() => onReject(r.reservation_id)}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium disabled:opacity-50 transition"
-          >
-            <Ban size={13} /> {loading ? "Processing…" : "Reject (Step 5 ✗)"}
-          </button>
-          <button
-            onClick={() => onApprove(r.reservation_id)}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50 transition"
-          >
-            <BadgeCheck size={13} /> {loading ? "Processing…" : "Approve (Step 5 ✓)"}
-          </button>
-        </div>
-      )}
-    </Modal>
-  )
-}
-
-// ─────────────────────────────────────────────
-// CONFIRM MODAL
-// ─────────────────────────────────────────────
-function ConfirmModal({ action, r, loading, onConfirm, onCancel }: {
-  action: "approve" | "reject"; r: Reservation
-  loading: boolean; onConfirm: () => void; onCancel: () => void
-}) {
-  const isApprove = action === "approve"
-  const slot = parseTimeSlot(r.time_slot)
-  return (
-    <Modal title={isApprove ? "✓ Confirm Approval" : "✗ Confirm Rejection"} onClose={onCancel}>
-      <p className="text-sm text-slate-400 mb-4">
-        {isApprove
-          ? "Approving this reservation will mark it as approved. A digital permit can then be issued (BPMN Step 13)."
-          : "Rejecting this reservation will notify the applicant their request was disapproved (BPMN Step 5)."}
-      </p>
-      <div className="bg-slate-800 rounded-xl px-4 py-3 text-xs space-y-1.5 text-slate-300 mb-5">
-        <div><span className="text-slate-500">ID: </span>{r.reservation_id}</div>
-        <div><span className="text-slate-500">Applicant: </span>{r.person?.full_name ?? "—"}</div>
-        <div><span className="text-slate-500">Venue: </span>{r.venue?.park_venue_name ?? "—"}</div>
-        <div><span className="text-slate-500">Date: </span>{r.reservation_date}{slot.time ? ` · ${slot.time}` : ""}</div>
-        {slot.eventName && <div><span className="text-slate-500">Event: </span>{slot.eventName}</div>}
-        {slot.purpose   && <div><span className="text-slate-500">Purpose: </span>{slot.purpose}</div>}
-      </div>
-      <div className="flex justify-end gap-2">
-        <button onClick={onCancel} disabled={loading}
-          className="px-4 py-2 text-sm rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 transition">
-          Cancel
-        </button>
-        <button onClick={onConfirm} disabled={loading}
-          className={`px-5 py-2 text-sm rounded-lg font-semibold text-white disabled:opacity-50 transition ${isApprove ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"}`}>
-          {loading ? "Saving…" : isApprove ? "✓ Yes, Approve" : "✗ Yes, Reject"}
-        </button>
-      </div>
-    </Modal>
-  )
-}
-
-// ─────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────
+// ─── MAIN COMPONENT ───
 export default function Reservations() {
   const { user } = useAuth()
 
-  const [reservations, setReservations]   = useState<Reservation[]>([])
-  const [loading, setLoading]             = useState(true)
+  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
-  const [error, setError]                 = useState<string | null>(null)
-  const [search, setSearch]               = useState("")
-  const [filterStatus, setFilterStatus]   = useState("all")
-  const [viewR, setViewR]                 = useState<Reservation | null>(null)
-  const [confirmAction, setConfirmAction] = useState<{
-    action: "approve" | "reject"; r: Reservation
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [filterStatus, setFilterStatus] = useState("all")
+  const [viewR, setViewR] = useState<Reservation | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    action: "approve" | "reject"
+    r: Reservation
   } | null>(null)
 
-  useEffect(() => { void loadData() }, [])
+  useEffect(() => {
+    void loadData()
+  }, [])
 
   async function loadData() {
     setLoading(true)
@@ -378,42 +182,59 @@ export default function Reservations() {
         .select(
           "reservation_id, park_venue_id, applicant_person_id, " +
           "reservation_date, time_slot, status, digital_permit_url, " +
+          "letter_of_intent_doc, application_form_doc, application_form_payload, " +
           "payment_id, processed_by_admin"
         )
         .order("reservation_date", { ascending: false })
 
       if (e1) throw new Error(`Reservations: ${e1.message}`)
-      if (!recs || recs.length === 0) { setReservations([]); return }
+      if (!recs || recs.length === 0) {
+        setReservations([])
+        return
+      }
 
-      const venueIds   = [...new Set(recs.map((r: any) => r.park_venue_id).filter(Boolean))]   as string[]
-      const personIds  = [...new Set(recs.map((r: any) => r.applicant_person_id).filter(Boolean))] as string[]
-      const paymentIds = [...new Set(recs.map((r: any) => r.payment_id).filter(Boolean))]      as string[]
+      const venueIds = [...new Set(recs.map((r: any) => r.park_venue_id).filter(Boolean))] as string[]
+      const personIds = [...new Set(recs.map((r: any) => r.applicant_person_id).filter(Boolean))] as string[]
+      const paymentIds = [...new Set(recs.map((r: any) => r.payment_id).filter(Boolean))] as string[]
+      const docIds = [
+        ...new Set(recs.flatMap((r: any) => [r.letter_of_intent_doc, r.application_form_doc].filter(Boolean))),
+      ] as string[]
 
-      const { data: venues }   = venueIds.length
-        ? await supabase.from("park_venue").select("park_venue_id, park_venue_name, location, venue_type, availability_status").in("park_venue_id", venueIds)
-        : { data: [] }
+      const [{ data: venues }, { data: persons }, { data: payments }, { data: docs }] = await Promise.all([
+        venueIds.length ? supabase.from("park_venue").select("park_venue_id, park_venue_name, location, venue_type, availability_status").in("park_venue_id", venueIds) : Promise.resolve({ data: [] }),
+        personIds.length ? supabase.from("person").select("person_id, full_name, address, contact_number").in("person_id", personIds) : Promise.resolve({ data: [] }),
+        paymentIds.length ? supabase.from("digital_payment").select("payment_id, amount_paid, payment_method, transaction_ref_no, digital_or_no, payment_status").in("payment_id", paymentIds) : Promise.resolve({ data: [] }),
+        docIds.length ? supabase.from("digital_document").select("document_id, file_url").in("document_id", docIds) : Promise.resolve({ data: [] }),
+      ])
 
-      const { data: persons }  = personIds.length
-        ? await supabase.from("person").select("person_id, full_name, address, contact_number").in("person_id", personIds)
-        : { data: [] }
-
-      const { data: payments } = paymentIds.length
-        ? await supabase.from("digital_payment").select("payment_id, amount_paid, payment_method, transaction_ref_no, digital_or_no, payment_status").in("payment_id", paymentIds)
-        : { data: [] }
-
-      const venueMap:   Record<string, Venue>   = {}
-      const personMap:  Record<string, Person>  = {}
+      const venueMap: Record<string, Venue> = {}
+      const personMap: Record<string, Person> = {}
       const paymentMap: Record<string, Payment> = {}
-      ;(venues   ?? []).forEach((v: any) => { venueMap[v.park_venue_id]   = v })
-      ;(persons  ?? []).forEach((p: any) => { personMap[p.person_id]      = p })
-      ;(payments ?? []).forEach((p: any) => { paymentMap[p.payment_id]    = p })
+      const docUrlMap: Record<string, string> = {}
+      ;(venues ?? []).forEach((v: any) => { venueMap[v.park_venue_id] = v })
+      ;(persons ?? []).forEach((p: any) => { personMap[p.person_id] = p })
+      ;(payments ?? []).forEach((p: any) => { paymentMap[p.payment_id] = p })
+      ;(docs ?? []).forEach((d: any) => { docUrlMap[d.document_id] = d.file_url ?? "" })
 
-      const merged: Reservation[] = recs.map((r: any) => ({
-        ...r,
-        venue:   venueMap[r.park_venue_id]        ?? null,
-        person:  personMap[r.applicant_person_id] ?? null,
-        payment: paymentMap[r.payment_id]         ?? null,
-      }))
+      const merged: Reservation[] = recs.map((r: any) => {
+        const rawPayload = r.application_form_payload as QmcParkApplicationPayload | null
+        const application_form_payload =
+          rawPayload &&
+          rawPayload.source_form === "qmc_facilities_2024_09" &&
+          rawPayload.applicant &&
+          rawPayload.event
+            ? rawPayload
+            : null
+        return {
+          ...r,
+          application_form_payload,
+          venue: venueMap[r.park_venue_id] ?? null,
+          person: personMap[r.applicant_person_id] ?? null,
+          payment: paymentMap[r.payment_id] ?? null,
+          letter_of_intent_url: r.letter_of_intent_doc ? docUrlMap[r.letter_of_intent_doc] ?? null : null,
+          application_form_url: r.application_form_doc ? docUrlMap[r.application_form_doc] ?? null : null,
+        }
+      })
 
       setReservations(merged)
     } catch (err: unknown) {
@@ -423,49 +244,38 @@ export default function Reservations() {
     }
   }
 
-  async function handleApprove(id: string) {
+  async function handleAction(action: "approve" | "reject", r: Reservation) {
     setActionLoading(true)
+    const newStatus = action === "approve" ? "admin_approved" : "admin_rejected"
+    const notifType = action === "approve" ? "reservation_approved" : "reservation_disapproved"
+    const message = action === "approve" 
+      ? `Your park reservation ${r.reservation_id} has been approved.`
+      : `Your park reservation ${r.reservation_id} was not approved.`
+
     try {
-      const r = reservations.find(x => x.reservation_id === id) ?? null
       const { error: e } = await supabase
-        .from("park_reservation_record").update({ status: "admin_approved" }).eq("reservation_id", id)
+        .from("park_reservation_record")
+        .update({ status: newStatus })
+        .eq("reservation_id", r.reservation_id)
+      
       if (e) throw new Error(e.message)
+
       await notifyCitizenByPersonId({
-        personId: r?.applicant_person_id ?? null,
-        referenceId: id,
-        notifType: "reservation_approved",
-        message: `Your park reservation ${id} has been approved.`,
+        personId: r.applicant_person_id,
+        referenceId: r.reservation_id,
+        notifType,
+        message,
       })
-      setConfirmAction(null); setViewR(null)
+
+      toast.success(`Reservation ${action === 'approve' ? 'approved' : 'rejected'} successfully.`)
+      setConfirmDialog(null)
+      setViewR(null)
       await loadData()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to approve.")
-    } finally { setActionLoading(false) }
-  }
-
-  async function handleReject(id: string) {
-    setActionLoading(true)
-    try {
-      const r = reservations.find(x => x.reservation_id === id) ?? null
-      const { error: e } = await supabase
-        .from("park_reservation_record").update({ status: "admin_rejected" }).eq("reservation_id", id)
-      if (e) throw new Error(e.message)
-      await notifyCitizenByPersonId({
-        personId: r?.applicant_person_id ?? null,
-        referenceId: id,
-        notifType: "reservation_disapproved",
-        message: `Your park reservation ${id} was not approved.`,
-      })
-      setConfirmAction(null); setViewR(null)
-      await loadData()
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to reject.")
-    } finally { setActionLoading(false) }
-  }
-
-  function openConfirm(action: "approve" | "reject", r: Reservation) {
-    setViewR(null)
-    setConfirmAction({ action, r })
+      toast.error(err instanceof Error ? err.message : `Failed to ${action}.`)
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const filtered = reservations.filter((r) => {
@@ -482,259 +292,435 @@ export default function Reservations() {
     )
   })
 
-  const pending = reservations.filter((r) => r.status === "endorsed_to_admin" || r.status === "pending")
-
-  const kpis = [
-    { label: "Total Reservations",  value: reservations.length,                                          icon: FileText    },
-    { label: "For Admin Review (Step 5)", value: pending.length,                                          icon: Clock       },
-    { label: "Approved (Step 5)",   value: reservations.filter((r) => ["admin_approved","approved"].includes(r.status)).length,  icon: CheckCircle  },
-    { label: "Completed (Step 15)", value: reservations.filter((r) => r.status === "completed").length, icon: CheckCircle2 },
-  ]
+  const pendingQueue = reservations.filter((r) => r.status === "endorsed_to_admin" || r.status === "pending")
 
   if (!user) return null
   const meta = ROLE_META[user.role]
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-6">
-
+    <div className="mx-auto max-w-(--breakpoint-2xl) animate-fade-in px-6 py-8 space-y-8">
       {/* HEADER */}
-      <div className="mb-8">
-        <span className="px-3 py-1 rounded text-xs font-semibold" style={{ background: meta.bgColor, color: meta.color }}>
-          {meta.label}
-        </span>
-        <h1 className="text-2xl font-bold mt-2">Reservations</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Parks &amp; Recreation Scheduling — BPMN Steps 2 · 3 · 4 · 5 · 13 · 15
-        </p>
-      </div>
-
-      {/* ERROR */}
-      {error && (
-        <div className="mb-4 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-          <AlertCircle size={15} className="shrink-0" />
-          <span className="font-medium">{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-700"><X size={13} /></button>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <Badge variant="outline" className="px-2 py-0.5" style={{ borderColor: meta.color, color: meta.color, backgroundColor: meta.bgColor }}>
+            {meta.label}
+          </Badge>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Reservations</h1>
+          <p className="text-muted-foreground text-sm">Monitor and process park scheduling requests.</p>
         </div>
-      )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => loadData()}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
+            Sync Records
+          </Button>
+        </div>
+      </header>
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {kpis.map((kpi, i) => {
-          const Icon = kpi.icon
-          return (
-            <Card key={i}>
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3"><Icon size={18} /></div>
-                <div className="text-2xl font-bold">{kpi.value}</div>
-                <div className="text-xs text-muted-foreground">{kpi.label}</div>
-              </CardContent>
-            </Card>
-          )
-        })}
+      {/* KPI HIGHLIGHTS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-border shadow-sm">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Requests</p>
+              <p className="text-xl font-bold">{reservations.length}</p>
+            </div>
+            <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-yellow-500 bg-yellow-50 shadow-sm">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-yellow-600 dark:text-yellow-400">For Review</p>
+              <p className="text-xl font-bold text-yellow-700 dark:text-yellow-300">{pendingQueue.length}</p>
+            </div>
+            <div className="h-8 w-8 rounded-full bg-yellow-100 dark:bg-yellow-900/40 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-green-500 bg-green-50 shadow-sm">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-green-600 dark:text-green-400">Approved</p>
+              <p className="text-xl font-bold text-green-700 dark:text-green-300">{reservations.filter(r => ['admin_approved','approved'].includes(r.status)).length}</p>
+            </div>
+            <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-500 bg-blue-50 shadow-sm">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Completed</p>
+              <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{reservations.filter(r => r.status === 'completed').length}</p>
+            </div>
+            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+              <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* TOOLBAR */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="relative flex-1 min-w-[180px] max-w-sm">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <input
-            className="w-full pl-8 pr-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-            placeholder="Search ID, venue, applicant, event…"
+      {/* ACTIONS & FILTERS */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input 
+            placeholder="Search venue, applicant, or ID..." 
+            className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="relative">
-          <Filter size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <select
-            className="appearance-none pl-8 pr-8 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="all">All Statuses</option>
-            <option value="endorsed_to_admin">Endorsed to Admin</option>
-            <option value="pending">Legacy Pending</option>
-            <option value="admin_approved">Admin Approved</option>
-            <option value="approved">Legacy Approved</option>
-            <option value="completed">Completed</option>
-            <option value="admin_rejected">Admin Rejected</option>
-            <option value="rejected">Legacy Rejected</option>
-          </select>
-          <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent py-2 pl-10 pr-8 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="all">All Statuses</option>
+              <option value="endorsed_to_admin">Endorsed</option>
+              <option value="pending">Legacy Pending</option>
+              <option value="admin_approved">Admin Approved</option>
+              <option value="completed">Completed</option>
+              <option value="admin_rejected">Admin Rejected</option>
+            </select>
+          </div>
+          {(search || filterStatus !== 'all') && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilterStatus('all') }}>
+              <X className="mr-2 h-4 w-4" /> Clear
+            </Button>
+          )}
         </div>
-        <div className="flex-1" />
-        <span className="text-xs text-muted-foreground">{filtered.length} of {reservations.length} records</span>
-        <button onClick={() => void loadData()} className="p-2 rounded-md border text-muted-foreground hover:bg-muted transition" title="Refresh">
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-        </button>
+        <div className="md:ml-auto text-xs text-muted-foreground whitespace-nowrap">
+          Showing <strong>{filtered.length}</strong> of {reservations.length} records
+        </div>
       </div>
 
-      {/* BPMN Step 4: PENDING QUEUE */}
-      {pending.length > 0 && filterStatus === "all" && !search && (
-        <Card className="mb-6 border-yellow-500/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Clock size={16} className="text-yellow-500" />
-              Awaiting Your Approval
-              <span className="ml-1 px-2 py-0.5 rounded-full bg-yellow-500 text-white text-[11px] font-bold">{pending.length}</span>
-              <span className="text-xs font-normal text-muted-foreground ml-1">— BPMN Step 4</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 pt-0">
-            {pending.map((r) => {
-              const slot = parseTimeSlot(r.time_slot)
-              return (
-                <div key={r.reservation_id} className="flex justify-between items-start py-2 border-b last:border-0">
-                  <div>
-                    <div className="text-sm font-medium">{r.person?.full_name ?? r.applicant_person_id}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {r.venue?.park_venue_name ?? r.park_venue_id} · {r.reservation_date} · {slot.time}
-                    </div>
-                    {slot.eventName && (
-                      <div className="text-xs text-slate-400 mt-0.5">🎉 {slot.eventName}</div>
-                    )}
-                    {slot.purpose && (
-                      <div className="text-xs text-slate-500 mt-0.5 flex items-start gap-1">
-                        <AlignLeft size={10} className="mt-0.5 shrink-0" />
-                        <span className="line-clamp-2">{slot.purpose}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <button onClick={() => setViewR(r)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition" title="View details">
-                      <Eye size={13} />
-                    </button>
-                    <button onClick={() => openConfirm("reject", r)} className="px-3 py-1 text-xs rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium transition">
-                      Reject
-                    </button>
-                    <button onClick={() => openConfirm("approve", r)} className="px-3 py-1 text-xs rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition">
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ALL RESERVATIONS */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            All Reservations
-            <span className="text-xs font-normal text-muted-foreground ml-2">({filtered.length} of {reservations.length})</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
-              <RefreshCw size={15} className="animate-spin mr-2" /> Loading from Supabase…
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <Calendar size={30} className="mb-2 opacity-25" />
-              <p className="text-sm">No reservations found.</p>
-              {(search || filterStatus !== "all") && (
-                <button onClick={() => { setSearch(""); setFilterStatus("all") }} className="mt-2 text-xs text-primary hover:underline">
-                  Clear filters
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filtered.map((r) => {
+      {/* TABLE */}
+      <Card className="border-border shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted">
+            <TableRow>
+              <TableHead className="w-[120px]">Status</TableHead>
+              <TableHead>Venue & Applicant</TableHead>
+              <TableHead className="hidden lg:table-cell">Schedule</TableHead>
+              <TableHead className="hidden md:table-cell text-right">Payment</TableHead>
+              <TableHead className="w-[100px] text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-32 text-center animate-pulse text-muted-foreground">
+                  Syncing with Supabase...
+                </TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  No reservations match those criteria.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((r) => {
                 const slot = parseTimeSlot(r.time_slot)
+                const isActionable = r.status === "endorsed_to_admin" || r.status === "pending"
                 return (
-                  <div key={r.reservation_id} className="flex justify-between items-start px-6 py-3 group hover:bg-muted/30 transition">
-                    <div className="min-w-0 flex-1 pr-4">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold">
-                          {r.venue?.park_venue_name ?? r.park_venue_id ?? "Unknown Venue"}
-                        </span>
-                        <span className="text-[10px] font-mono text-muted-foreground/40">{r.reservation_id}</span>
+                  <TableRow key={r.reservation_id} className="group hover:bg-muted">
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(r.status)}
                       </div>
-                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                        {r.person?.full_name && (
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <User size={10} />{r.person.full_name}
+                    </TableCell>
+                    <TableCell>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-sm font-semibold truncate leading-none">
+                          {r.venue?.park_venue_name ?? "Unknown Venue"}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-mono text-[10px] opacity-80">#{r.reservation_id.slice(-8)}</span>
+                          <Separator orientation="vertical" className="h-2" />
+                          <span className="flex items-center gap-1 truncate">
+                            <User className="h-3 w-3" /> {r.person?.full_name ?? "Guest"}
                           </span>
-                        )}
-                        {r.venue?.location && (
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <MapPin size={10} />{r.venue.location}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Calendar size={10} />{r.reservation_date} · {slot.time}
-                        </span>
-                        {r.payment?.amount_paid != null && (
-                          <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                            <CreditCard size={10} />₱{Number(r.payment.amount_paid).toLocaleString()}
-                          </span>
+                        </div>
+                        {slot.eventName && (
+                          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                            <span className="inline-block px-1 bg-secondary rounded text-[9px]">EVENT</span>
+                            <span className="truncate max-w-[200px]">{slot.eventName}</span>
+                          </div>
                         )}
                       </div>
-                      {/* Show event name + purpose snippet in list */}
-                      {slot.eventName && (
-                        <div className="text-xs text-slate-400 mt-0.5">🎉 {slot.eventName}</div>
-                      )}
-                      {slot.purpose && (
-                        <div className="text-xs text-slate-500 mt-0.5 flex items-start gap-1">
-                          <AlignLeft size={10} className="mt-0.5 shrink-0" />
-                          <span className="line-clamp-1">{slot.purpose}</span>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <div className="text-xs space-y-1">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="font-medium text-foreground">{r.reservation_date}</span>
                         </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 mt-1">
-                      <span className={`px-2 py-1 rounded-full text-[11px] font-semibold text-white ${statusBg(r.status)}`}>
-                        {cap(r.status)}
-                      </span>
-                      {(r.status === "endorsed_to_admin" || r.status === "pending") && (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openConfirm("approve", r)} className="p-1.5 rounded text-muted-foreground hover:text-green-600 hover:bg-green-50 transition" title="Approve">
-                            <ThumbsUp size={13} />
-                          </button>
-                          <button onClick={() => openConfirm("reject", r)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 transition" title="Reject">
-                            <ThumbsDown size={13} />
-                          </button>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-muted-foreground">{slot.time}</span>
                         </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-right">
+                      {r.payment?.amount_paid != null ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-sm font-bold text-foreground">
+                            ₱{Number(r.payment.amount_paid).toLocaleString()}
+                          </span>
+                          <Badge variant="outline" className="text-[9px] h-4 border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10">
+                            SETTLED
+                          </Badge>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40 italic">—</span>
                       )}
-                      <button onClick={() => setViewR(r)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition opacity-0 group-hover:opacity-100" title="View details">
-                        <Eye size={13} />
-                      </button>
-                    </div>
-                  </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {isActionable && (
+                          <div className="flex items-center gap-1 mr-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => setConfirmDialog({ action: 'approve', r })}>
+                              <ThumbsUp className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setConfirmDialog({ action: 'reject', r })}>
+                              <ThumbsDown className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => setViewR(r)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 )
-              })}
-            </div>
-          )}
-        </CardContent>
+              })
+            )}
+          </TableBody>
+        </Table>
       </Card>
 
-      {/* MODALS */}
-      {viewR && (
-        <DetailModal
-          r={viewR}
-          onClose={() => setViewR(null)}
-          onApprove={(id) => openConfirm("approve", reservations.find((x) => x.reservation_id === id)!)}
-          onReject={(id) => openConfirm("reject", reservations.find((x) => x.reservation_id === id)!)}
-          loading={actionLoading}
-        />
-      )}
-      {confirmAction && (
-        <ConfirmModal
-          action={confirmAction.action}
-          r={confirmAction.r}
-          loading={actionLoading}
-          onConfirm={() =>
-            confirmAction.action === "approve"
-              ? handleApprove(confirmAction.r.reservation_id)
-              : handleReject(confirmAction.r.reservation_id)
-          }
-          onCancel={() => setConfirmAction(null)}
-        />
-      )}
+      {/* DETAIL DIALOG */}
+      <Dialog open={!!viewR} onOpenChange={(open) => !open && setViewR(null)}>
+        <DialogContent className="sm:max-w-4xl w-[min(100vw-2rem,56rem)] p-0 overflow-hidden border-none bg-transparent shadow-none max-h-[92vh]">
+          {viewR && (
+            <div className="card-premium mx-auto w-full animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto sidebar-scrollbar">
+              <DialogHeader className="mb-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <Badge variant={['approved', 'admin_approved', 'completed'].includes(viewR.status) ? 'success' : 'warning'} className="font-bold uppercase tracking-wider text-[10px]">
+                    {viewR.status.replace(/_/g, ' ')}
+                  </Badge>
+                  <span className="text-[10px] font-mono text-muted-foreground opacity-60 tracking-tighter">ID: {viewR.reservation_id}</span>
+                </div>
+                <DialogTitle className="font-display text-2xl font-extrabold tracking-tight text-foreground leading-tight">
+                  {viewR.venue?.park_venue_name ?? 'Reservation Detail'}
+                </DialogTitle>
+                <DialogDescription className="font-medium text-muted-foreground/80 mt-1">
+                  Parks & Facilities Registry Record — submitted forms below
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <Eye className="h-3.5 w-3.5 text-primary" /> Submitted documents
+                  </h4>
+                  <ParkReservationDocumentsViewer
+                    reservationId={viewR.reservation_id}
+                    loiUrl={viewR.letter_of_intent_url}
+                    applicationFormDocUrl={viewR.application_form_url}
+                    applicationFormPayload={viewR.application_form_payload}
+                    permitUrl={viewR.digital_permit_url}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="surface-box group border border-border/20">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-primary transition-colors flex items-center gap-1.5">
+                      <User className="h-3 w-3" /> Applicant
+                    </p>
+                    <p className="text-sm font-bold text-foreground leading-tight">{viewR.person?.full_name ?? '—'}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-medium flex items-center gap-1">
+                      <CreditCard className="h-2.5 w-2.5 opacity-50" /> {viewR.person?.contact_number ?? 'No contact line'}
+                    </p>
+                  </div>
+                  <div className="surface-box group border border-border/20">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 group-hover:text-primary transition-colors flex items-center gap-1.5">
+                      <CalendarIcon className="h-3.5 w-3.5" /> Schedule
+                    </p>
+                    <p className="text-sm font-bold text-foreground leading-tight">{viewR.reservation_date}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-medium flex items-center gap-1">
+                      <Clock className="h-2.5 w-2.5 opacity-50" /> {parseTimeSlot(viewR.time_slot).time}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="surface-box border border-border/40 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                     <FileText size={48} />
+                  </div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-4">
+                    <FileText className="h-3.5 w-3.5 text-primary" /> Event Information
+                  </h4>
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-muted-foreground font-semibold">Event Title</span>
+                      <span className="text-sm font-bold text-foreground">{parseTimeSlot(viewR.time_slot).eventName || 'Untitled Event'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 pt-3 border-t border-border/5">
+                      <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5">
+                        <AlignLeft className="h-3 w-3" /> Purpose / Remarks
+                      </span>
+                      <p className="text-xs text-foreground leading-relaxed font-medium italic pl-3 border-l-2 border-primary/30 py-1 bg-primary/5 rounded-r-lg">
+                        {parseTimeSlot(viewR.time_slot).purpose || 'No description provided for this occupancy.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="surface-box border border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden">
+                   <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                     <BadgeCheck size={40} className="text-emerald-500" />
+                  </div>
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-4">
+                    <CreditCard className="h-3.5 w-3.5" /> Financial Summary
+                  </h4>
+                  {viewR.payment_id ? (
+                    <div className="grid grid-cols-2 gap-y-4">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-muted-foreground font-semibold">Amount Paid</span>
+                        <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">₱{Number(viewR.payment?.amount_paid).toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5 text-right">
+                        <span className="text-[10px] text-muted-foreground font-semibold">Method</span>
+                        <span className="text-[10px] font-bold uppercase py-1 px-2 bg-emerald-500/10 rounded-lg text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {viewR.payment?.payment_method || 'DIGITAL'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-muted-foreground font-semibold">OR Number</span>
+                        <span className="text-xs font-mono font-bold text-foreground">{viewR.payment?.digital_or_no || 'Pending Receipt'}</span>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5">
+                         <Badge variant="outline" className="text-[9px] font-bold h-5 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                           OFFICIALLY SETTLED
+                         </Badge>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 bg-muted/30 rounded-lg border border-dashed border-border flex items-center justify-center gap-2 text-xs text-muted-foreground font-medium italic">
+                      <AlertCircle className="h-4 w-4 opacity-50" /> Pending validation.
+                    </div>
+                  )}
+                </div>
+
+                <div className="admin-box mt-6 group">
+                  <ShieldCheck className="absolute top-4 right-4 h-12 w-12 text-primary/5 transition-transform group-hover:scale-110 duration-500" />
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-6 w-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Authorization Authority</span>
+                  </div>
+                  <div className="text-sm font-bold text-foreground leading-tight px-1">
+                    {viewR.processed_by_admin || 'Global System Governance'}
+                  </div>
+                  <div className="sep mt-4">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-medium italic">
+                      <Clock className="h-3 w-3 text-primary/40" />
+                      Digital Signature Verified · {new Date().toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter className="mt-8 pt-6 border-t border-border/10 flex items-center justify-end gap-3">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {(viewR.status === "endorsed_to_admin" || viewR.status === "pending") && (
+                      <>
+                        <Button variant="outline" size="sm" className="rounded-xl border-red-500/30 text-red-500 hover:bg-red-50 font-bold text-[11px] h-11 px-6 transition-all active:scale-95" onClick={() => setConfirmDialog({ action: 'reject', r: viewR })}>
+                          REJECT
+                        </Button>
+                        <Button size="sm" className="rounded-xl bg-primary hover:bg-primary/90 font-bold text-[11px] h-11 px-8 shadow-lg shadow-primary/20 transition-all active:scale-95" onClick={() => setConfirmDialog({ action: 'approve', r: viewR })}>
+                          APPROVE
+                        </Button>
+                      </>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => setViewR(null)} className="rounded-xl h-11 px-6 font-bold text-[11px] uppercase tracking-widest hover:bg-muted">
+                      Close View
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* CONFIRM ACTION DIALOG */}
+      <Dialog open={!!confirmDialog} onOpenChange={(open) => !open && setConfirmDialog(null)}>
+        <DialogContent className="max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none">
+          {confirmDialog && (
+            <div className="card-premium mx-auto w-full animate-in slide-in-from-bottom-4 duration-300">
+              <DialogHeader className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                   <div className={cn(
+                     "h-10 w-10 rounded-full flex items-center justify-center shadow-inner",
+                     confirmDialog?.action === 'approve' ? "bg-green-100 text-green-600 dark:bg-green-900/40" : "bg-red-100 text-red-600 dark:bg-red-900/40"
+                   )}>
+                      {confirmDialog?.action === 'approve' ? <BadgeCheck size={20} /> : <Ban size={20} />}
+                   </div>
+                   <div>
+                     <DialogTitle className="font-display text-xl font-bold text-foreground">
+                        {confirmDialog?.action === 'approve' ? 'Authorize Request' : 'Decline Request'}
+                     </DialogTitle>
+                     <DialogDescription className="font-medium">
+                        Confirm legal action on registry entry.
+                     </DialogDescription>
+                   </div>
+                </div>
+              </DialogHeader>
+
+              <div className="surface-box border border-border/40 bg-muted/40 p-5 space-y-4">
+                <div className="grid grid-cols-[100px_1fr] gap-x-4 gap-y-3">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Reference</span>
+                  <span className="text-xs font-mono font-bold text-primary">{confirmDialog?.r.reservation_id}</span>
+                  
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Applicant</span>
+                  <span className="text-xs font-bold text-foreground">{confirmDialog?.r.person?.full_name ?? 'Anonymous'}</span>
+                  
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Venue</span>
+                  <span className="text-xs font-bold text-foreground">{confirmDialog?.r.venue?.park_venue_name ?? '—'}</span>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-8 flex items-center justify-end gap-3">
+                <Button variant="ghost" size="sm" className="font-bold text-[11px] uppercase tracking-widest h-10 px-6 hover:bg-muted" onClick={() => setConfirmDialog(null)} disabled={actionLoading}>
+                   Back
+                </Button>
+                <Button 
+                  size="sm" 
+                  className={cn(
+                    "rounded-xl font-extrabold text-[11px] h-10 px-8 shadow-lg transition-all active:scale-95",
+                    confirmDialog?.action === 'approve' ? "bg-green-600 hover:bg-green-700 shadow-green-600/20" : "bg-red-600 hover:bg-red-700 shadow-red-600/20"
+                  )}
+                  onClick={() => confirmDialog && handleAction(confirmDialog.action, confirmDialog.r)}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : 'CONFIRM'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
