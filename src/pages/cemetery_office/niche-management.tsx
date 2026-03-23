@@ -71,6 +71,9 @@ export default function NicheManagement() {
                 setDrawnForm({ niche_number: '', cemetery_id: 'CEM-001', status: 'available' })
             } else if (e.data.type === 'MAP_READY') {
                 sendNichesToMap()
+            } else if (e.data.type === 'NICHE_CLICKED') {
+                const clickedNiche = niches.find(n => n.niche_id === e.data.nicheId)
+                if (clickedNiche) setSelected(clickedNiche)
             }
         }
         window.addEventListener('message', handleMessage)

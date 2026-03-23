@@ -520,6 +520,9 @@
                 const color = COLOR_MAP[n.status] || '#3498db';
                 const poly = L.polygon(latlngs, { color: color, fillColor: color, fillOpacity: 0.35, weight: 2 });
                 poly.bindTooltip('<b>' + n.niche_number + '</b><br>' + (n.status || ''), { permanent: false, direction: 'top' });
+                poly.on('click', function() {
+                    window.parent.postMessage({ type: 'NICHE_CLICKED', nicheId: n.niche_id }, '*');
+                });
                 poly.addTo(dbNichesLayer);
             });
         }
@@ -543,6 +546,9 @@
                 const color = COLOR_MAP[n.status] || '#3498db';
                 const poly = L.polygon(latlngs, { color: color, fillColor: color, fillOpacity: 0.35, weight: 2 });
                 poly.bindTooltip('<b>' + n.niche_number + '</b><br>' + (n.status || ''), { permanent: false, direction: 'top' });
+                poly.on('click', function() {
+                    window.parent.postMessage({ type: 'NICHE_CLICKED', nicheId: n.niche_id }, '*');
+                });
                 poly.addTo(dbNichesLayer);
             });
         }
