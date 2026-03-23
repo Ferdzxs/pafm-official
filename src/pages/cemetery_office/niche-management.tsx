@@ -23,6 +23,7 @@ interface NicheRecord {
     niche_id: string
     cemetery_id: string
     niche_number: string
+    section?: string
     status: string
     burial_schedule_date?: string
     coordinates?: LatLng[]
@@ -48,7 +49,7 @@ export default function NicheManagement() {
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [isCreating, setIsCreating] = useState(false)
     const [drawnNiche, setDrawnNiche] = useState<DrawnNiche | null>(null)
-    const [drawnForm, setDrawnForm] = useState({ niche_number: '', cemetery_id: 'CEM-001', status: 'available' })
+    const [drawnForm, setDrawnForm] = useState({ niche_number: '', section: 'A', status: 'available' })
     const [isSavingDrawn, setIsSavingDrawn] = useState(false)
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const [createData, setCreateData] = useState({
@@ -68,7 +69,7 @@ export default function NicheManagement() {
             if (!e.data || typeof e.data !== 'object') return
             if (e.data.type === 'NICHE_DRAWN') {
                 setDrawnNiche({ latlngs: e.data.latlngs, area: e.data.area })
-                setDrawnForm({ niche_number: '', cemetery_id: 'CEM-001', status: 'available' })
+                setDrawnForm({ niche_number: '', section: 'A', status: 'available' })
             } else if (e.data.type === 'MAP_READY') {
                 sendNichesToMap()
             } else if (e.data.type === 'NICHE_CLICKED') {
@@ -98,7 +99,8 @@ export default function NicheManagement() {
             const nicheId = `NR-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
             const { error } = await supabase.from('niche_record').insert({
                 niche_id: nicheId,
-                cemetery_id: drawnForm.cemetery_id,
+                cemetery_id: 'CEM-001',
+                section: drawnForm.section,
                 niche_number: drawnForm.niche_number.trim(),
                 status: drawnForm.status,
                 coordinates: drawnNiche.latlngs
@@ -109,7 +111,8 @@ export default function NicheManagement() {
             setDrawnNiche(null)
             fetchNiches()
         } catch (err: unknown) {
-            toast.error('Failed to save: ' + (err instanceof Error ? err.message : String(err)))
+            const errorMessage = (err as { message?: string }).message || JSON.stringify(err)
+            toast.error('Failed to save: ' + errorMessage)
         } finally {
             setIsSavingDrawn(false)
         }
@@ -246,7 +249,7 @@ export default function NicheManagement() {
     }
 
     const sectionNiches = niches
-        .filter(n => n.niche_number.startsWith(selectedSection))
+        .filter(n => n.section === selectedSection || (!n.section && n.niche_number && n.niche_number.startsWith(selectedSection)))
         .sort((a, b) => a.niche_number.localeCompare(b.niche_number))
 
     const counts = {
@@ -317,13 +320,13 @@ export default function NicheManagement() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Cemetery</label>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Section</label>
                                     <select
                                         className="input-field w-full"
-                                        value={drawnForm.cemetery_id}
-                                        onChange={e => setDrawnForm(prev => ({ ...prev, cemetery_id: e.target.value }))}
+                                        value={drawnForm.section}
+                                        onChange={e => setDrawnForm(prev => ({ ...prev, section: e.target.value }))}
                                     >
-                                        {CEMETERIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        {SECTIONS.map(sec => <option key={sec} value={sec}>Section {sec}</option>)}
                                     </select>
                                 </div>
                                 <div>
