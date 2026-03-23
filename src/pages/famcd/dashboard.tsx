@@ -18,6 +18,7 @@ const RECENT_ACTIVITY = [
 ]
 
 const QUICK_ACTIONS = [
+ { label: 'Asset requests (all units)', emoji: '📋', path: '/assets/requests' },
  { label: 'Schedule Inspections', emoji: '📅', path: '/assets/inspections' },
  { label: 'Track Assets', emoji: '📊', path: '/assets/inventory' },
 ]
@@ -42,21 +43,19 @@ export default function FamcdDashboard() {
  const meta = ROLE_META[user.role]
 
  return (
-  <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in">
-   <div className="mb-8">
-    <div className="flex items-center gap-2 mb-2">
-     <span className="px-2.5 py-1 rounded-md text-xs font-semibold" style={{ background: meta.bgColor, color: meta.color }}>
-      {meta.label}
-     </span>
-    </div>
-    <h1 className="font-display text-2xl font-bold text-foreground">
-     Good {getGreeting()}, {user.full_name.split(' ')[0]}! 👋
+  <div className="mx-auto max-w-(--breakpoint-2xl) animate-fade-in px-6 py-8 space-y-8">
+   <header className="space-y-1">
+    <Badge variant="outline" className="px-2 py-0.5" style={{ borderColor: meta.color, color: meta.color, backgroundColor: meta.bgColor }}>
+     {meta.label}
+    </Badge>
+    <h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+     Good {getGreeting()}, {user.full_name.split(' ')[0]}!
     </h1>
-    <p className="text-muted-foreground text-sm mt-1">
+    <p className="text-muted-foreground text-sm max-w-2xl">
      {new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-     {user.office && ` · ${user.office}`}
+     {user.office ? ` · ${user.office}` : ''}
     </p>
-   </div>
+   </header>
 
    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
     {KPI_DATA.map((kpi, i) => {
@@ -132,4 +131,5 @@ export default function FamcdDashboard() {
     </div>
    </div>
   </div>
- )}
+ )
+}

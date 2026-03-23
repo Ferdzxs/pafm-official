@@ -9,7 +9,6 @@ import {
   Sun,
   Moon,
   Bell,
-  Settings,
   Search,
   ChevronRight,
   User,
@@ -147,20 +146,6 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar, onCloseSidebar }: To
           )}
         </button>
 
-        {/* Settings */}
-        <NavLink
-          to="/settings"
-          className={({ isActive }) =>
-            clsx(
-              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-[color:var(--color-sidebar-text)] hover:bg-[color:var(--color-sidebar-hover)] hover:text-[color:var(--text-primary)]",
-              isActive && "bg-[color:var(--color-sidebar-active-bg)] text-[color:var(--color-sidebar-text-active)]"
-            )
-          }
-          title="Settings"
-        >
-          <Settings size={17} />
-        </NavLink>
-
         {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button
@@ -222,9 +207,6 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar, onCloseSidebar }: To
                   ))
                 )}
               </div>
-              <button className="w-full py-2.5 text-[10px] font-bold text-primary hover:bg-primary/5 transition-colors border-t border-border uppercase tracking-widest">
-                View All Notifications
-              </button>
             </div>
           )}
         </div>
@@ -292,15 +274,6 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar, onCloseSidebar }: To
                   <User size={15} className="group-hover:scale-110 transition-transform text-muted-foreground group-hover:text-primary" /> 
                   <span className="tracking-wide">MY ACCOUNT</span>
                 </NavLink>
-                <NavLink
-                  to="/settings"
-                  className="flex items-center gap-3 px-3.5 py-2.5 text-[11px] font-bold text-foreground/70 hover:text-primary hover:bg-primary/5 rounded-lg transition-all group"
-                  onClick={() => setShowUser(false)}
-                >
-                  <Settings size={15} className="group-hover:rotate-45 transition-transform text-muted-foreground group-hover:text-primary" /> 
-                  <span className="tracking-wide">SETTINGS</span>
-                </NavLink>
-                
                 <div className="h-px bg-border/50 my-1 mx-2" />
                 
                 <button

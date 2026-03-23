@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { ROLE_META } from '@/config/rbac'
+import { AdminDeskPageShell } from '@/components/layout/AdminDeskPageShell'
 import { toast } from 'react-hot-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 
@@ -168,22 +170,23 @@ export default function FamcdInventoryReports() {
   r.digital_report_url &&
   ['draft', 'returned_for_revision'].includes(r.approval_status?.toLowerCase())
 
+ if (!user) return null
+ const meta = ROLE_META[user.role]
+
  return (
-  <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
-   {/* Header */}
-   <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-    <div>
-     <h1 className="font-display text-2xl font-bold text-foreground">Inventory Reports</h1>
-     <p className="text-muted-foreground text-sm mt-1">
-      Attach documents to inventory reports and submit them to CGSD for approval.
-     </p>
-    </div>
-    <Button variant="outline" className="gap-2" onClick={loadReports}>
+  <AdminDeskPageShell
+   roleLabel={meta.label}
+   roleColor={meta.color}
+   roleBgColor={meta.bgColor}
+   title="Inventory reports"
+   description="Attach documents to inventory reports and submit them to CGSD for approval."
+   wide
+   actions={
+    <Button variant="outline" size="sm" className="gap-2" type="button" onClick={loadReports}>
      <RefreshCw size={16} /> Refresh
     </Button>
-   </div>
-
-   {/* Search */}
+   }
+  >
    <Card className="mb-6 shadow-sm border-border">
     <CardContent className="p-4 flex gap-4 items-center bg-card">
      <div className="relative w-full sm:w-96">
@@ -477,6 +480,6 @@ export default function FamcdInventoryReports() {
      )}
     </DialogContent>
    </Dialog>
-  </div>
+  </AdminDeskPageShell>
  )
 }

@@ -22,7 +22,7 @@ const MOCK_INSPECTIONS = [
 const ROLE_REQUEST_PATH: Record<string, string | undefined> = {
  cemetery_office: '/burial/asset-requests',
  parks_admin: '/parks/asset-requests',
- punong_barangay: '/barangay/pb/facilities',
+ punong_barangay: '/barangay/pb/asset-requests',
 }
 
 export default function AssetInventoryPage() {

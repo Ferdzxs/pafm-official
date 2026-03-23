@@ -4,8 +4,11 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Search, Filter, XCircle, Users, Building2, TreePine, Eye, Info, Clock, AlertCircle } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Search, Filter, Users, Building2, TreePine, Eye, Info, Clock, AlertCircle } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { ROLE_META } from '@/config/rbac'
+import { AdminDeskPageShell } from '@/components/layout/AdminDeskPageShell'
 
 type AssetRequest = {
  id: string
@@ -16,15 +19,15 @@ type AssetRequest = {
  priority: 'Low' | 'Medium' | 'High'
 }
 
-const MOCK_REQUESTS: AssetRequest[] = [
- { id: 'REQ-CO-001', origin: 'Cemetery Office', item: 'Lawnmower Parts', status: 'Pending', date: '2024-02-18', priority: 'Medium' },
- { id: 'REQ-CO-002', origin: 'Cemetery Office', item: 'Grave Digging Equipment Maintenance', status: 'In Progress', date: '2024-02-12', priority: 'High' },
- { id: 'REQ-PA-001', origin: 'Parks Admin', item: 'Park Benches (x6)', status: 'Approved', date: '2024-02-10', priority: 'Low' },
- { id: 'REQ-PB-001', origin: 'Punong Barangay', item: 'Community Hall Tables', status: 'Pending', date: '2024-02-15', priority: 'Medium' },
- { id: 'REQ-PB-002', origin: 'Punong Barangay', item: 'Floodlight Repairs', status: 'Rejected', date: '2024-02-08', priority: 'High' },
-]
+function mapOfficeToOrigin(officeName: string | undefined): AssetRequest['origin'] {
+  const n = (officeName || '').trim()
+  if (n === 'Parks & Recreation Administration' || n === 'Parks Admin') return 'Parks Admin'
+  if (n === 'Barangay Secretariat' || n.toLowerCase().includes('barangay secretariat')) return 'Punong Barangay'
+  return 'Cemetery Office'
+}
 
 export default function AssetsRequestsPage() {
+ const { user } = useAuth()
  const [search, setSearch] = useState('')
  const [originFilter, setOriginFilter] = useState<'All' | AssetRequest['origin']>('All')
  const [requests, setRequests] = useState<AssetRequest[]>([])
@@ -38,13 +41,18 @@ export default function AssetsRequestsPage() {
   .from('inventory_request')
   .select(`
   inventory_request_id,
+  inventory_scope,
+  status,
+  date_requested,
+  cycle_type,
   property_id,
   property (
    property_name,
    location,
    asset_condition,
    acquisition_date
-  )
+  ),
+  government_office!requesting_office ( office_name )
   `)
   .order('date_requested', { ascending: false })
 
@@ -55,7 +63,7 @@ export default function AssetsRequestsPage() {
  }
 
  const mapped: AssetRequest[] = (data || []).map((row: any) => {
-  const origin = (row.government_office?.office_name as AssetRequest['origin']) || 'Cemetery Office'
+  const origin = mapOfficeToOrigin(row.government_office?.office_name)
   const statusMap: Record<string, AssetRequest['status']> = {
   pending: 'Pending',
   in_progress: 'In Progress',
@@ -109,20 +117,32 @@ export default function AssetsRequestsPage() {
  return counts
  }, [filtered])
 
+ if (!user) return null
+ const meta = ROLE_META[user.role]
+
  return (
- <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
-  <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-  <div>
-   <h1 className="font-display text-2xl font-bold text-foreground">Asset Requests</h1>
-   <p className="text-muted-foreground text-sm mt-1">
-   Review and manage asset & maintenance requests submitted by operational units.
-   </p>
-  </div>
+ <AdminDeskPageShell
+  roleLabel={meta.label}
+  roleColor={meta.color}
+  roleBgColor={meta.bgColor}
+  title="Asset requests (all units)"
+  description="Review and manage asset and maintenance requests submitted by Cemetery, Parks, and Barangay offices."
+  wide
+ >
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+   {(['Pending', 'Approved', 'Rejected', 'In Progress'] as const).map((k) => (
+    <Card key={k} className="border-border shadow-sm">
+     <CardContent className="p-4">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{k}</p>
+      <p className="text-2xl font-bold tabular-nums">{stats[k] ?? 0}</p>
+     </CardContent>
+    </Card>
+   ))}
   </div>
 
   <Card className="mb-6 shadow-sm border-border">
-  <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-card">
-   <div className="relative w-full sm:w-96">
+  <CardContent className="p-4 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between bg-card">
+   <div className="relative flex-1 min-w-0 max-w-md">
    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
    <Input
     placeholder="Search by request, item, or unit..."
@@ -131,9 +151,22 @@ export default function AssetsRequestsPage() {
     className="pl-10 h-10 w-full bg-background relative z-10"
    />
    </div>
+   <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">
+    Unit
+    <select
+     className="input-field h-10 min-w-[10rem] bg-background text-sm font-medium"
+     value={originFilter}
+     onChange={(e) => setOriginFilter(e.target.value as typeof originFilter)}
+    >
+     <option value="All">All units</option>
+     <option value="Cemetery Office">Cemetery</option>
+     <option value="Parks Admin">Parks</option>
+     <option value="Punong Barangay">Barangay</option>
+    </select>
+   </label>
 
-   <div className="flex items-center gap-2 w-full sm:w-auto">
-   <Button variant="outline" className="gap-2 flex-1 sm:flex-none" onClick={() => setSearch('')}>
+   <div className="flex items-center gap-2 w-full lg:w-auto">
+   <Button variant="outline" className="gap-2 flex-1 lg:flex-none" type="button" onClick={() => { setSearch(''); setOriginFilter('All') }}>
     <Filter size={16} /> Reset
    </Button>
    </div>
@@ -275,6 +308,6 @@ export default function AssetsRequestsPage() {
     </DialogContent>
    </Dialog>
 
- </div>
+ </AdminDeskPageShell>
  )
 }

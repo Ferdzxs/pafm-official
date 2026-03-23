@@ -6,9 +6,13 @@ import { Badge } from '@/components/ui/badge'
 import { Search, Filter, Eye, Layers, XCircle, MapPin, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
+import { useAuth } from '@/contexts/AuthContext'
+import { ROLE_META } from '@/config/rbac'
+import { AdminDeskPageShell } from '@/components/layout/AdminDeskPageShell'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 
 export default function FamcdInventoryAssets() {
+ const { user } = useAuth()
  const [searchTerm, setSearchTerm] = useState('')
  const [properties, setProperties] = useState<any[]>([])
  const [selectedProperty, setSelectedProperty] = useState<any | null>(null)
@@ -61,19 +65,18 @@ export default function FamcdInventoryAssets() {
  }
  }
 
- return (
- <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
-  {/* Header */}
-  <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-  <div>
-   <h1 className="font-display text-2xl font-bold text-foreground">Inventory & Assets</h1>
-   <p className="text-muted-foreground text-sm mt-1">
-   Read-only reference of city-owned properties. Condition updates flow through your inspection reports.
-   </p>
-  </div>
-  </div>
+ if (!user) return null
+ const meta = ROLE_META[user.role]
 
-  {/* Search */}
+ return (
+ <AdminDeskPageShell
+  roleLabel={meta.label}
+  roleColor={meta.color}
+  roleBgColor={meta.bgColor}
+  title="Inventory & assets"
+  description="Read-only reference of city-owned properties. Condition updates flow through your inspection reports."
+  wide
+ >
   <Card className="mb-6 shadow-sm border-border">
   <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-card">
    <div className="relative w-full sm:w-96">
@@ -209,6 +212,6 @@ export default function FamcdInventoryAssets() {
     )}
    </DialogContent>
   </Dialog>
- </div>
+ </AdminDeskPageShell>
  )
 }

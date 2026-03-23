@@ -14,7 +14,6 @@ import SignupPage from "@/pages/auth/SignupPage";
 
 // ─── Core Pages ──────────────────────────────────────────────────────────────
 import ProfilePage from "@/pages/ProfilePage";
-import SettingsPage from "@/pages/SettingsPage";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 
 // ─── Cemetery Office (Burial) ────────────────────────────────────────────────
@@ -31,6 +30,7 @@ import BarangayBookingCalendar from "@/pages/barangay_secretary/booking-calendar
 // ─── Punong Barangay ─────────────────────────────────────────────────────────
 import PunongBarangayPendingApprovals from "@/pages/punong_barangay/pending-approvals";
 import PunongBarangayFacilityManagement from "@/pages/punong_barangay/facility-management";
+import PunongBarangayAssetRequestsPage from "@/pages/punong_barangay/asset-requests";
 
 // ─── Role Dashboards ─────────────────────────────────────────────────────────
 import CemeteryOfficeDashboard from "@/pages/cemetery_office/dashboard";
@@ -52,7 +52,7 @@ import UtilityEngineeringDashboard from "@/pages/utility_engineering/dashboard";
 import UtilityHelpdeskDashboard from "@/pages/utility_helpdesk/dashboard";
 
 // ─── Citizen Module ──────────────────────────────────────────────────────────
-import CitizenBurialApplicationPage from "@/pages/citizen/BurialApplicationPage";
+import ApplyBurialCitizenPage from "@/pages/citizen/apply-burial";
 import ApplyWaterPage from "@/pages/citizen/apply-utility_request";
 import ApplyBarangayFacilityPage from "@/pages/citizen/apply-barangay";
 import MyApplicationsPage from "@/pages/citizen/my-applications";
@@ -99,7 +99,11 @@ import FamcdSubmissionRecords from "@/pages/famcd/submission-records";
 import CgsdInventoryAssetsPage from "@/pages/cgsd_management/inventory-assets";
 import CgsdInventoryReportsPage from "@/pages/cgsd_management/inventory-reports";
 import CgsdApprovalRecordsPage from "@/pages/cgsd_management/approval-records";
+import CgsdApprovalsPage from "@/pages/cgsd_management/approvals";
 import CgsdOcularInspectionsPage from "@/pages/cgsd_management/ocular-inspections";
+import RmcdDashboardPage from "@/pages/rmcd/dashboard";
+import RmcdRoutingPage from "@/pages/rmcd/routing";
+import RmcdReleasesPage from "@/pages/rmcd/releases";
 
 // ─── Cemetery Office detailed pages ─────────────────────────────────────────
 import DeceasedRegistryPage from "@/pages/cemetery_office/deceased-registry";
@@ -254,7 +258,6 @@ function AppRoutes() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardRedirect />} />
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="settings" element={<SettingsPage />} />
 
         {/* ── Role Dashboards ── */}
         <Route
@@ -285,6 +288,7 @@ function AppRoutes() {
           path="cgsd_management/dashboard"
           element={<CgsdManagementDashboard />}
         />
+        <Route path="rmcd/dashboard" element={<RmcdDashboardPage />} />
         <Route path="treasurer/dashboard" element={<TreasurerDashboard />} />
         <Route
           path="system_admin/dashboard"
@@ -342,7 +346,7 @@ function AppRoutes() {
           path="citizen/apply/burial"
           element={
             <RoleRoute allow={["citizen"]}>
-              <CitizenBurialApplicationPage />
+              <ApplyBurialCitizenPage />
             </RoleRoute>
           }
         />
@@ -418,7 +422,7 @@ function AppRoutes() {
           path="parks/asset-requests"
           element={
             <RoleRoute allow={["parks_admin"]}>
-              <Navigate to="/assets/requests" replace />
+              <ParksAssetRequestsPage />
             </RoleRoute>
           }
         />
@@ -459,11 +463,19 @@ function AppRoutes() {
             </RoleRoute>
           }
         />
+        <Route
+          path="barangay/pb/asset-requests"
+          element={
+            <RoleRoute allow={["punong_barangay"]}>
+              <PunongBarangayAssetRequestsPage />
+            </RoleRoute>
+          }
+        />
         <Route path="barangay/secretary/intake" element={<BarangaySecretaryIntake />} />
         <Route path="barangay/secretary/calendar" element={<BarangayBookingCalendar />} />
         <Route path="barangay/pending" element={<BarangayLegacyPendingRedirect />} />
         <Route path="barangay/ordinances" element={<Navigate to="/barangay/pb/pending" replace />} />
-        <Route path="barangay/asset-requests" element={<Navigate to="/barangay/pb/facilities" replace />} />
+        <Route path="barangay/asset-requests" element={<Navigate to="/barangay/pb/asset-requests" replace />} />
 
         {/* ── Barangay Secretary ── */}
         <Route
@@ -488,12 +500,52 @@ function AppRoutes() {
         <Route path="utility/connections" element={<ConnectionStatusPage />} />
 
         {/* ── Assets ── */}
-        <Route path="assets/requests" element={<AssetsRequestsPage />} />
+        <Route
+          path="assets/requests"
+          element={
+            <RoleRoute allow={["cgsd_management", "famcd"]}>
+              <AssetsRequestsPage />
+            </RoleRoute>
+          }
+        />
         <Route path="assets/inventory" element={<AssetsInventoryRoute />} />
         <Route path="assets/inspections" element={<AssetsInspectionsRoute />} />
         <Route path="assets/reports" element={<AssetsReportsRoute />} />
-        <Route path="assets/approvals" element={<AssetsApprovalsRoute />} />
+        <Route
+          path="assets/approvals"
+          element={
+            <RoleRoute allow={["cgsd_management"]}>
+              <CgsdApprovalsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="assets/approval-records"
+          element={
+            <RoleRoute allow={["cgsd_management"]}>
+              <CgsdApprovalRecordsPage />
+            </RoleRoute>
+          }
+        />
         <Route path="assets/submissions" element={<AssetsSubmissionsRoute />} />
+
+        {/* ── RMCD ── */}
+        <Route
+          path="rmcd/routing"
+          element={
+            <RoleRoute allow={["rmcd"]}>
+              <RmcdRoutingPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="rmcd/releases"
+          element={
+            <RoleRoute allow={["rmcd"]}>
+              <RmcdReleasesPage />
+            </RoleRoute>
+          }
+        />
 
         {/* ── Payments / Treasurer ── */}
         <Route path="payments" element={<Navigate to="/treasurer/collections" replace />} />

@@ -34,9 +34,11 @@ export function extractUtilityDocStoragePath(fileUrl: string): string | null {
 export async function resolveUtilityDocumentViewUrl(fileUrl: string | null | undefined): Promise<string | null> {
   if (!fileUrl?.trim()) return null
   const path = extractUtilityDocStoragePath(fileUrl)
-  if (!path) return fileUrl
+  if (!path) return fileUrl.trim()
   const { data, error } = await supabase.storage.from(BUCKET_UTILITY_DOCS).createSignedUrl(path, 3600)
-  if (error || !data?.signedUrl) return fileUrl
+  // utility-docs is private: the stored "public" URL often 404s (bucket missing or not public).
+  // Never fall back to that URL — it surfaces raw JSON errors in the browser.
+  if (error || !data?.signedUrl) return null
   return data.signedUrl
 }
 

@@ -12,23 +12,6 @@ import {
 } from '@/lib/externalCitizenPortal'
 import { syncExternalProfileIntoBpmPerson } from '@/lib/citizenProfileDisplay'
 
-// ─── Mock demo users for the UI dropdown ───────────────────────────────────────
-export const DEMO_USERS: Record<string, { role: UserRole, password: string }> = {
-    'cemetery@bpm.qc.gov.ph': { role: 'cemetery_office', password: 'admin123' },
-    'ssdd@bpm.qc.gov.ph': { role: 'ssdd', password: 'admin123' },
-    'admin@bpm.qc.gov.ph': { role: 'system_admin', password: 'admin123' },
-    'secretary@bpm.qc.gov.ph': { role: 'barangay_secretary', password: 'admin123' },
-    'punong@bpm.qc.gov.ph': { role: 'punong_barangay', password: 'admin123' },
-    'treasurer@bpm.qc.gov.ph': { role: 'treasurer', password: 'admin123' },
-    'utility@bpm.qc.gov.ph': { role: 'utility_engineering', password: 'admin123' },
-    'parks@bpm.qc.gov.ph': { role: 'parks_admin', password: 'admin123' },
-    'desk@bpm.qc.gov.ph': { role: 'reservation_officer', password: 'admin123' },
-    'deathreg@bpm.qc.gov.ph': { role: 'death_registration', password: 'admin123' },
-    'famcd@bpm.qc.gov.ph': { role: 'famcd', password: 'admin123' },
-    'citizen@bpm.qc.gov.ph': { role: 'citizen', password: 'admin123' },
-    'juan.delacruz@email.com': { role: 'citizen', password: 'citizen123' }
-}
-
 function titleFromNotifType(t?: string | null) {
     const raw = (t ?? '').replace(/_/g, ' ').trim()
     if (!raw) return 'Notification'

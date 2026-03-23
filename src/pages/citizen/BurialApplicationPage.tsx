@@ -1,97 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Upload, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import toast from 'react-hot-toast'
-import { getCitizenPersonIdForSession } from '@/lib/citizenBpmIdentity'
-import {
-  BPM_PERSON_SELECT_MINIMAL,
-  computePersonFullName,
-  profileDisplayName,
-} from '@/lib/citizenProfileDisplay'
 
 type Step = 1 | 2 | 3
-
-/** Quick-pick lists — all values remain editable via “Other” or free text where shown */
-const PLACE_OF_DEATH_PRESETS = [
-  'Residence / home',
-  'East Avenue Medical Center',
-  'Philippine Heart Center',
-  'Lung Center of the Philippines',
-  'National Kidney and Transplant Institute',
-  'Quezon City General Hospital',
-  "St. Luke's Medical Center — Quezon City",
-] as const
-
-const CAUSE_OF_DEATH_PRESETS = [
-  'Natural causes / old age',
-  'Cardiovascular disease',
-  'Cancer / neoplasm',
-  'Respiratory disease',
-  'Cerebrovascular / stroke',
-  'Accident / injury',
-  'COVID-19 or related complications',
-] as const
-
-const HOUSEHOLD_INCOME_OPTIONS: { label: string; value: string }[] = [
-  { label: 'Below ₱5,000', value: '4000' },
-  { label: '₱5,000 – ₱9,999', value: '7500' },
-  { label: '₱10,000 – ₱14,999', value: '12500' },
-  { label: '₱15,000 – ₱24,999', value: '20000' },
-  { label: '₱25,000 and above', value: '30000' },
-  { label: 'Enter exact amount…', value: '__custom__' },
-]
-
-function buildRecentDeathDateOptions(daysBack: number): { value: string; label: string }[] {
-    const out: { value: string; label: string }[] = []
-    for (let i = 0; i < daysBack; i++) {
-        const d = new Date()
-        d.setHours(0, 0, 0, 0)
-        d.setDate(d.getDate() - i)
-        const iso = d.toISOString().slice(0, 10)
-        let label: string
-        if (i === 0) label = 'Today'
-        else if (i === 1) label = 'Yesterday'
-        else {
-            label = d.toLocaleDateString('en-PH', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-            })
-        }
-        out.push({ value: iso, label })
-    }
-    return out
-}
-
-const AGE_QUICK_OPTIONS: { value: string; label: string }[] = [
-    { value: '', label: 'Quick pick common age…' },
-    ...[0, 1, 5, 10, 15, 18, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90].map((n) => ({
-        value: String(n),
-        label: `${n} years`,
-    })),
-    { value: '__other__', label: 'Other — enter exact age' },
-]
-
-const QC_BARANGAY_OPTIONS = [
-  'Bagong Silangan',
-  'Commonwealth',
-  'Batasan Hills',
-  'Payatas',
-  'Cubao',
-  'Diliman',
-  'Kamuning',
-  'Katipunan / Krus na Ligas',
-  'Loyola Heights',
-  'Novaliches Proper',
-  'Project 6',
-  'Project 8',
-  'Santa Mesa Heights',
-  'Tandang Sora',
-  'Ugong Norte',
-  'Other — type manually',
-] as const
 
 export default function CitizenBurialApplicationPage() {
     const { user } = useAuth()
@@ -105,13 +18,13 @@ export default function CitizenBurialApplicationPage() {
     const [mswdCertFile, setMswdCertFile] = useState<File | null>(null)
     const [indigentRelationshipFile, setIndigentRelationshipFile] = useState<File | null>(null)
 
-    type ReqKey = 'death_cert' | 'medical_cert' | 'embalming_cert' | 'valid_id' | 'proof_of_relationship'
+    type ReqKey = 'death_cert' | 'transfer_permit' | 'affidavit_undertaking' | 'burial_form' | 'valid_id'
     const REQUIREMENTS: { key: ReqKey; label: string; required: boolean }[] = [
-        { key: 'death_cert',          label: 'Death Certificate (PSA Form)',                        required: true },
-        { key: 'medical_cert',        label: 'Medical Certificate signed by attending physician',  required: true },
-        { key: 'embalming_cert',      label: 'Certificate of Embalming (if applicable)',            required: false },
-        { key: 'valid_id',            label: 'Valid ID of requesting party (next of kin)',          required: true },
-        { key: 'proof_of_relationship', label: 'Proof of relationship to the deceased',            required: true },
+        { key: 'death_cert',           label: 'Certified copy of Certificate of Death',                                                                                   required: true },
+        { key: 'transfer_permit',      label: 'Original Copy of Transfer or Entrance Permit (if death occurred in another city/municipality)',                             required: false },
+        { key: 'affidavit_undertaking',label: 'Affidavit of Undertaking (if remains will be interred in Bagbag or Novaliches Public Cemetery)',                           required: false },
+        { key: 'burial_form',          label: 'Burial Form from Quezon City Health Department',                                                                            required: true },
+        { key: 'valid_id',             label: 'Valid Identification Cards (IDs) of the informant/family/relative/authorized person',                                      required: true },
     ]
     const [reqFiles, setReqFiles] = useState<Partial<Record<ReqKey, File>>>({})
     const setReqFile = (key: ReqKey, file: File | undefined) =>
@@ -119,10 +32,6 @@ export default function CitizenBurialApplicationPage() {
 
     const BURIAL_FEES: Record<string, number> = { niche: 4000, ground: 8000, wall: 3000 }
     const PERMIT_FEE = 300
-
-    const personDetailsMerged = useRef(false)
-
-    const deathDateQuickOptions = useMemo(() => buildRecentDeathDateOptions(30), [])
 
     const [form, setForm] = useState({
         // Applicant
@@ -143,16 +52,17 @@ export default function CitizenBurialApplicationPage() {
     })
 
     const fetchPersonId = useCallback(async () => {
-        if (!user?.is_citizen) {
-            setPersonId(null)
-            return
-        }
         try {
-            const pid = await getCitizenPersonIdForSession(supabase, user)
-            setPersonId(pid)
+            const { data, error } = await supabase
+                .from('citizen_account')
+                .select('person_id')
+                .eq('account_id', user?.id)
+                .single()
+
+            if (data) setPersonId(data.person_id)
+            if (error) console.error('Error fetching person_id:', error)
         } catch (err) {
-            console.error('BurialApplication: resolve person_id', err)
-            setPersonId(null)
+            console.error(err)
         }
     }, [user])
 
@@ -162,62 +72,15 @@ export default function CitizenBurialApplicationPage() {
         }
     }, [user, fetchPersonId])
 
-    useEffect(() => {
-        if (!personId || !user?.is_citizen || personDetailsMerged.current) return
-        let cancelled = false
-        void (async () => {
-            const { data, error } = await supabase
-                .from('person')
-                .select(BPM_PERSON_SELECT_MINIMAL)
-                .eq('person_id', personId)
-                .maybeSingle()
-            if (cancelled || error || !data) return
-            personDetailsMerged.current = true
-            const row = data as unknown as Record<string, unknown>
-            const full =
-                (typeof row.full_name === 'string' && row.full_name.trim()) ||
-                computePersonFullName(row) ||
-                profileDisplayName(row, user.email ?? '')
-            const contact =
-                typeof row.contact_number === 'string' && row.contact_number.trim()
-                    ? row.contact_number.trim()
-                    : ''
-            const brgy = typeof row.barangay === 'string' && row.barangay.trim() ? row.barangay.trim() : ''
-            setForm(prev => ({
-                ...prev,
-                applicant_name: prev.applicant_name.trim() || full,
-                applicant_contact: prev.applicant_contact.trim() || contact,
-                issuing_barangay: prev.issuing_barangay.trim() || brgy,
-            }))
-        })()
-        return () => {
-            cancelled = true
-        }
-    }, [personId, user])
-
     const update = (k: string, v: string | boolean) => setForm(prev => ({ ...prev, [k]: v }))
 
-    const supabaseErr = (err: unknown) =>
-        err && typeof err === 'object' && 'message' in err && typeof (err as { message: string }).message === 'string'
-            ? (err as { message: string }).message
-            : String(err)
-
     const handleSubmit = async () => {
-        let activePersonId = personId
-        if (!activePersonId && user?.is_citizen) {
-            activePersonId = await getCitizenPersonIdForSession(supabase, user)
-            if (activePersonId) setPersonId(activePersonId)
-        }
-
-        if (!activePersonId) {
-            toast.error(
-                'Your citizen profile is not linked (person_id missing). Sign out and sign in again, or contact support if you use an external portal account.',
-            )
+        if (!personId) {
+            toast.error('Identity not verified. Please contact support.')
             return
         }
 
         setSubmitting(true)
-        let storageHadError = false
         try {
             const deceasedId = 'DEC-' + Math.floor(Math.random() * 1000000)
             const applicationId = 'OBA-' + Math.floor(Math.random() * 1000000)
@@ -229,82 +92,22 @@ export default function CitizenBurialApplicationPage() {
                 form.deceased_middle_name,
             ].filter(Boolean).join(', ')
 
-            const deceasedRow: Record<string, unknown> = {
+            const { error: decError } = await supabase.from('deceased').insert({
                 deceased_id: deceasedId,
                 full_name: fullName,
-                date_of_death: form.date_of_death,
-                place_of_death: form.place_of_death,
-                death_certificate_no: form.death_cert_no,
                 last_name: form.deceased_last_name,
                 first_name: form.deceased_first_name,
                 middle_name: form.deceased_middle_name || null,
-                age_at_death: form.age_at_death ? parseInt(form.age_at_death, 10) : null,
+                age_at_death: form.age_at_death ? parseInt(form.age_at_death) : null,
+                date_of_death: form.date_of_death,
+                place_of_death: form.place_of_death,
                 cause_of_death: form.cause_of_death,
-            }
+                death_certificate_no: form.death_cert_no
+            })
 
-            let decError = (await supabase.from('deceased').insert(deceasedRow)).error
-            if (decError?.message?.includes('column') || decError?.code === 'PGRST204') {
-                const minimal = {
-                    deceased_id: deceasedId,
-                    full_name: fullName,
-                    date_of_death: form.date_of_death,
-                    place_of_death: form.place_of_death || null,
-                    death_certificate_no: form.death_cert_no || null,
-                }
-                const retry = await supabase.from('deceased').insert(minimal)
-                decError = retry.error
-            }
+            if (decError) throw decError
 
-            if (decError) {
-                const dm = supabaseErr(decError)
-                if (/row-level security|RLS|policy/i.test(dm)) {
-                    throw new Error(
-                        `${dm} — Allow INSERT on deceased for anon, or run open policies. See sql/supabase_burial_citizen_writes.sql.`,
-                    )
-                }
-                throw new Error(dm)
-            }
-
-            // 2. Persist application row BEFORE storage (anon + custom auth: storage often fails RLS while DB may allow insert).
-            const appBase = {
-                application_id: applicationId,
-                person_id: activePersonId,
-                deceased_id: deceasedId,
-                submission_date: new Date().toISOString().split('T')[0],
-                application_status: 'pending',
-                document_validation_status: 'pending',
-            }
-            const appRowFull: Record<string, unknown> = {
-                ...appBase,
-                is_resident: form.is_resident === 'resident',
-                doc_death_cert_url: null,
-                doc_medical_cert_url: null,
-                doc_embalming_cert_url: null,
-                doc_valid_id_url: null,
-                doc_proof_relationship_url: null,
-            }
-
-            let appError = (await supabase.from('online_burial_application').insert(appRowFull)).error
-            if (
-                appError &&
-                (appError.message?.includes('column') ||
-                    appError.message?.includes('Could not find') ||
-                    appError.code === 'PGRST204')
-            ) {
-                const retry = await supabase.from('online_burial_application').insert(appBase)
-                appError = retry.error
-            }
-            if (appError) {
-                const msg = supabaseErr(appError)
-                if (/row-level security|RLS|policy/i.test(msg)) {
-                    throw new Error(
-                        `${msg} — In Supabase: enable INSERT for anon on online_burial_application (or use open policies). See sql/supabase_burial_citizen_writes.sql in the repo.`,
-                    )
-                }
-                throw new Error(msg)
-            }
-
-            // 3. Upload requirement documents, then UPDATE application with URLs (row already exists in DB).
+            // 2. Upload requirement documents and store URLs
             const uploadedDocs: Partial<Record<string, string>> = {}
             for (const req of REQUIREMENTS) {
                 const file = reqFiles[req.key]
@@ -314,11 +117,7 @@ export default function CitizenBurialApplicationPage() {
                     const { data: up, error: upErr } = await supabase.storage
                         .from('burial-documents')
                         .upload(path, file, { upsert: true })
-                    if (upErr) {
-                        storageHadError = true
-                        console.error('burial-documents upload:', upErr)
-                        continue
-                    }
+                    if (upErr) throw upErr
                     if (up) {
                         const { data: pub } = supabase.storage.from('burial-documents').getPublicUrl(path)
                         uploadedDocs[req.key] = pub.publicUrl
@@ -326,34 +125,22 @@ export default function CitizenBurialApplicationPage() {
                 }
             }
 
-            const updatePayload: Record<string, unknown> = {
-                doc_death_cert_url: uploadedDocs['death_cert'] ?? null,
-                doc_medical_cert_url: uploadedDocs['medical_cert'] ?? null,
-                doc_embalming_cert_url: uploadedDocs['embalming_cert'] ?? null,
-                doc_valid_id_url: uploadedDocs['valid_id'] ?? null,
-                doc_proof_relationship_url: uploadedDocs['proof_of_relationship'] ?? null,
+            // 3. Create Online Burial Application with document URLs
+            const { error: appError } = await supabase.from('online_burial_application').insert({
+                application_id: applicationId,
+                person_id: personId,
+                deceased_id: deceasedId,
+                submission_date: new Date().toISOString().split('T')[0],
+                application_status: 'pending',
                 is_resident: form.is_resident === 'resident',
-            }
-            const { error: updErr } = await supabase
-                .from('online_burial_application')
-                .update(updatePayload)
-                .eq('application_id', applicationId)
-            if (updErr && (updErr.message?.includes('column') || updErr.message?.includes('Could not find'))) {
-                await supabase
-                    .from('online_burial_application')
-                    .update({
-                        doc_death_cert_url: uploadedDocs['death_cert'] ?? null,
-                        doc_medical_cert_url: uploadedDocs['medical_cert'] ?? null,
-                        doc_embalming_cert_url: uploadedDocs['embalming_cert'] ?? null,
-                        doc_valid_id_url: uploadedDocs['valid_id'] ?? null,
-                        doc_proof_relationship_url: uploadedDocs['proof_of_relationship'] ?? null,
-                    })
-                    .eq('application_id', applicationId)
-            } else if (updErr) {
-                console.error('online_burial_application update (docs):', updErr)
-                storageHadError = true
-            }
+                doc_death_cert_url: uploadedDocs['death_cert'] ?? null,
+                doc_medical_cert_url: uploadedDocs['transfer_permit'] ?? null,
+                doc_embalming_cert_url: uploadedDocs['affidavit_undertaking'] ?? null,
+                doc_valid_id_url: uploadedDocs['valid_id'] ?? null,
+                doc_proof_relationship_url: uploadedDocs['burial_form'] ?? null,
+            })
 
+            if (appError) throw appError
 
             // 4. Create Indigent Record if applicable
             if (form.is_indigent) {
@@ -410,7 +197,7 @@ export default function CitizenBurialApplicationPage() {
                     indigent_relationship_url: indigentRelationshipUrl,
                 })
 
-                if (indigentErr) throw new Error(supabaseErr(indigentErr))
+                if (indigentErr) throw indigentErr
             }
 
             // 6. Log Notification
@@ -425,15 +212,9 @@ export default function CitizenBurialApplicationPage() {
 
             setAppId(applicationId)
             setSubmitted(true)
-            toast.success(
-                storageHadError
-                    ? 'Application saved in the database. Some document uploads failed — create bucket "burial-documents" and Storage policies (see sql/supabase_burial_citizen_writes.sql), or staff may request files by email.'
-                    : 'Application submitted successfully!',
-                { duration: storageHadError ? 10000 : 4000 },
-            )
+            toast.success('Application submitted successfully!')
         } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : supabaseErr(error)
-            toast.error('Submission failed: ' + msg)
+            toast.error('Submission failed: ' + (error instanceof Error ? error.message : String(error)))
         } finally {
             setSubmitting(false)
         }
@@ -458,7 +239,7 @@ export default function CitizenBurialApplicationPage() {
     )
 
     return (
-        <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in max-w-2xl mx-auto">
+        <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in mx-auto">
             <div className="mb-6">
                 <h1 className="font-display text-2xl font-bold text-white">Burial Application</h1>
                 <p className="text-slate-400 text-sm mt-0.5">Online Burial Application — Follow the BPM Process</p>
@@ -527,46 +308,14 @@ export default function CitizenBurialApplicationPage() {
                                     {/* Issuing Barangay */}
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Issuing Barangay *</label>
-                                        {(() => {
-                                            const listed = QC_BARANGAY_OPTIONS.filter(b => b !== 'Other — type manually') as string[]
-                                            const barangaySelectValue = listed.includes(form.issuing_barangay)
-                                                ? form.issuing_barangay
-                                                : form.issuing_barangay
-                                                  ? 'Other — type manually'
-                                                  : ''
-                                            return (
-                                                <>
-                                                    <select
-                                                        className="input-field"
-                                                        value={barangaySelectValue}
-                                                        onChange={e => {
-                                                            const v = e.target.value
-                                                            if (v === 'Other — type manually') update('issuing_barangay', '')
-                                                            else update('issuing_barangay', v)
-                                                        }}
-                                                        required={!form.issuing_barangay}
-                                                    >
-                                                        <option value="">Select barangay…</option>
-                                                        {listed.map(b => (
-                                                            <option key={b} value={b}>
-                                                                {b}
-                                                            </option>
-                                                        ))}
-                                                        <option value="Other — type manually">Other — type manually</option>
-                                                    </select>
-                                                    {barangaySelectValue === 'Other — type manually' && (
-                                                        <input
-                                                            type="text"
-                                                            className="input-field mt-2"
-                                                            placeholder="Enter barangay name"
-                                                            value={form.issuing_barangay}
-                                                            onChange={e => update('issuing_barangay', e.target.value)}
-                                                            required
-                                                        />
-                                                    )}
-                                                </>
-                                            )
-                                        })()}
+                                        <input
+                                            type="text"
+                                            className="input-field"
+                                            placeholder="e.g. Barangay Caaringayan"
+                                            value={form.issuing_barangay}
+                                            onChange={e => update('issuing_barangay', e.target.value)}
+                                            required
+                                        />
                                     </div>
 
                                     {/* 4Ps / NHTS */}
@@ -588,46 +337,15 @@ export default function CitizenBurialApplicationPage() {
                                     {/* Monthly Income */}
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Household Monthly Income *</label>
-                                        {(() => {
-                                            const incomeSelect =
-                                                HOUSEHOLD_INCOME_OPTIONS.find(
-                                                    o => o.value === form.monthly_income && o.value !== '__custom__',
-                                                )?.value ??
-                                                (form.monthly_income ? '__custom__' : '')
-                                            return (
-                                                <>
-                                                    <select
-                                                        className="input-field"
-                                                        value={incomeSelect}
-                                                        onChange={e => {
-                                                            const v = e.target.value
-                                                            if (v === '__custom__') update('monthly_income', '')
-                                                            else update('monthly_income', v)
-                                                        }}
-                                                        required={!form.monthly_income}
-                                                    >
-                                                        <option value="">Select range…</option>
-                                                        {HOUSEHOLD_INCOME_OPTIONS.map(o => (
-                                                            <option key={o.value} value={o.value}>
-                                                                {o.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    {incomeSelect === '__custom__' && (
-                                                        <input
-                                                            type="number"
-                                                            className="input-field mt-2"
-                                                            placeholder="Exact amount (₱)"
-                                                            min="0"
-                                                            step="100"
-                                                            value={form.monthly_income}
-                                                            onChange={e => update('monthly_income', e.target.value)}
-                                                            required
-                                                        />
-                                                    )}
-                                                </>
-                                            )
-                                        })()}
+                                        <input
+                                            type="number"
+                                            className="input-field"
+                                            placeholder="e.g. 5000"
+                                            min="0"
+                                            value={form.monthly_income}
+                                            onChange={e => update('monthly_income', e.target.value)}
+                                            required
+                                        />
                                     </div>
 
                                     {/* Barangay Indigency Certificate Upload */}
@@ -730,202 +448,23 @@ export default function CitizenBurialApplicationPage() {
                             </div>
                         </div>
 
-                        {/* Age at Death — quick pick or exact number (always editable) */}
+                        {/* Age at Death */}
                         <div>
                             <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Age at Death *</label>
-                            <select
-                                className="input-field mb-2"
-                                value={
-                                    !form.age_at_death
-                                        ? ''
-                                        : AGE_QUICK_OPTIONS.some(
-                                              o =>
-                                                  o.value === form.age_at_death &&
-                                                  o.value !== '' &&
-                                                  o.value !== '__other__',
-                                          )
-                                          ? form.age_at_death
-                                          : '__other__'
-                                }
-                                onChange={e => {
-                                    const v = e.target.value
-                                    if (v === '') update('age_at_death', '')
-                                    else if (v === '__other__') update('age_at_death', '')
-                                    else update('age_at_death', v)
-                                }}
-                            >
-                                {AGE_QUICK_OPTIONS.map(o => (
-                                    <option key={o.value || 'empty'} value={o.value}>
-                                        {o.label}
-                                    </option>
-                                ))}
-                            </select>
-                            {(!form.age_at_death ||
-                                !AGE_QUICK_OPTIONS.some(
-                                    o =>
-                                        o.value === form.age_at_death &&
-                                        o.value !== '' &&
-                                        o.value !== '__other__',
-                                )) && (
-                                <input
-                                    type="number"
-                                    className="input-field"
-                                    placeholder="Exact age (years)"
-                                    min="0"
-                                    max="150"
-                                    value={form.age_at_death}
-                                    onChange={e => update('age_at_death', e.target.value)}
-                                    required
-                                />
-                            )}
+                            <input type="number" className="input-field" placeholder="e.g. 75" min="0" max="150" value={form.age_at_death} onChange={e => update('age_at_death', e.target.value)} required />
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-                                Death certificate number *
-                            </label>
-                            <input
-                                type="text"
-                                className="input-field"
-                                placeholder="DC-2024-XXXX"
-                                value={form.death_cert_no}
-                                onChange={e => update('death_cert_no', e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-                                Date of death *
-                            </label>
-                            <select
-                                className="input-field mb-2"
-                                value={
-                                    !form.date_of_death
-                                        ? ''
-                                        : deathDateQuickOptions.some(o => o.value === form.date_of_death)
-                                          ? form.date_of_death
-                                          : '__manual__'
-                                }
-                                onChange={e => {
-                                    const v = e.target.value
-                                    if (v === '' || v === '__manual__') {
-                                        if (v === '') update('date_of_death', '')
-                                    } else update('date_of_death', v)
-                                }}
-                            >
-                                <option value="">Quick pick (last 30 days)…</option>
-                                {deathDateQuickOptions.map(o => (
-                                    <option key={o.value} value={o.value}>
-                                        {o.label}
-                                    </option>
-                                ))}
-                                <option value="__manual__">Pick another date (calendar)…</option>
-                            </select>
-                            <input
-                                type="date"
-                                className="input-field"
-                                value={form.date_of_death}
-                                onChange={e => update('date_of_death', e.target.value)}
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-                                Place of death *
-                            </label>
-                            {(() => {
-                                const presets = [...PLACE_OF_DEATH_PRESETS]
-                                const placeSelectValue = presets.includes(
-                                    form.place_of_death as (typeof PLACE_OF_DEATH_PRESETS)[number],
-                                )
-                                    ? form.place_of_death
-                                    : form.place_of_death
-                                      ? '__other__'
-                                      : ''
-                                return (
-                                    <>
-                                        <select
-                                            className="input-field"
-                                            value={placeSelectValue}
-                                            onChange={e => {
-                                                const v = e.target.value
-                                                if (v === '__other__') update('place_of_death', '')
-                                                else update('place_of_death', v)
-                                            }}
-                                            required={!form.place_of_death}
-                                        >
-                                            <option value="">Select place…</option>
-                                            {presets.map(p => (
-                                                <option key={p} value={p}>
-                                                    {p}
-                                                </option>
-                                            ))}
-                                            <option value="__other__">Other — specify below</option>
-                                        </select>
-                                        {placeSelectValue === '__other__' && (
-                                            <input
-                                                type="text"
-                                                className="input-field mt-2"
-                                                placeholder="Hospital, address, or facility name"
-                                                value={form.place_of_death}
-                                                onChange={e => update('place_of_death', e.target.value)}
-                                                required
-                                            />
-                                        )}
-                                    </>
-                                )
-                            })()}
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">
-                                Cause of death *
-                            </label>
-                            {(() => {
-                                const presets = [...CAUSE_OF_DEATH_PRESETS]
-                                const causeSelectValue = presets.includes(
-                                    form.cause_of_death as (typeof CAUSE_OF_DEATH_PRESETS)[number],
-                                )
-                                    ? form.cause_of_death
-                                    : form.cause_of_death
-                                      ? '__other__'
-                                      : ''
-                                return (
-                                    <>
-                                        <select
-                                            className="input-field"
-                                            value={causeSelectValue}
-                                            onChange={e => {
-                                                const v = e.target.value
-                                                if (v === '__other__') update('cause_of_death', '')
-                                                else update('cause_of_death', v)
-                                            }}
-                                            required={!form.cause_of_death}
-                                        >
-                                            <option value="">Select cause…</option>
-                                            {presets.map(p => (
-                                                <option key={p} value={p}>
-                                                    {p}
-                                                </option>
-                                            ))}
-                                            <option value="__other__">Other — specify below</option>
-                                        </select>
-                                        {causeSelectValue === '__other__' && (
-                                            <input
-                                                type="text"
-                                                className="input-field mt-2"
-                                                placeholder="Cause of death (as on certificate)"
-                                                value={form.cause_of_death}
-                                                onChange={e => update('cause_of_death', e.target.value)}
-                                                required
-                                            />
-                                        )}
-                                    </>
-                                )
-                            })()}
-                        </div>
+                        {([
+                            { key: 'death_cert_no' as const, label: 'Death Certificate Number', placeholder: 'DC-2024-XXXX', type: 'text' },
+                            { key: 'date_of_death' as const, label: 'Date of Death', placeholder: '', type: 'date' },
+                            { key: 'place_of_death' as const, label: 'Place of Death', placeholder: 'QC General Hospital', type: 'text' },
+                            { key: 'cause_of_death' as const, label: 'Cause of Death', placeholder: 'Natural causes', type: 'text' },
+                        ]).map(f => (
+                            <div key={f.key}>
+                                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">{f.label} *</label>
+                                <input type={f.type} className="input-field" placeholder={f.placeholder} value={form[f.key]} onChange={e => update(f.key, e.target.value)} required />
+                            </div>
+                        ))}
 
                         <div className="flex gap-3">
                             <button className="btn-secondary" onClick={() => setStep(1)}>← Back</button>
@@ -1085,7 +624,7 @@ export default function CitizenBurialApplicationPage() {
                             <button
                                 className="btn-primary flex-1 justify-center"
                                 onClick={handleSubmit}
-                                disabled={submitting || !requiredUploaded}
+                                disabled={submitting || !personId || !requiredUploaded}
                             >
                                 {submitting ? <><Loader2 size={14} className="animate-spin" /> Submitting…</> : '✓ Submit Application'}
                             </button>

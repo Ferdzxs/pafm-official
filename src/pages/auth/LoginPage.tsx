@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth, DEMO_USERS } from '@/contexts/AuthContext'
-import { ROLE_META } from '@/config/rbac'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   Eye, EyeOff, AlertCircle, Loader2,
-  ChevronDown, Shield, ArrowUpRight,
+  Shield, ArrowUpRight,
   CheckCircle, Lock, Mail
 } from 'lucide-react'
 
@@ -19,7 +18,6 @@ export default function LoginPage() {
   const [showPw,   setShowPw]   = useState(false)
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
-  const [showDemo, setShowDemo] = useState(false)
   const [ready,    setReady]    = useState(false)
 
   useEffect(() => {
@@ -33,11 +31,6 @@ export default function LoginPage() {
     setLoading(false)
     if (err) { setError(err); return }
     navigate('/dashboard')
-  }
-
-  const fillDemo = (demoEmail: string) => {
-    const u = DEMO_USERS[demoEmail]
-    setEmail(demoEmail); setPassword(u.password); setShowDemo(false)
   }
 
   return (
@@ -179,10 +172,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="lp-fr">
-                <a href="#" className="lp-forgot">Forgot password?</a>
-              </div>
-
               {error && (
                 <div className="lp-err" role="alert">
                   <AlertCircle size={13}/><span>{error}</span>
@@ -209,35 +198,6 @@ export default function LoginPage() {
               </span>
               <ArrowUpRight size={15} className="lp-cta-i"/>
             </a>
-
-            {/* Demo */}
-            <div className="demo-wrap">
-              <button type="button" className="demo-trig"
-                onClick={()=>setShowDemo(v=>!v)}>
-                <span>🔑 Demo accounts — quick login</span>
-                <ChevronDown size={11} style={{
-                  transform: showDemo?'rotate(180deg)':'rotate(0)',
-                  transition:'transform .2s'
-                }}/>
-              </button>
-              {showDemo && (
-                <div className="demo-panel">
-                  {Object.entries(DEMO_USERS).map(([em,u])=>{
-                    const meta = ROLE_META[u.role]
-                    return (
-                      <button key={em} type="button" className="demo-row"
-                        onClick={()=>fillDemo(em)}>
-                        <span className="demo-pip" style={{background:meta.color}}/>
-                        <span className="demo-info">
-                          <span className="demo-role">{meta.label}</span>
-                          <span className="demo-em">{em}</span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
 
           </div>{/* /lp-card */}
 

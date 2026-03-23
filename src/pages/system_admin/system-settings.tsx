@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import SettingsPage from '@/pages/SettingsPage'
 import { fetchSystemSettings, updateSystemSetting, fetchBackups, logBackupRow } from '@/lib/admin'
 import { useAuth } from '@/contexts/AuthContext'
 import { logAudit } from '@/lib/admin'
@@ -94,7 +93,14 @@ export default function SystemSettings() {
 
  return (
  <div className="px-4 py-4 sm:px-6 lg:px-8 space-y-8">
-  <SettingsPage />
+  <section className="max-w-5xl mx-auto">
+  <h1 className="font-display text-2xl font-bold text-white mb-2">
+   System Settings
+  </h1>
+  <p className="text-slate-400 text-sm">
+   Manage platform configuration and backup behavior.
+  </p>
+  </section>
 
   <section className="max-w-5xl mx-auto">
   <h2 className="font-display text-xl font-bold text-white mb-2">

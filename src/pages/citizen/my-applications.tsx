@@ -27,6 +27,10 @@ import {
   utilityTicketTypeLabel,
 } from '@/config/utilityCitizenWorkflow'
 import {
+  resolveUtilityDocumentViewUrls,
+  type UtilityDocRowForView,
+} from '@/lib/utilityRequestDocuments'
+import {
   Loader2,
   Search,
   Filter,
@@ -114,27 +118,56 @@ function applicantNameFromRaw(raw: unknown, fallback: string) {
 
 function CitizenUtilityUploads({ ticketId }: { ticketId: string }) {
   const [rows, setRows] = useState<
-    { requirement_key: string; file_name: string; file_url: string; verified_at: string | null }[]
+    {
+      id: string
+      requirement_key: string
+      file_name: string
+      file_url: string
+      verified_at: string | null
+    }[]
   >([])
+  const [viewUrls, setViewUrls] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const { data } = await supabase
+      setLoading(true)
+      const { data, error } = await supabase
         .from('utility_request_document')
-        .select('requirement_key, file_name, file_url, verified_at')
+        .select('id, requirement_key, file_name, file_url, verified_at')
         .eq('ticket_id', ticketId)
-      if (!cancelled) {
-        setRows(
-          (data as {
-            requirement_key: string
-            file_name: string
-            file_url: string
-            verified_at: string | null
-          }[]) ?? [],
-        )
+      if (cancelled) return
+      if (error) {
+        setRows([])
+        setViewUrls({})
         setLoading(false)
+        return
       }
+      const list =
+        (data as {
+          id: string
+          requirement_key: string
+          file_name: string
+          file_url: string
+          verified_at: string | null
+        }[]) ?? []
+      if (list.length === 0) {
+        setRows([])
+        setViewUrls({})
+        setLoading(false)
+        return
+      }
+      const mapped: UtilityDocRowForView[] = list.map(r => ({
+        id: r.id,
+        requirement_key: r.requirement_key,
+        file_name: r.file_name,
+        file_url: r.file_url,
+      }))
+      const resolved = await resolveUtilityDocumentViewUrls(mapped, ticketId)
+      if (cancelled) return
+      setRows(list)
+      setViewUrls(resolved)
+      setLoading(false)
     })()
     return () => {
       cancelled = true
@@ -147,35 +180,47 @@ function CitizenUtilityUploads({ ticketId }: { ticketId: string }) {
         Your submitted requirements
       </p>
       <ul className="space-y-2 text-sm">
-        {rows.map(r => (
-          <li
-            key={`${r.requirement_key}-${r.file_name}`}
-            className="flex flex-wrap items-center gap-2 justify-between border-b border-border/30 pb-2 last:border-0"
-          >
-            <span className="font-medium capitalize text-foreground">
-              {r.requirement_key.replace(/_/g, ' ')}
-            </span>
-            <div className="flex items-center gap-2">
-              {r.file_url ? (
-                <a
-                  href={r.file_url}
-                  className="text-xs font-semibold text-primary hover:underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View file
-                </a>
-              ) : (
-                <span className="text-xs text-amber-600">Upload pending</span>
-              )}
-              {r.verified_at ? (
-                <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-700">
-                  Verified
-                </Badge>
-              ) : null}
-            </div>
-          </li>
-        ))}
+        {rows.map(r => {
+          const href = viewUrls[r.id]
+          return (
+            <li
+              key={r.id}
+              className="flex flex-wrap items-center gap-2 justify-between border-b border-border/30 pb-2 last:border-0"
+            >
+              <span className="font-medium capitalize text-foreground">
+                {r.requirement_key.replace(/_/g, ' ')}
+              </span>
+              <div className="flex items-center gap-2">
+                {r.file_url ? (
+                  href ? (
+                    <a
+                      href={href}
+                      className="text-xs font-semibold text-primary hover:underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View file
+                    </a>
+                  ) : (
+                    <span
+                      className="text-xs text-amber-700 dark:text-amber-500"
+                      title="Ensure the utility-docs bucket exists in Supabase (sql/supabase_storage_all_buckets.sql)."
+                    >
+                      File link unavailable
+                    </span>
+                  )
+                ) : (
+                  <span className="text-xs text-amber-600">Upload pending</span>
+                )}
+                {r.verified_at ? (
+                  <Badge variant="outline" className="text-[9px] border-emerald-500/40 text-emerald-700">
+                    Verified
+                  </Badge>
+                ) : null}
+              </div>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

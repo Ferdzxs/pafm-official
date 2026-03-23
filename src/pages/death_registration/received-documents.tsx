@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import {
   Search, Loader2, FileText, CheckCircle2, XCircle, AlertCircle,
-  Inbox, ShieldCheck, ArrowRight
+  Inbox, ShieldCheck, X, ArrowRight
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Badge } from '@/components/ui/badge'
 import toast from 'react-hot-toast'
 import { Pagination } from '@/components/ui/pagination'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { DialogPremiumInner, premiumDialogShellClasses } from '@/components/ui/dialog-premium'
 
 interface BurialApp {
   application_id: string
@@ -260,145 +258,120 @@ export default function ReceivedDocuments() {
         </>
       )}
 
-      {/* Detail Modal — premium card (centered via shared Dialog) */}
-      <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}>
-        <DialogContent className={premiumDialogShellClasses('max-w-lg')}>
-          <DialogPremiumInner className="flex max-h-[min(92vh,880px)] flex-col overflow-hidden p-0">
-            <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-muted/30 px-6 pb-4 pt-2 pr-12">
+      {/* Detail Modal */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="glass rounded-2xl w-full max-w-lg animate-fade-in border border-white/10 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/3">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
                   <FileText size={24} />
                 </div>
                 <div>
-                  <h2 className="font-display text-lg font-bold text-foreground">{selected?.deceased?.full_name}</h2>
-                  <p className="font-mono text-xs text-muted-foreground">{selected?.application_id}</p>
+                  <h2 className="text-lg font-bold text-white">{selected.deceased?.full_name}</h2>
+                  <p className="text-xs font-mono text-slate-500">{selected.application_id}</p>
                 </div>
               </div>
+              <button onClick={() => setSelected(null)} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"><X size={18} /></button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5 sidebar-scrollbar">
-              {selected &&
-                [
-                  [
-                    'Date of Death',
-                    selected.deceased?.date_of_death
-                      ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'long' })
-                      : '—',
-                  ],
-                  [
-                    'Age at Death',
-                    selected.deceased?.age_at_death != null ? `${selected.deceased.age_at_death} yrs` : '—',
-                  ],
-                  ['Place of Death', selected.deceased?.place_of_death ?? '—'],
-                  ['Death Certificate #', selected.deceased?.death_certificate_no ?? 'Not provided'],
-                  ['Applicant', selected.person?.full_name ?? '—'],
-                  ['Contact', selected.person?.contact_number ?? '—'],
-                  [
-                    'Submitted',
-                    new Date(selected.submission_date).toLocaleDateString('en-PH', { dateStyle: 'long' }),
-                  ],
-                  [
-                    'Case Type',
-                    selected.indigent_assistance_record?.length > 0 ? 'Indigent Path (SSDD Assisted)' : 'Regular Path',
-                  ],
-                  ['Doc Validation', selected.document_validation_status.toUpperCase()],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="flex justify-between gap-3 border-b border-border/50 py-2.5 last:border-0"
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
-                    <span className="max-w-[55%] text-right text-sm font-medium text-foreground">{value}</span>
-                  </div>
-                ))}
-
-              {selected && (
-                <div className="pt-2">
-                  <span className="mb-3 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                    Uploaded Requirements
-                  </span>
-                  <div className="space-y-2">
-                    {[
-                      { label: 'Death Certificate (PSA)', url: selected.doc_death_cert_url },
-                      { label: 'Medical Certificate', url: selected.doc_medical_cert_url },
-                      { label: 'Certificate of Embalming', url: selected.doc_embalming_cert_url },
-                      { label: 'Valid ID (Next of Kin)', url: selected.doc_valid_id_url },
-                      { label: 'Proof of Relationship', url: selected.doc_proof_relationship_url },
-                    ].map(req =>
-                      req.url ? (
-                        <a
-                          key={req.label}
-                          href={req.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group flex items-center justify-between rounded-lg border border-border bg-muted/30 p-2.5 transition-colors hover:bg-muted/50"
-                        >
-                          <span className="flex items-center gap-2 text-sm text-foreground transition-colors">
-                            <FileText size={16} className="text-blue-600 dark:text-blue-400" /> {req.label}
-                          </span>
-                          <span className="rounded bg-blue-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-400">
-                            View
-                          </span>
-                        </a>
-                      ) : (
-                        <div
-                          key={req.label}
-                          className="flex items-center justify-between rounded-lg border border-border/50 bg-transparent p-2.5 opacity-60"
-                        >
-                          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <XCircle size={16} /> {req.label}
-                          </span>
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            N/A
-                          </span>
-                        </div>
-                      ),
-                    )}
-                  </div>
+            <div className="p-6 space-y-3">
+              {[
+                ['Date of Death', selected.deceased?.date_of_death
+                  ? new Date(selected.deceased.date_of_death).toLocaleDateString('en-PH', { dateStyle: 'long' })
+                  : '—'],
+                ['Age at Death', selected.deceased?.age_at_death != null ? `${selected.deceased.age_at_death} yrs` : '—'],
+                ['Place of Death', selected.deceased?.place_of_death ?? '—'],
+                ['Death Certificate #', selected.deceased?.death_certificate_no ?? 'Not provided'],
+                ['Applicant', selected.person?.full_name ?? '—'],
+                ['Contact', selected.person?.contact_number ?? '—'],
+                ['Submitted', new Date(selected.submission_date).toLocaleDateString('en-PH', { dateStyle: 'long' })],
+                ['Case Type', selected.indigent_assistance_record?.length > 0 ? 'Indigent Path (SSDD Assisted)' : 'Regular Path'],
+                ['Doc Validation', selected.document_validation_status.toUpperCase()],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between py-2 border-b border-white/5">
+                  <span className="text-xs text-slate-500 uppercase font-bold tracking-wide">{label}</span>
+                  <span className="text-sm text-white font-medium text-right max-w-[55%]">{value}</span>
                 </div>
-              )}
+              ))}
 
-              {selected?.indigent_assistance_record?.[0]?.digital_cert_of_guarantee_url && (
+              {/* Burial Requirements Links */}
+              <div className="pt-2">
+                <span className="text-xs text-slate-500 uppercase font-bold tracking-wide block mb-3">Uploaded Requirements</span>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Certificate of Death', url: selected.doc_death_cert_url },
+                    { label: 'Transfer or Entrance Permit', url: selected.doc_medical_cert_url },
+                    { label: 'Affidavit of Undertaking', url: selected.doc_embalming_cert_url },
+                    { label: 'Valid ID (Informant / Authorized Person)', url: selected.doc_valid_id_url },
+                    { label: 'Burial Form (QC Health Dept)', url: selected.doc_proof_relationship_url },
+                  ].map(req => req.url ? (
+                    <a
+                      key={req.label}
+                      href={req.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-2.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors group"
+                    >
+                      <span className="flex items-center gap-2 text-sm text-slate-300 group-hover:text-white transition-colors">
+                        <FileText size={16} className="text-blue-400" /> {req.label}
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded">View</span>
+                    </a>
+                  ) : (
+                    <div key={req.label} className="flex items-center justify-between p-2.5 rounded-lg border border-white/5 bg-transparent opacity-50">
+                      <span className="flex items-center gap-2 text-sm text-slate-500">
+                        <XCircle size={16} /> {req.label}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">N/A</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {selected.indigent_assistance_record?.[0]?.digital_cert_of_guarantee_url && (
                 <a
                   href={selected.indigent_assistance_record[0].digital_cert_of_guarantee_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-xs font-bold text-emerald-800 transition-all hover:bg-emerald-500/15 dark:text-emerald-400"
+                  className="flex items-center gap-2 w-full py-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all text-xs font-bold border border-emerald-500/20 justify-center"
                 >
                   <ShieldCheck size={14} /> Certificate of Guarantee (SSDD)
                 </a>
               )}
 
-              {selected?.document_validation_status === 'pending' && (
-                <div className="mt-4 flex gap-2 border-t border-border/50 pt-4">
+              {selected.document_validation_status === 'pending' && (
+                <div className="flex gap-2 mt-4 pt-2">
                   <button
-                    type="button"
                     disabled={!!validating}
-                    onClick={() => selected && handleValidate(selected.application_id, 'rejected')}
-                    className="flex-1 rounded-xl border border-red-500/30 py-2 text-xs font-bold uppercase text-red-600 transition-all hover:bg-red-500/10 dark:text-red-400"
+                    onClick={() => handleValidate(selected.application_id, 'rejected')}
+                    className="flex-1 py-2 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all text-xs font-bold uppercase"
                   >
-                    {validating ? <Loader2 size={14} className="mx-auto animate-spin" /> : 'Deny Documents'}
+                    {validating ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Deny Documents'}
                   </button>
                   <button
-                    type="button"
                     disabled={!!validating}
-                    onClick={() => selected && handleValidate(selected.application_id, 'validated')}
-                    className="flex-1 rounded-xl border border-emerald-500/30 bg-emerald-500/10 py-2 text-xs font-bold uppercase text-emerald-800 transition-all hover:bg-emerald-500/15 dark:text-emerald-400"
+                    onClick={() => handleValidate(selected.application_id, 'validated')}
+                    className="flex-1 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all text-xs font-bold uppercase"
                   >
-                    {validating ? <Loader2 size={14} className="mx-auto animate-spin" /> : 'Validate & Forward'}
+                    {validating ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Validate & Forward'}
                   </button>
                 </div>
               )}
             </div>
-
-            <div className="shrink-0 border-t border-border/60 bg-muted/20 px-6 py-4">
-              <button type="button" onClick={() => setSelected(null)} className="btn-secondary w-full justify-center">
-                Close
-              </button>
+            <div className="px-6 pb-6">
+              <button onClick={() => setSelected(null)} className="btn-secondary w-full justify-center">Close</button>
             </div>
-          </DialogPremiumInner>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

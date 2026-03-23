@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import type { ServiceTicket, TicketPriority, TicketStatus } from '@/types'
-import { Search, AlertTriangle, Clock, CheckCircle, User, Loader2, Zap } from 'lucide-react'
+import { Search, AlertTriangle, Clock, CheckCircle, User, Loader2, Zap, ClipboardCheck } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { listTickets, updateTicket, logTicketEvent } from '../../lib/serviceTickets'
@@ -8,6 +8,9 @@ import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { UtilityRequirementChecklist } from '@/pages/citizen/apply-utility_request'
 
@@ -40,6 +43,9 @@ export default function ServiceTickets() {
  const [assessFindings, setAssessFindings] = useState('')
  const [assessFeasible, setAssessFeasible] = useState(true)
  const [assessQuote, setAssessQuote] = useState('')
+ const [resolveDialogOpen, setResolveDialogOpen] = useState(false)
+ const [ticketForResolve, setTicketForResolve] = useState<ServiceTicket | null>(null)
+ const [resolutionNote, setResolutionNote] = useState('')
 
  useEffect(() => {
   if (!user) return
@@ -177,9 +183,17 @@ export default function ServiceTickets() {
   }
  }
 
- const handleResolve = async (ticket: ServiceTicket) => {
-  const note = window.prompt('Enter resolution note:', '')
-  if (note === null) return
+ const openResolveDialog = (ticket: ServiceTicket) => {
+  setTicketForResolve(ticket)
+  setResolutionNote(ticket.description?.trim() || '')
+  setResolveDialogOpen(true)
+  setSelected(null)
+ }
+
+ const confirmResolve = async () => {
+  const ticket = ticketForResolve
+  if (!ticket) return
+  const note = resolutionNote.trim()
   const resolved_at = new Date().toISOString()
   setLoading(true)
   try {
@@ -199,8 +213,11 @@ export default function ServiceTickets() {
     ),
    )
    toast.success('Ticket marked as resolved.')
-  } catch (err: any) {
-   toast.error(err?.message || 'Failed to mark ticket as resolved.')
+   setResolveDialogOpen(false)
+   setTicketForResolve(null)
+   setResolutionNote('')
+  } catch (err: unknown) {
+   toast.error(err instanceof Error ? err.message : 'Failed to mark ticket as resolved.')
   } finally {
    setLoading(false)
   }
@@ -429,9 +446,10 @@ export default function ServiceTickets() {
           )}
           {selected.status === 'in_progress' && (
            <button
+            type="button"
             className="h-11 rounded-xl flex-1 px-6 text-[11px] font-extrabold uppercase tracking-widest text-white shadow-lg flex items-center justify-center transition-all bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50"
             disabled={loading}
-            onClick={() => handleResolve(selected)}
+            onClick={() => openResolveDialog(selected)}
            >
             Mark Resolved
            </button>
@@ -439,6 +457,91 @@ export default function ServiceTickets() {
          </div>
         </div>
        )}
+      </DialogContent>
+     </Dialog>
+
+     <Dialog
+      open={resolveDialogOpen}
+      onOpenChange={open => {
+       if (!open) {
+        setResolveDialogOpen(false)
+        setTicketForResolve(null)
+        setResolutionNote('')
+       }
+      }}
+     >
+      <DialogContent className="max-w-md border-border bg-card p-0 gap-0 overflow-hidden shadow-lg sm:max-w-md">
+       <div className="bg-muted/30 border-b border-border px-6 py-4">
+        <DialogHeader className="space-y-1 text-left">
+         <div className="flex items-center gap-2 text-primary">
+          <ClipboardCheck className="h-5 w-5 shrink-0" aria-hidden />
+          <DialogTitle className="font-display text-lg font-bold tracking-tight text-foreground">
+           Resolve ticket
+          </DialogTitle>
+         </div>
+         <DialogDescription className="text-sm text-muted-foreground pt-1">
+          Record what was completed on site. This note is stored on the ticket for Helpdesk and audit.
+         </DialogDescription>
+        </DialogHeader>
+       </div>
+       <div className="px-6 py-5 space-y-4">
+        {ticketForResolve && (
+         <p className="text-xs font-mono text-muted-foreground">
+          {ticketForResolve.ticket_id}
+          <span className="mx-2 text-border">·</span>
+          <span className="font-sans text-foreground">{ticketForResolve.requester_name}</span>
+         </p>
+        )}
+        <div className="space-y-2">
+         <Label htmlFor="resolution-note" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Resolution summary
+         </Label>
+         <Textarea
+          id="resolution-note"
+          value={resolutionNote}
+          onChange={e => setResolutionNote(e.target.value)}
+          placeholder="Describe work completed, parts replaced, verification done, or reason for closure…"
+          className="min-h-[120px] rounded-xl border-border/60 bg-background text-sm resize-y"
+          disabled={loading}
+         />
+         <p className="text-[11px] text-muted-foreground">
+          Defaults to the original request description; edit as needed for a clear handoff to Helpdesk.
+         </p>
+        </div>
+       </div>
+       <DialogFooter className="border-t border-border bg-muted/20 px-6 py-4 gap-2 sm:gap-2 flex-col-reverse sm:flex-row sm:justify-end">
+        <Button
+         type="button"
+         variant="outline"
+         className="w-full sm:w-auto"
+         disabled={loading}
+         onClick={() => {
+          setResolveDialogOpen(false)
+          setTicketForResolve(null)
+          setResolutionNote('')
+         }}
+        >
+         Cancel
+        </Button>
+        <Button
+         type="button"
+         className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700"
+         disabled={loading}
+         onClick={() => void confirmResolve()}
+        >
+         {loading ? (
+          <>
+           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+           Saving…
+          </>
+         ) : (
+          <>
+           <CheckCircle className="mr-2 h-4 w-4" />
+           Confirm resolution
+          </>
+         )}
+        </Button>
+       </DialogFooter>
       </DialogContent>
      </Dialog>
     </>

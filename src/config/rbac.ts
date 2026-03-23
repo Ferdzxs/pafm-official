@@ -3,7 +3,7 @@ import type { FC } from 'react'
 import {
     LayoutDashboard, Users, FileText, Building2, Calendar,
     Wrench, ClipboardList, Package, CreditCard, ShieldCheck,
-    Settings, HelpCircle, Bell, Search, ChevronRight,
+    HelpCircle, Bell, Search, ChevronRight,
     Heart, Droplets, TreePine, Home, Skull, MapPin, Receipt,
     BarChart3, UserCog, Database, Hammer,
     Ticket, CheckSquare, AlertTriangle, Eye, BookOpen,
@@ -62,8 +62,7 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'reservations', label: 'Reservations', icon: Calendar, path: '/parks/reservations', badgeKey: 'pending_park_res' },
         { id: 'usage-logs', label: 'Site Usage Logs', icon: ClipboardList, path: '/parks/usage-logs' },
         { id: 'calendar', label: 'Booking Calendar', icon: Calendar, path: '/parks/calendar' },
-        // Route to the shared Assets module (no mock parks page)
-        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/assets/requests' },
+        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/parks/asset-requests' },
     ],
     reservation_officer: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -76,13 +75,13 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'pending-approvals', label: 'Pending Approvals', icon: CheckSquare, path: '/barangay/pb/pending', badgeKey: 'pending_bar_res' },
         { id: 'facilities', label: 'Facility management', icon: Building2, path: '/barangay/pb/facilities' },
+        { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/barangay/pb/asset-requests' },
     ],
     barangay_secretary: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
         { id: 'sec-intake', label: 'Intake & availability', icon: CheckSquare, path: '/barangay/secretary/intake', badgeKey: 'barangay_intake_queue' },
         { id: 'sec-calendar', label: 'Booking calendar', icon: Calendar, path: '/barangay/secretary/calendar' },
         { id: 'sec-reservations', label: 'Reservation records', icon: Building2, path: '/barangay/secretary/reservations' },
-        { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
     ],
     utility_engineering: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -99,6 +98,7 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     cgsd_management: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+        { id: 'asset-requests', label: 'Asset Requests', icon: ClipboardList, path: '/assets/requests' },
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
         { id: 'inspections', label: 'Ocular Inspections', icon: Microscope, path: '/assets/inspections' },
         { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
@@ -106,10 +106,16 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     famcd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+        { id: 'asset-requests', label: 'Asset Requests', icon: ClipboardList, path: '/assets/requests' },
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
         { id: 'inspections', label: 'Ocular Inspections', icon: Microscope, path: '/assets/inspections' },
         { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
         { id: 'submissions', label: 'Submission Records', icon: Send, path: '/assets/submissions' },
+    ],
+    rmcd: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+        { id: 'routing', label: 'Request Routing', icon: Send, path: '/rmcd/routing' },
+        { id: 'releases', label: 'Document Releases', icon: FileCheck, path: '/rmcd/releases' },
     ],
     treasurer: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
@@ -141,13 +147,14 @@ export const ROLE_META: Record<UserRole, { label: string; color: string; bgColor
     utility_helpdesk: { label: 'Utility Helpdesk', color: '#38bdf8', bgColor: 'rgba(56,189,248,0.12)' },
     cgsd_management: { label: 'CGSD Management', color: '#f472b6', bgColor: 'rgba(244,114,182,0.12)' },
     famcd: { label: 'FAMCD', color: '#a3e635', bgColor: 'rgba(163,230,53,0.12)' },
+    rmcd: { label: 'RMCD', color: '#22c55e', bgColor: 'rgba(34,197,94,0.12)' },
     treasurer: { label: 'Treasurer Officer', color: '#fcd34d', bgColor: 'rgba(252,211,77,0.12)' },
     system_admin: { label: 'System Administrator', color: '#94a3b8', bgColor: 'rgba(148,163,184,0.12)' },
 }
 
 export {
     LayoutDashboard, Users, FileText, Building2, Calendar, Wrench,
-    ClipboardList, Package, CreditCard, ShieldCheck, Settings, HelpCircle,
+    ClipboardList, Package, CreditCard, ShieldCheck, HelpCircle,
     Search, ChevronRight, Heart, Droplets, TreePine, Home, Skull, MapPin,
     Receipt, BarChart3, UserCog, Database, Hammer, Ticket, CheckSquare,
     AlertTriangle, Eye, BookOpen, FolderOpen, DollarSign, RefreshCw,

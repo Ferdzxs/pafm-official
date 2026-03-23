@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Search, Filter, Eye, CheckCircle, XCircle, FileText, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { ROLE_META } from '@/config/rbac'
+import { AdminDeskPageShell } from '@/components/layout/AdminDeskPageShell'
 import { toast } from 'react-hot-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 
@@ -163,17 +165,18 @@ export default function ApprovalsPage() {
   fetchPendingReports()
  }
 
- return (
-  <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
-   <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-    <div>
-     <h1 className="font-display text-2xl font-bold text-foreground">Approvals</h1>
-     <p className="text-muted-foreground text-sm mt-1">
-      Review and approve/return inventory submissions and asset requests.
-     </p>
-    </div>
-   </div>
+ if (!user) return null
+ const meta = ROLE_META[user.role]
 
+ return (
+  <AdminDeskPageShell
+   roleLabel={meta.label}
+   roleColor={meta.color}
+   roleBgColor={meta.bgColor}
+   title="Approvals queue"
+   description="Review and approve or return inventory submissions pending CGSD action."
+   wide
+  >
    <Card className="mb-6 shadow-sm border-border">
     <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-card">
      <div className="relative w-full sm:w-96">
@@ -378,6 +381,6 @@ export default function ApprovalsPage() {
      </div>
     </DialogContent>
    </Dialog>
-  </div>
+  </AdminDeskPageShell>
  )
 }
