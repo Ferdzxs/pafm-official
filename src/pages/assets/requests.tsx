@@ -4,9 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
-import { Search, Filter, XCircle, Users, Building2, TreePine, Eye, CheckCircle } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
-import { toast } from 'react-hot-toast'
+import { Search, Filter, XCircle, Users, Building2, TreePine, Eye } from 'lucide-react'
 
 type AssetRequest = {
   id: string
@@ -28,7 +26,6 @@ const MOCK_REQUESTS: AssetRequest[] = [
 export default function AssetsRequestsPage() {
   const [search, setSearch] = useState('')
   const [originFilter, setOriginFilter] = useState<'All' | AssetRequest['origin']>('All')
-  const [statusFilter, setStatusFilter] = useState<'All' | AssetRequest['status']>('Pending')
   const [requests, setRequests] = useState<AssetRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedRequest, setSelectedRequest] = useState<AssetRequest | null>(null)
@@ -41,19 +38,13 @@ export default function AssetsRequestsPage() {
       .select(`
         inventory_request_id,
         property_id,
-        status,
-        inventory_scope,
-        date_requested,
-        cycle_type,
-        government_office (
-          office_name
-        ),
         property (
           property_name,
           location,
           asset_condition,
           acquisition_date
-        )
+        ),
+        government_office!requesting_office(office_name)
       `)
       .order('date_requested', { ascending: false })
 
@@ -67,7 +58,6 @@ export default function AssetsRequestsPage() {
       const origin = (row.government_office?.office_name as AssetRequest['origin']) || 'Cemetery Office'
       const statusMap: Record<string, AssetRequest['status']> = {
         pending: 'Pending',
-        approved: 'Approved',
         in_progress: 'In Progress',
         completed: 'Approved',
         rejected: 'Rejected',
@@ -76,7 +66,7 @@ export default function AssetsRequestsPage() {
         id: row.inventory_request_id,
         origin,
         item: row.inventory_scope || 'General request',
-        status: statusMap[row.status?.toLowerCase()] || 'Pending',
+        status: statusMap[row.status] || 'Pending',
         date: row.date_requested || '',
         priority: (['Low', 'Medium', 'High'] as const).includes(row.cycle_type) ? row.cycle_type : 'Medium',
       }
@@ -91,28 +81,9 @@ export default function AssetsRequestsPage() {
     loadRequests()
   }, [])
 
-  const handleUpdateStatus = async (id: string, newStatus: string) => {
-    const toastId = toast.loading(`Updating status...`)
-    const { error, data } = await supabase
-      .from('inventory_request')
-      .update({ status: newStatus })
-      .eq('inventory_request_id', id)
-      .select()
-
-    if (error || !data || data.length === 0) {
-      console.error(error)
-      toast.error('Failed to update request status. Check database constraints.', { id: toastId })
-    } else {
-      toast.success(`Request marked as ${newStatus}`, { id: toastId })
-      setSelectedRequest(null)
-      loadRequests()
-    }
-  }
-
   const filtered = useMemo(() => {
     const base = requests.filter((req) =>
-      (originFilter === 'All' ? true : req.origin === originFilter) &&
-      (statusFilter === 'All' ? true : req.status?.toLowerCase() === statusFilter.toLowerCase())
+      originFilter === 'All' ? true : req.origin === originFilter
     )
 
     if (!search.trim()) return base
@@ -123,7 +94,7 @@ export default function AssetsRequestsPage() {
       req.item.toLowerCase().includes(query) ||
       req.origin.toLowerCase().includes(query)
     )
-  }, [search, originFilter, statusFilter, requests])
+  }, [search, originFilter, requests])
 
   const stats = useMemo(() => {
     const counts = {
@@ -162,18 +133,7 @@ export default function AssetsRequestsPage() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="h-10 px-3 rounded-md border border-input bg-background/50 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Pending">Pending Only</option>
-              <option value="Approved">Approved Only</option>
-              <option value="Rejected">Rejected Only</option>
-              <option value="In Progress">In Progress</option>
-            </select>
-            <Button variant="outline" className="gap-2 flex-1 sm:flex-none" onClick={() => { setSearch(''); setOriginFilter('All'); setStatusFilter('Pending'); }}>
+            <Button variant="outline" className="gap-2 flex-1 sm:flex-none" onClick={() => setSearch('')}>
               <Filter size={16} /> Reset
             </Button>
           </div>
@@ -278,17 +238,6 @@ export default function AssetsRequestsPage() {
                   </Badge>
                 </div>
               </div>
-
-              {selectedRequest.status === 'Pending' && (
-                <div className="flex justify-end gap-3 pt-4 border-t border-border">
-                  <Button variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive" onClick={() => handleUpdateStatus(selectedRequest.id, 'rejected')}>
-                    <XCircle size={16} className="mr-2" /> Reject
-                  </Button>
-                  <Button className="bg-success text-white hover:bg-success/90" onClick={() => handleUpdateStatus(selectedRequest.id, 'approved')}>
-                    <CheckCircle size={16} className="mr-2" /> Approve
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

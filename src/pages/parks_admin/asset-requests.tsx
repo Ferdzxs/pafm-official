@@ -118,7 +118,10 @@ export default function ParksAssetRequestsPage() {
 
         const attachedDocs = Object.entries(formFiles).filter(([, f]) => f !== null)
         const docLabel = attachedDocs.map(([k]) => k === 'letter' ? 'Request Letter' : k === 'ra16' ? 'RA-16' : 'NR-15').join(', ')
-        const scopeWithDocs = formItem.trim() + (docLabel ? ` [Docs: ${docLabel}]` : '')
+        const scopeWithDocs =
+            formItem.trim() +
+            (docLabel ? ` [Docs: ${docLabel}]` : '') +
+            (formNotes.trim() ? ` [Notes: ${formNotes.trim()}]` : '')
 
         const { error } = await supabase.from('inventory_request').insert({
             inventory_request_id: reqId,

@@ -311,6 +311,8 @@ export default function CgsdOcularInspectionsPage() {
                                         ))}
                                     </div>
                                 )}
+
+
                             </div>
                         </CardContent>
                     </Card>
@@ -453,7 +455,7 @@ export default function CgsdOcularInspectionsPage() {
                                         </td>
                                         <td className="p-4">{getReportStatusBadge(item.linkedReport?.approval_status)}</td>
                                         <td className="p-4 text-right">
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedReport(item)}>
+                                            <Button variant="ghost" size="sm" onClick={() => openReview(item)}>
                                                 <Eye size={16} className="mr-2" /> Review
                                             </Button>
                                         </td>

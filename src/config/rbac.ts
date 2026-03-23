@@ -78,6 +78,7 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'pending-approvals', label: 'Pending Approvals', icon: CheckSquare, path: '/barangay/pending', badgeKey: 'pending_bar_res' },
         { id: 'ordinances', label: 'Ordinance References', icon: BookOpen, path: '/barangay/ordinances' },
         { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/barangay/asset-requests' },
+        { id: 'reports', label: 'Reports', icon: BarChart3, path: '/assets/reports' },
     ],
     barangay_secretary: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },

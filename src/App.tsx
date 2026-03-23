@@ -49,6 +49,7 @@ import ApprovalsPage from '@/pages/cgsd_management/approvals'
 import InventoryAssetsPage from '@/pages/cgsd_management/inventory-assets'
 import InventoryReportsPage from '@/pages/cgsd_management/inventory-reports'
 import OcularInspectionsPage from '@/pages/famcd/ocular-inspections'
+import CgsdOcularInspectionsPage from '@/pages/cgsd_management/ocular-inspections'
 import SubmissionsPage from '@/pages/famcd/submissions'
 import RmcdDashboard from '@/pages/rmcd/dashboard'
 import RmcdRoutingPage from '@/pages/rmcd/routing'
@@ -94,6 +95,13 @@ function SmartDashboard() {
   const { user } = useAuth()
   if (user?.role === 'barangay_secretary') return <BarangaySecretaryDashboard />
   return <DashboardPage />
+}
+
+function AssetsInspectionsRoute() {
+  const { user, isLoading } = useAuth()
+  if (isLoading) return null
+  if (user?.role === 'cgsd_management') return <CgsdOcularInspectionsPage />
+  return <OcularInspectionsPage />
 }
 
 function AppRoutes() {
@@ -208,7 +216,7 @@ function AppRoutes() {
         {/* ── Assets ── */}
         <Route path="assets/requests" element={<AssetsRequestsPage />} />
         <Route path="assets/inventory" element={<InventoryAssetsPage />} />
-        <Route path="assets/inspections" element={<OcularInspectionsPage />} />
+        <Route path="assets/inspections" element={<AssetsInspectionsRoute />} />
         <Route path="assets/reports" element={<InventoryReportsPage />} />
         <Route path="assets/approvals" element={<ApprovalsPage />} />
         <Route path="assets/submissions" element={<SubmissionsPage />} />

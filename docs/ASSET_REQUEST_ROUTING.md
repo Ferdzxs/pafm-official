@@ -2,6 +2,8 @@
 
 This document specifies **exact app routes**, **database tables and fields**, and **status transitions** for inventory-related asset requests involving **Punong Barangay**, **Cemetery Office**, **Parks Admin**, **FAMCD**, and **CGSD Management**. **RMCD** is included where the code touches the same records.
 
+**Main functions (whole flow):** the five steps in **§9** are the canonical sequence—submit → RMCD endorse (optional) → FAMCD inspection & report → CGSD approve or return → RMCD release.
+
 ---
 
 ## 1. Role → URL map (what each role opens in the browser)
@@ -177,13 +179,17 @@ There is **no** separate screen where FAMCD “sends a message” back to Punong
 
 ---
 
-## 9. One-page sequence (numbered)
+## 9. Main functions (end-to-end sequence)
+
+These five steps are the **main functions** of this workflow (to‑be / intended order). Step-by-step tables and file references are in **§4**.
 
 1. **Punong Barangay / Cemetery / Parks** submits → `inventory_request` **`pending`** (+ optional `digital_document`).
-2. **RMCD** may set **`in_progress`** on `/rmcd/routing`.
-3. **FAMCD** picks from **`pending`** on `/assets/inspections` → writes **`ocular_inspection`**, **`inventory_report`** (`pending`), sets request **`completed`**.
-4. **CGSD** approves or **`returned_for_revision`** on ocular review UI (see §8).
-5. **RMCD** marks approved report **released** on `/rmcd/releases`.
+2. **RMCD** may set **`in_progress`** on `/rmcd/routing` (endorse toward FAMCD).
+3. **FAMCD** works **`/assets/inspections`**: load queue → write **`ocular_inspection`**, **`inventory_report`** (`approval_status: pending`) → set `inventory_request` **`completed`**.
+4. **CGSD** approves (`approval_status: approved`) or returns (`returned_for_revision`) on the **ocular review** UI; vice versa, FAMCD addresses returns and resubmits (see §4 Step D, §8).
+5. **RMCD** marks CGSD-approved report **released** on `/rmcd/releases` (`approval_record`, `decision: released`).
+
+**Code note:** Step 3’s queue today filters **`pending`** only; if step 2 always runs first, align FAMCD’s query with **`in_progress`** (or skip endorsement)—see **§8**.
 
 ---
 

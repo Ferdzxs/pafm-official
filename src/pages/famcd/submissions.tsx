@@ -377,7 +377,7 @@ export default function Submissions() {
                                             )}
                                         </td>
                                         <td className="p-4 text-right">
-                                            {req.status === 'Pending' ? (
+                                            {(req.status === 'Pending' || req.status === 'In Progress') ? (
                                                 <div className="flex justify-end gap-2">
                                                     <Button
                                                         variant="outline"

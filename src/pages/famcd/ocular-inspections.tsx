@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,9 @@ export default function OcularInspectionsPage() {
     const [selectedItem, setSelectedItem] = useState<any | null>(null)
     const [inspections, setInspections] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [selectedImages, setSelectedImages] = useState<File[]>([])
+    const [isUploadingPhotos, setIsUploadingPhotos] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement | null>(null)
     
     // Form State for the Inspector
     const [newCondition, setNewCondition] = useState('Excellent')
@@ -36,7 +39,7 @@ export default function OcularInspectionsPage() {
                     acquisition_date
                 )
             `)
-            .eq('status', 'pending')
+            .in('status', ['pending', 'in_progress'])
             .order('date_requested', { ascending: false })
 
         if (error) {
@@ -64,11 +67,71 @@ export default function OcularInspectionsPage() {
         a.property?.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
+    const openFilePicker = () => fileInputRef.current?.click()
+    const handleImagesSelected = (files: FileList | null) => {
+        if (!files) {
+            setSelectedImages([])
+            return
+        }
+        setSelectedImages(Array.from(files).slice(0, 8))
+    }
+
+    const uploadImagesForInspection = async (inspectionId: string): Promise<string | null> => {
+        if (!selectedImages.length || !user) return null
+
+        let firstPublicUrl: string | null = null
+
+        for (const file of selectedImages) {
+            const ext = file.name.split('.').pop() || 'jpg'
+            const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+            const filePath = `inspection-evidence/${inspectionId}/${fileName}`
+
+            const { error: uploadError } = await supabase.storage
+                .from('inspection-evidence')
+                .upload(filePath, file)
+
+            if (uploadError) {
+                throw uploadError
+            }
+
+            const { data: urlData } = await supabase.storage
+                .from('inspection-evidence')
+                .getPublicUrl(filePath)
+
+            if (!urlData?.publicUrl) {
+                throw new Error('Unable to get public URL for uploaded photo.')
+            }
+
+            if (!firstPublicUrl) {
+                firstPublicUrl = urlData.publicUrl
+            }
+
+            const evidenceId = `EVID-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+            const employeeId = user.id?.startsWith('EMP-') ? user.id : null
+
+            const { error: insertError } = await supabase
+                .from('inspection_photo_evidence')
+                .insert({
+                    evidence_id: evidenceId,
+                    inspection_id: inspectionId,
+                    photo_url: urlData.publicUrl,
+                    description: `Uploaded by ${user.email || user.id}`,
+                    uploaded_by_employee: employeeId
+                })
+
+            if (insertError) {
+                throw insertError
+            }
+        }
+
+        return firstPublicUrl
+    }
+
     const handleSubmitReport = async () => {
         if (!selectedItem || !user) return
         
-        if (!findings.trim()) {
-            toast.error('Please enter inspection notes before submitting.')
+        if (!findings.trim() && !selectedImages.length) {
+            toast.error('Please enter inspection notes or attach at least one photo before submitting.')
             return
         }
 
@@ -85,8 +148,24 @@ export default function OcularInspectionsPage() {
                 inspection_date: new Date().toISOString().split('T')[0],
                 conducted_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 conducted_by_employee: user.id || 'EMP-004',
-                asset_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
+                physical_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
             })
+
+        // 1.5 Upload photo evidence (optional)
+        let digitalReportUrl: string | null = null
+
+        if (!inspError && selectedImages.length) {
+            setIsUploadingPhotos(true)
+            try {
+                digitalReportUrl = await uploadImagesForInspection(inspectionId)
+                toast.success('Photos uploaded successfully.')
+            } catch (err: any) {
+                console.error('Photo upload error:', err)
+                toast.error(`Photo upload failed: ${err?.message || 'Unknown error'}`)
+            } finally {
+                setIsUploadingPhotos(false)
+            }
+        }
 
         // 2. Generate the draft inventory report for CGSD
         const reportId = `IRP-${Date.now()}`
@@ -98,7 +177,8 @@ export default function OcularInspectionsPage() {
                 preparation_date: new Date().toISOString().split('T')[0],
                 prepared_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 prepared_by_employee: user.id || 'EMP-004',
-                approval_status: 'pending' // pending CGSD
+                approval_status: 'pending', // pending CGSD
+                digital_report_url: digitalReportUrl
             })
 
         // 3. Mark the inventory request as completed/forwarded
@@ -116,6 +196,7 @@ export default function OcularInspectionsPage() {
         toast.success(`Inspection Report for ${selectedItem.request_id} submitted to CGSD Approvals queue!`, { id: toastId })
         setSelectedItem(null)
         setFindings('')
+        setSelectedImages([])
         fetchPendingInspections()
     }
 
@@ -221,11 +302,30 @@ export default function OcularInspectionsPage() {
 
                             <div>
                                 <label className="text-xs font-semibold text-foreground mb-1.5 block">Photographic Evidence</label>
-                                <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
+                                <div onClick={openFilePicker} className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
                                     <Camera size={28} className="text-muted-foreground mb-2" />
                                     <div className="text-sm font-medium">Click to upload photos</div>
                                     <div className="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
                                 </div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={e => handleImagesSelected(e.target.files)}
+                                />
+                                {selectedImages.length > 0 && (
+                                    <div className="mt-3">
+                                        <span className="text-xs text-foreground">{selectedImages.length} file{selectedImages.length > 1 ? 's' : ''} selected</span>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {selectedImages.slice(0, 4).map((file, idx) => (
+                                                <span key={idx} className="px-2 py-1 text-[10px] bg-muted/40 rounded text-muted-foreground">{file.name}</span>
+                                            ))}
+                                            {selectedImages.length > 4 && <span className="text-[10px] text-muted-foreground">+{selectedImages.length - 4} more</span>}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div>
