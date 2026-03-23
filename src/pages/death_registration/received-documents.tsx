@@ -307,11 +307,11 @@ export default function ReceivedDocuments() {
                 <span className="text-xs text-slate-500 uppercase font-bold tracking-wide block mb-3">Uploaded Requirements</span>
                 <div className="space-y-2">
                   {[
-                    { label: 'Death Certificate (PSA)', url: selected.doc_death_cert_url },
-                    { label: 'Medical Certificate', url: selected.doc_medical_cert_url },
-                    { label: 'Certificate of Embalming', url: selected.doc_embalming_cert_url },
-                    { label: 'Valid ID (Next of Kin)', url: selected.doc_valid_id_url },
-                    { label: 'Proof of Relationship', url: selected.doc_proof_relationship_url },
+                    { label: 'Certificate of Death', url: selected.doc_death_cert_url },
+                    { label: 'Transfer or Entrance Permit', url: selected.doc_medical_cert_url },
+                    { label: 'Affidavit of Undertaking', url: selected.doc_embalming_cert_url },
+                    { label: 'Valid ID (Informant / Authorized Person)', url: selected.doc_valid_id_url },
+                    { label: 'Burial Form (QC Health Dept)', url: selected.doc_proof_relationship_url },
                   ].map(req => req.url ? (
                     <a
                       key={req.label}

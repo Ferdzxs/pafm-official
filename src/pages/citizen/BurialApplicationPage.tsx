@@ -18,13 +18,13 @@ export default function CitizenBurialApplicationPage() {
     const [mswdCertFile, setMswdCertFile] = useState<File | null>(null)
     const [indigentRelationshipFile, setIndigentRelationshipFile] = useState<File | null>(null)
 
-    type ReqKey = 'death_cert' | 'medical_cert' | 'embalming_cert' | 'valid_id' | 'proof_of_relationship'
+    type ReqKey = 'death_cert' | 'transfer_permit' | 'affidavit_undertaking' | 'burial_form' | 'valid_id'
     const REQUIREMENTS: { key: ReqKey; label: string; required: boolean }[] = [
-        { key: 'death_cert',          label: 'Death Certificate (PSA Form)',                        required: true },
-        { key: 'medical_cert',        label: 'Medical Certificate signed by attending physician',  required: true },
-        { key: 'embalming_cert',      label: 'Certificate of Embalming (if applicable)',            required: false },
-        { key: 'valid_id',            label: 'Valid ID of requesting party (next of kin)',          required: true },
-        { key: 'proof_of_relationship', label: 'Proof of relationship to the deceased',            required: true },
+        { key: 'death_cert',           label: 'Certified copy of Certificate of Death',                                                                                   required: true },
+        { key: 'transfer_permit',      label: 'Original Copy of Transfer or Entrance Permit (if death occurred in another city/municipality)',                             required: false },
+        { key: 'affidavit_undertaking',label: 'Affidavit of Undertaking (if remains will be interred in Bagbag or Novaliches Public Cemetery)',                           required: false },
+        { key: 'burial_form',          label: 'Burial Form from Quezon City Health Department',                                                                            required: true },
+        { key: 'valid_id',             label: 'Valid Identification Cards (IDs) of the informant/family/relative/authorized person',                                      required: true },
     ]
     const [reqFiles, setReqFiles] = useState<Partial<Record<ReqKey, File>>>({})
     const setReqFile = (key: ReqKey, file: File | undefined) =>
@@ -134,10 +134,10 @@ export default function CitizenBurialApplicationPage() {
                 application_status: 'pending',
                 is_resident: form.is_resident === 'resident',
                 doc_death_cert_url: uploadedDocs['death_cert'] ?? null,
-                doc_medical_cert_url: uploadedDocs['medical_cert'] ?? null,
-                doc_embalming_cert_url: uploadedDocs['embalming_cert'] ?? null,
+                doc_medical_cert_url: uploadedDocs['transfer_permit'] ?? null,
+                doc_embalming_cert_url: uploadedDocs['affidavit_undertaking'] ?? null,
                 doc_valid_id_url: uploadedDocs['valid_id'] ?? null,
-                doc_proof_relationship_url: uploadedDocs['proof_of_relationship'] ?? null,
+                doc_proof_relationship_url: uploadedDocs['burial_form'] ?? null,
             })
 
             if (appError) throw appError

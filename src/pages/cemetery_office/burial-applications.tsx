@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Search, Eye, CheckCircle, XCircle, Plus, Loader2, Shield } from 'lucide-react'
-import type { OnlineBurialApplication } from '@/types'
+
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { clsx } from 'clsx'
@@ -16,12 +16,22 @@ const STATUS_BADGE: Record<string, string> = {
     rejected: 'badge-rejected', 
     completed: 'badge-completed',
 }
+type ApplicationWithRelations = {
+    application_id: string
+    application_status: string
+    is_indigent?: boolean
+    person_id?: string
+    deceased_id?: string
+    submission_date?: string
+    person?: { full_name: string }
+    deceased?: { full_name: string; date_of_death: string; death_certificate_no: string }
+}
 
 export default function BurialApplications() {
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
-    const [selected, setSelected] = useState<any | null>(null)
-    const [applications, setApplications] = useState<any[]>([])
+    const [selected, setSelected] = useState<ApplicationWithRelations | null>(null)
+    const [applications, setApplications] = useState<ApplicationWithRelations[]>([])
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
@@ -73,7 +83,7 @@ export default function BurialApplications() {
             if (error) throw error
             setApplications(data || [])
         } catch (error) {
-            toast.error('Failed to fetch applications: ' + (error as any).message)
+            toast.error('Failed to fetch applications: ' + (error as Error).message)
         } finally {
             setLoading(false)
         }
@@ -92,7 +102,7 @@ export default function BurialApplications() {
             fetchApplications()
             if (selected?.application_id === id) setSelected(null)
         } catch (error) {
-            toast.error('Failed to update status: ' + (error as any).message)
+            toast.error('Failed to update status: ' + (error as Error).message)
         } finally {
             setActionLoading(null)
         }
@@ -122,8 +132,8 @@ export default function BurialApplications() {
             toast.success('Burial application created successfully')
             setShowNewModal(false)
             fetchApplications()
-        } catch (error: any) {
-            toast.error('Failed to create application: ' + error.message)
+        } catch (error) {
+            toast.error('Failed to create application: ' + (error as Error).message)
         } finally {
             setIsSaving(false)
         }
@@ -201,7 +211,7 @@ export default function BurialApplications() {
                                     <td className="px-4 py-3 text-sm font-mono text-blue-400">{app.application_id}</td>
                                     <td className="px-4 py-3 text-sm text-white">{app.person?.full_name}</td>
                                     <td className="px-4 py-3 text-sm text-slate-300">{app.deceased?.full_name}</td>
-                                    <td className="px-4 py-3 text-sm text-slate-400">{new Date(app.deceased?.date_of_death).toLocaleDateString('en-PH')}</td>
+                                    <td className="px-4 py-3 text-sm text-slate-400">{app.deceased?.date_of_death ? new Date(app.deceased.date_of_death).toLocaleDateString('en-PH') : '—'}</td>
                                     <td className="px-4 py-3 text-sm font-mono text-slate-400">{app.deceased?.death_certificate_no ?? '—'}</td>
                                     <td className="px-4 py-3">
                                         <div className="flex flex-col gap-1">
