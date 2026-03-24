@@ -1,6 +1,3 @@
-import React from 'react'
-import SettingsPage from '@/pages/SettingsPage'
-
-export default function SystemSettings() {
-  return <SettingsPage />
+export default function Placeholder() {
+  return <div>Placeholder</div>;
 }

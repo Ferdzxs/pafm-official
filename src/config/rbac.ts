@@ -105,10 +105,7 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     cgsd_management: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'requests', label: 'Asset Requests', icon: Package, path: '/assets/requests' },
-        { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
         { id: 'inspections', label: 'Inspection Findings', icon: Microscope, path: '/assets/inspections' },
-        { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
         { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/assets/approvals' },
     ],
     famcd: [

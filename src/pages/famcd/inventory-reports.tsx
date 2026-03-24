@@ -174,7 +174,7 @@ export default function FamcdInventoryReports() {
                 <div>
                     <h1 className="font-display text-2xl font-bold text-foreground">Inventory Reports</h1>
                     <p className="text-muted-foreground text-sm mt-1">
-                        Attach documents to inventory reports and submit them to CGSD for approval.
+                        View and download finalized and pending asset inventory reports.
                     </p>
                 </div>
                 <Button variant="outline" className="gap-2" onClick={loadReports}>
@@ -261,14 +261,23 @@ export default function FamcdInventoryReports() {
                                         {/* Document */}
                                         <td className="p-4">
                                             {item.digital_report_url ? (
-                                                <a
-                                                    href={item.digital_report_url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="inline-flex items-center gap-1.5 text-blue-500 underline text-xs font-medium"
-                                                >
-                                                    <Eye size={13} /> View File
-                                                </a>
+                                                <div className="flex items-center gap-2">
+                                                    <a
+                                                        href={item.digital_report_url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-blue-500 underline text-xs font-medium"
+                                                    >
+                                                        <Eye size={13} /> View
+                                                    </a>
+                                                    <a
+                                                        href={item.digital_report_url}
+                                                        download
+                                                        className="inline-flex items-center gap-1.5 text-green-600 underline text-xs font-medium"
+                                                    >
+                                                        <FileText size={13} /> Download
+                                                    </a>
+                                                </div>
                                             ) : (
                                                 <span className="text-xs text-muted-foreground italic">No file attached</span>
                                             )}

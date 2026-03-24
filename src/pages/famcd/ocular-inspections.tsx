@@ -23,6 +23,13 @@ export default function OcularInspectionsPage() {
     const [findings, setFindings] = useState('')
     const [recommendation, setRecommendation] = useState('Approve Request')
 
+    const parseScopeFields = (scope: string) => {
+        const lastCondition = scope.match(/Last Condition:\s*([^|\]]+)/i)?.[1]?.trim() || ''
+        const acquiredOn = scope.match(/Acquired On:\s*([^|\]]+)/i)?.[1]?.trim() || ''
+        const registeredArea = scope.match(/Registered Area:\s*([^|\]]+)/i)?.[1]?.trim() || ''
+        return { lastCondition, acquiredOn, registeredArea }
+    }
+
     async function fetchPendingInspections() {
         setIsLoading(true)
         // Fetch inventory requests that are pending
@@ -36,7 +43,8 @@ export default function OcularInspectionsPage() {
                     property_name,
                     location,
                     asset_condition,
-                    acquisition_date
+                    acquisition_date,
+                    area_size
                 )
             `)
             .in('status', ['pending', 'in_progress'])
@@ -139,6 +147,12 @@ export default function OcularInspectionsPage() {
         
         // 1. Create an ocular_inspection record
         const inspectionId = `INSP-${Date.now()}`
+        const scopeData = parseScopeFields(selectedItem.inventory_scope || '')
+        const registryCondition = selectedItem.property?.asset_condition || scopeData.lastCondition || 'Unknown'
+        const registryAcquiredOn = selectedItem.property?.acquisition_date || scopeData.acquiredOn || 'Unknown'
+        const registryArea = selectedItem.property?.area_size || scopeData.registeredArea || 'Unknown'
+        const physicalConditionNotes = `Registry Last Condition: ${registryCondition} | Acquired On: ${registryAcquiredOn} | Registered Area: ${registryArea} | Inspector Condition: ${newCondition} | Recommendation: ${recommendation} | Notes: ${findings}`
+
         const { error: inspError } = await supabase
             .from('ocular_inspection')
             .insert({
@@ -148,7 +162,8 @@ export default function OcularInspectionsPage() {
                 inspection_date: new Date().toISOString().split('T')[0],
                 conducted_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 conducted_by_employee: user.id || 'EMP-004',
-                physical_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
+                new_condition: newCondition,
+                physical_condition_notes: physicalConditionNotes
             })
 
         // 1.5 Upload photo evidence (optional)
@@ -242,24 +257,22 @@ export default function OcularInspectionsPage() {
                                     {selectedItem.property?.location || '-'}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Condition</label>
-                                    <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm capitalize">
-                                        <Badge variant="secondary">{selectedItem.property?.asset_condition || 'Unknown'}</Badge>
-                                    </div>
+                            <div>
+                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Known Condition</label>
+                                <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
+                                    {selectedItem.property?.asset_condition || parseScopeFields(selectedItem.inventory_scope || '').lastCondition || '-'}
                                 </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acquired On</label>
-                                    <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
-                                        {selectedItem.property?.acquisition_date || 'Unknown'}
-                                    </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acquired On</label>
+                                <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
+                                    {selectedItem.property?.acquisition_date || parseScopeFields(selectedItem.inventory_scope || '').acquiredOn || '-'}
                                 </div>
                             </div>
                             <div>
                                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registered Area</label>
                                 <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
-                                    {selectedItem.property?.area_sqm || 0} sq.m
+                                    {selectedItem.property?.area_size || parseScopeFields(selectedItem.inventory_scope || '').registeredArea || '-'}
                                 </div>
                             </div>
                         </CardContent>

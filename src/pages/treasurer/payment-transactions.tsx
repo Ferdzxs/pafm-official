@@ -1,6 +1,3 @@
-import React from 'react'
-import TreasurerTransactionsPage from '@/pages/treasurer/TransactionsPage'
-
-export default function PaymentTransactions() {
-  return <TreasurerTransactionsPage />
+export default function Placeholder() {
+  return <div>Placeholder</div>;
 }

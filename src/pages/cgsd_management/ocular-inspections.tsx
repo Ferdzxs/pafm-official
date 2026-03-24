@@ -250,6 +250,8 @@ export default function CgsdOcularInspectionsPage() {
                                 { label: 'Property / Item', value: selectedReport.property?.property_name || 'N/A: General Assessment' },
                                 { label: 'Location', value: selectedReport.property?.location || '—' },
                                 { label: 'Previous Condition', value: selectedReport.property?.asset_condition || '—' },
+                                { label: 'Acquired On', value: selectedReport.property?.acquisition_date || '—' },
+                                { label: 'Registered Area', value: selectedReport.property?.area_size || '—' },
                                 { label: 'Inspection Date', value: selectedReport.inspection_date || '—' },
                             ].map(f => (
                                 <div key={f.label} className="p-3 rounded-lg bg-muted/30 border border-border">
@@ -320,12 +322,9 @@ export default function CgsdOcularInspectionsPage() {
 
                 {/* Action Buttons */}
                 {report && report.approval_status === 'pending' && (
-                    <div className="flex justify-end gap-3 mt-6">
+                    <div className="flex justify-end mt-6">
                         <Button variant="outline" onClick={() => { setIsReturnModalOpen(true) }} className="gap-2 border-destructive text-destructive hover:bg-destructive/10">
                             <AlertTriangle size={15} /> Return for Revision
-                        </Button>
-                        <Button onClick={handleApprove} disabled={isActing} className="gap-2">
-                            <CheckCircle size={15} /> Approve Report
                         </Button>
                     </div>
                 )}

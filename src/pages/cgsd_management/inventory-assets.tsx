@@ -19,6 +19,11 @@ interface PropertyItem {
   property_type?: string
   area_size?: string
   government_office?: GovernmentOffice
+  inventory_request?: {
+    inventory_request_id?: string
+    status?: string
+    inventory_scope?: string
+  }
 }
 
 export default function InventoryAssetsPage() {
@@ -47,7 +52,8 @@ export default function InventoryAssetsPage() {
         asset_condition,
         acquisition_date,
         property_type,
-        government_office ( office_name )
+        government_office ( office_name ),
+        inventory_request ( inventory_request_id, status, inventory_scope )
       `)
       .order('property_name', { ascending: true })
 
@@ -151,9 +157,10 @@ export default function InventoryAssetsPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/50">
                   <th className="p-4 text-xs font-semibold text-muted-foreground w-1/4">Asset</th>
-                  <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Type</th>
-                  <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Condition</th>
-                  <th className="p-4 text-xs font-semibold text-muted-foreground w-1/5">Office</th>
+                  <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Type</th>
+                  <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Condition</th>
+                  <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Source Request</th>
+                  <th className="p-4 text-xs font-semibold text-muted-foreground w-1/6">Status</th>
                   <th className="p-4 text-xs font-semibold text-muted-foreground text-right">Actions</th>
                 </tr>
               </thead>
@@ -185,7 +192,13 @@ export default function InventoryAssetsPage() {
                     </td>
                     <td className={`p-4 text-sm text-foreground capitalize ${getTypeColor(property.property_type)}`}>{property.property_type || 'Unknown'}</td>
                     <td className="p-4">{property.asset_condition ? <Badge variant="secondary" className="text-[10px] uppercase">{property.asset_condition}</Badge> : <Badge variant="secondary" className="text-[10px] uppercase">Unknown</Badge>}</td>
-                    <td className="p-4 text-sm text-muted-foreground" title={property.government_office?.office_name}>{property.government_office?.office_name || 'Unassigned'}</td>
+                    <td className="p-4 text-sm text-muted-foreground" title={property.inventory_request?.inventory_request_id || ''}>
+                      {property.inventory_request?.inventory_request_id ? property.inventory_request.inventory_request_id : '—'}
+                      <div className="text-[10px] text-muted-foreground">{property.inventory_request?.inventory_scope || ''}</div>
+                    </td>
+                    <td className="p-4">
+                      {property.inventory_request?.status ? <Badge variant="secondary" className="text-[10px] uppercase">{property.inventory_request.status}</Badge> : <Badge variant="secondary" className="text-[10px] uppercase">Unlinked</Badge>}
+                    </td>
                     <td className="p-4 text-right">
                       <Button variant="ghost" size="sm" onClick={() => openPropertyModal(property)}>
                         <Eye size={16} className="mr-2" /> View

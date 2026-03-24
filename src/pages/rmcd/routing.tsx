@@ -32,7 +32,11 @@ export default function RmcdRoutingPage() {
                 property_id,
                 property!left (
                     property_name,
-                    location
+                    location,
+                    asset_condition
+                ),
+                government_office!requesting_office (
+                    office_name
                 )
             `)
             .in('status', ['pending', 'in_progress'])
@@ -165,8 +169,9 @@ export default function RmcdRoutingPage() {
                                         <td className="p-4">
                                             <div className="text-sm text-foreground font-medium">{item.property?.property_name || 'General Assessment'}</div>
                                             <div className="text-xs text-muted-foreground">{item.property?.location || '—'}</div>
+                                            <div className="text-xs text-muted-foreground mt-1">Previous: <span className="font-medium">{item.property?.asset_condition || 'Unknown'}</span></div>
                                         </td>
-                                        <td className="p-4 text-sm text-muted-foreground">{item.requesting_office || '—'}</td>
+                                        <td className="p-4 text-sm text-muted-foreground">{(item as any).government_office?.office_name || item.requesting_office || '—'}</td>
                                         <td className="p-4 text-sm text-muted-foreground">{item.date_requested || '—'}</td>
                                         <td className="p-4">
                                             {item.status === 'pending' && (

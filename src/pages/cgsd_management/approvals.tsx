@@ -20,6 +20,26 @@ export default function ApprovalsPage() {
     const [isLoading, setIsLoading] = useState(true)
 
     const [inspectionRequestIds, setInspectionRequestIds] = useState<Set<string>>(new Set())
+    const [selectedItemDocuments, setSelectedItemDocuments] = useState<any[]>([])
+
+    const openSelectedItem = async (item: any) => {
+        setSelectedItem(item)
+        if (!item) { setSelectedItemDocuments([]); return }
+
+        const requestId = item.inventory_request_id
+        const reportId = item.inventory_report_id
+        const { data, error } = await supabase
+            .from('digital_document')
+            .select('document_id, document_type, file_url, reference_no')
+            .in('reference_no', [requestId, reportId])
+
+        if (error) {
+            console.error('Error fetching attached documents:', error)
+            setSelectedItemDocuments([])
+        } else {
+            setSelectedItemDocuments(data || [])
+        }
+    }
 
     useEffect(() => {
         fetchPendingReports()
@@ -37,6 +57,7 @@ export default function ApprovalsPage() {
         setInspectionRequestIds(ocularRequestIds)
 
         // Fetch inventory reports that are pending or have been returned
+        // NOTE: Now includes BOTH formal reports AND ocular inspection reports
         const { data, error } = await supabase
             .from('inventory_report')
             .select(`
@@ -60,11 +81,8 @@ export default function ApprovalsPage() {
             console.error('Error fetching reports:', error)
             toast.error('Failed to load pending approvals.')
         } else {
-            // Exclude any report that was submitted from an ocular inspection
-            const formalOnly = (data || []).filter(
-                (r: any) => !ocularRequestIds.has(r.inventory_request_id)
-            )
-            setReports(formalOnly)
+            // Show ALL reports including ocular inspection reports
+            setReports(data || [])
         }
         setIsLoading(false)
     }
@@ -180,6 +198,7 @@ export default function ApprovalsPage() {
 
         toast.success(`Approved ${selectedItem.inventory_report_id}! Asset condition updated.`, { id: toastId })
         setSelectedItem(null)
+        setSelectedItemDocuments([])
         fetchPendingReports()
     }
 
@@ -252,6 +271,7 @@ export default function ApprovalsPage() {
         setIsRejectModalOpen(false)
         setRejectReason('')
         setSelectedItem(null)
+        setSelectedItemDocuments([])
         fetchPendingReports()
     }
 
@@ -503,7 +523,7 @@ export default function ApprovalsPage() {
                                             {item.approval_status === 'draft' && <Badge variant="secondary" className="text-[10px] uppercase">Draft</Badge>}
                                         </td>
                                         <td className="p-4 text-right">
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedItem(item)}>
+                                            <Button variant="ghost" size="sm" onClick={() => openSelectedItem(item)}>
                                                 <Eye size={16} className="mr-2" /> View
                                             </Button>
                                         </td>
@@ -525,7 +545,7 @@ export default function ApprovalsPage() {
                                     <CardTitle className="text-xl">Review Submission</CardTitle>
                                     <p className="text-sm text-muted-foreground mt-1">{selectedItem.inventory_report_id}</p>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => setSelectedItem(null)}>
+                                <Button variant="ghost" size="icon" onClick={() => { setSelectedItem(null); setSelectedItemDocuments([]); }}>
                                     <XCircle size={20} />
                                 </Button>
                             </div>
@@ -555,11 +575,20 @@ export default function ApprovalsPage() {
                             <div className="p-4 bg-accent rounded-lg border border-border text-center text-sm text-muted-foreground">
                                 <FileText size={24} className="mx-auto mb-2 opacity-50" />
                                 <div className="mb-2">Document Details</div>
-                                {selectedItem.digital_report_url ? (
-                                    <a href={selectedItem.digital_report_url} target="_blank" rel="noreferrer" className="text-blue-500 underline text-xs">View Original Report File</a>
-                                ) : (
+
+                                {selectedItemDocuments.length > 0 ? (
+                                    <div className="text-center text-xs">
+                                        {selectedItemDocuments.map((doc) => (
+                                            <div key={doc.document_id} className="mb-1">
+                                                <a href={doc.file_url} target="_blank" rel="noreferrer" className="text-blue-500 underline">
+                                                    {doc.document_type || doc.document_id} (ref: {doc.reference_no})
+                                                </a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : !selectedItem.digital_report_url ? (
                                     <span className="text-xs">No attached file in DB record.</span>
-                                )}
+                                ) : null}
                             </div>
 
                             {['pending', 'returned_for_revision'].includes(selectedItem.approval_status) && (

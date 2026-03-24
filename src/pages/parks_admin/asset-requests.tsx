@@ -34,11 +34,38 @@ export default function ParksAssetRequestsPage() {
     const [showModal, setShowModal] = useState(false)
     const [submitting, setSubmitting] = useState(false)
 
+    const [properties, setProperties] = useState<any[]>([])
+
     // New request form state
     const [formItem, setFormItem] = useState('')
+    const [formPropertyId, setFormPropertyId] = useState('')
+    const [formPreviousCondition, setFormPreviousCondition] = useState('')
+    const [formAcquiredOn, setFormAcquiredOn] = useState('')
+    const [formRegisteredArea, setFormRegisteredArea] = useState('')
     const [formPriority, setFormPriority] = useState('Medium')
     const [formNotes, setFormNotes] = useState('')
     const [formFiles, setFormFiles] = useState<Record<string, File | null>>({ letter: null, ra16: null, nr15: null })
+
+    const loadProperties = async () => {
+        const { data: officeData, error: officeErr } = await supabase
+            .from('government_office')
+            .select('office_id')
+            .eq('office_name', OFFICE_NAME)
+            .maybeSingle()
+
+        if (officeErr || !officeData) {
+            console.error('Failed to load office for property filter', officeErr)
+            setProperties([])
+            return
+        }
+
+        const { data } = await supabase
+            .from('property')
+            .select('property_id, property_name, location, asset_condition, acquisition_date, area_size')
+            .eq('managing_office', officeData.office_id)
+            .order('property_name', { ascending: true })
+        setProperties(data || [])
+    }
 
     const load = async () => {
         setIsLoading(true)
@@ -82,7 +109,10 @@ export default function ParksAssetRequestsPage() {
         setIsLoading(false)
     }
 
-    useEffect(() => { load() }, [])
+    useEffect(() => { 
+        load()
+        loadProperties()
+    }, [])
 
     const filtered = useMemo(() => {
         if (!search.trim()) return requests
@@ -96,9 +126,40 @@ export default function ParksAssetRequestsPage() {
         Rejected: requests.filter(r => r.status === 'Rejected').length,
     }), [requests])
 
+    const allowedFileTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'image/jpeg',
+        'image/png',
+    ]
+
+    const isValidFile = (file: File) => {
+        const extension = file.name.split('.').pop()?.toLowerCase() || ''
+        const allowedExtensions = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png']
+        if (allowedFileTypes.includes(file.type)) return true
+        if (allowedExtensions.includes(extension)) return true
+        return false
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!formItem.trim()) { toast.error('Please enter an item or service.'); return }
+        if (!formPropertyId) { toast.error('Please select a target property.'); return }
+
+        if (!formFiles['ra16'] && !formFiles['nr15']) {
+            toast.error('Please attach either Land Assessment Form (RA-16) or Building / Structure Form (NR-15).')
+            return
+        }
+
+        const filesToValidate = Object.entries(formFiles).filter(([, file]) => file)
+        for (const [, file] of filesToValidate) {
+            if (file && !isValidFile(file)) {
+                toast.error('One or more attached files are not a permitted format. Allowed: PDF, DOC, DOCX, JPG, PNG.')
+                return
+            }
+        }
+
         setSubmitting(true)
 
         const { data: officeData, error: officeErr } = await supabase
@@ -118,10 +179,12 @@ export default function ParksAssetRequestsPage() {
 
         const attachedDocs = Object.entries(formFiles).filter(([, f]) => f !== null)
         const docLabel = attachedDocs.map(([k]) => k === 'letter' ? 'Request Letter' : k === 'ra16' ? 'RA-16' : 'NR-15').join(', ')
-        const scopeWithDocs =
-            formItem.trim() +
-            (docLabel ? ` [Docs: ${docLabel}]` : '') +
-            (formNotes.trim() ? ` [Notes: ${formNotes.trim()}]` : '')
+        const extraInfo = [
+            formPreviousCondition && `Last Condition: ${formPreviousCondition}`,
+            formAcquiredOn && `Acquired On: ${formAcquiredOn}`,
+            formRegisteredArea && `Registered Area: ${formRegisteredArea}`
+        ].filter(Boolean).join(' | ')
+        const scopeWithDocs = formItem.trim() + (docLabel ? ` [Docs: ${docLabel}]` : '') + (extraInfo ? ` [${extraInfo}]` : '')
 
         const { error } = await supabase.from('inventory_request').insert({
             inventory_request_id: reqId,
@@ -130,6 +193,7 @@ export default function ParksAssetRequestsPage() {
             status: 'pending',
             date_requested: today,
             cycle_type: formPriority,
+            property_id: formPropertyId,
         })
 
         if (error) {
@@ -165,9 +229,13 @@ export default function ParksAssetRequestsPage() {
                     }
                 })
             )
-            toast.success('Request submitted to FAMCD!')
+            toast.success('Request submitted to RMCD!')
             setShowModal(false)
             setFormItem('')
+            setFormPropertyId('')
+            setFormPreviousCondition('')
+            setFormAcquiredOn('')
+            setFormRegisteredArea('')
             setFormPriority('Medium')
             setFormNotes('')
             setFormFiles({ letter: null, ra16: null, nr15: null })
@@ -319,6 +387,69 @@ export default function ParksAssetRequestsPage() {
                                 />
                             </div>
                             <div>
+                                <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Target Property *</label>
+                                <select
+                                    className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500"
+                                    style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                                    value={formPropertyId}
+                                    onChange={e => {
+                                        const val = e.target.value
+                                        setFormPropertyId(val)
+                                        const selected = properties.find(p => p.property_id === val)
+                                        setFormPreviousCondition(selected?.asset_condition || '')
+                                        setFormAcquiredOn(selected?.acquisition_date || '')
+                                        setFormRegisteredArea(selected?.area_size || '')
+                                    }}
+                                    required
+                                >
+                                    <option value="">—— Select a property ——</option>
+                                    {properties.map(p => (
+                                        <option key={p.property_id} value={p.property_id}>
+                                            {p.property_name} ({p.location || 'No location'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Last Known Condition</label>
+                                    <select
+                                        className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500"
+                                        style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                                        value={formPreviousCondition}
+                                        onChange={e => setFormPreviousCondition(e.target.value)}
+                                    >
+                                        <option value="">Select condition</option>
+                                        <option value="Excellent">Excellent</option>
+                                        <option value="Good">Good</option>
+                                        <option value="Fair">Fair</option>
+                                        <option value="Poor">Poor</option>
+                                        <option value="Condemned / Beyond Repair">Condemned / Beyond Repair</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Acquired On</label>
+                                    <input
+                                        type="date"
+                                        className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500"
+                                        style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                                        value={formAcquiredOn}
+                                        onChange={e => setFormAcquiredOn(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Registered Area</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500"
+                                        style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                                        value={formRegisteredArea}
+                                        onChange={e => setFormRegisteredArea(e.target.value)}
+                                        placeholder="e.g. 2,100 sqm"
+                                    />
+                                </div>
+                            </div>
+                            <div>
                                 <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Priority</label>
                                 <select
                                     className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500"
@@ -344,7 +475,7 @@ export default function ParksAssetRequestsPage() {
                             </div>
                             {/* DOCUMENT ATTACHMENTS */}
                             <div>
-                                <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--color-text-muted)' }}>Supporting Documents <span className="font-normal">(optional)</span></label>
+                                <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--color-text-muted)' }}>Supporting Documents <span className="font-normal">(Request Letter optional; RA-16 & NR-15 required)</span></label>
                                 <div className="space-y-2">
                                     {[
                                         { key: 'letter', label: 'Request Letter', hint: 'QCG-GSD-FAIS-IRL' },
@@ -364,7 +495,14 @@ export default function ParksAssetRequestsPage() {
                                             <label className="cursor-pointer px-2.5 py-1 rounded-lg text-xs font-semibold flex-shrink-0" style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
                                                 Browse
                                                 <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" className="hidden"
-                                                    onChange={e => setFormFiles(prev => ({ ...prev, [doc.key]: e.target.files?.[0] ?? null }))}
+                                                    onChange={e => {
+                                                        const file = e.target.files?.[0] ?? null
+                                                        if (file && !isValidFile(file)) {
+                                                            toast.error('Invalid file type. Supported: PDF, DOC, DOCX, JPG, PNG.')
+                                                            return
+                                                        }
+                                                        setFormFiles(prev => ({ ...prev, [doc.key]: file }))
+                                                    }}
                                                 />
                                             </label>
                                         </div>

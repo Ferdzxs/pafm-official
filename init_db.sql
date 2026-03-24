@@ -1139,19 +1139,6 @@ INSERT INTO submission_record VALUES
 ('SUB-002','IRP-001','FAMCD Office','2024-01-30','EMP-007',NULL),
 ('SUB-003','IRP-002','Barangay Captain''s Office','2024-02-25','EMP-004',NULL);
 
-
-CREATE TABLE public.inspection_photo_evidence (
-  evidence_id text NOT NULL,
-  inspection_id text NOT NULL,
-  photo_url text NOT NULL,
-  description text,
-  uploaded_at timestamp with time zone DEFAULT now(),
-  uploaded_by_employee text,
-  CONSTRAINT inspection_photo_evidence_pkey PRIMARY KEY (evidence_id),
-  CONSTRAINT inspection_photo_evidence_inspection_id_fkey FOREIGN KEY (inspection_id) REFERENCES public.ocular_inspection(inspection_id),
-  CONSTRAINT inspection_photo_evidence_uploaded_by_employee_fkey FOREIGN KEY (uploaded_by_employee) REFERENCES public.employee(employee_id)
-);
-
 -- ══════════════════════════════════════════════════════════════════════
 -- ENABLE RLS + OPEN POLICIES ON ALL NEW TABLES
 -- ══════════════════════════════════════════════════════════════════════
