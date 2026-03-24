@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
- Search, Eye, Loader2, Download, ScrollText,
+ Search, Eye, Loader2, ScrollText,
  MapPin, Calendar, Building2, X, CheckCircle, AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -73,40 +73,6 @@ export default function BurialRecords() {
  const totalPages = Math.ceil(filtered.length / itemsPerPage)
  const paginatedItems = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
- function exportToCSV() {
- if (records.length === 0) {
-  toast.error('No data to export')
-  return
- }
-
- const headers = ['Burial ID', 'Deceased Name', 'Burial Date', 'Cemetery', 'Niche Number', 'Funeral Home', 'Indigent Assistance', 'Payment Amount', 'Payment Status']
- const csvRows = records.map(r => {
-  return [
-  r.burial_id,
-  `"${r.deceased?.full_name ?? ''}"`,
-  r.burial_date,
-  `"${r.cemetery?.cemetery_name ?? ''}"`,
-  `"${r.niche_record?.niche_number ?? ''}"`,
-  `"${r.funeral_home?.name ?? ''}"`,
-  r.indigent_assistance_record?.status === 'approved' ? 'YES' : 'NO',
-  r.digital_payment?.amount_paid ?? 0,
-  r.digital_payment?.payment_status ?? 'pending'
-  ].join(',')
- })
-
- const csvContent = [headers.join(','), ...csvRows].join('\n')
- const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
- const url = URL.createObjectURL(blob)
- const link = document.createElement('a')
- link.setAttribute('href', url)
- link.setAttribute('download', `burial_records_${new Date().toISOString().split('T')[0]}.csv`)
- link.style.visibility = 'hidden'
- document.body.appendChild(link)
- link.click()
- document.body.removeChild(link)
- toast.success('Records exported to CSV')
- }
-
  return (
  <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in text-white">
   {/* Header */}
@@ -117,12 +83,7 @@ export default function BurialRecords() {
    </h1>
    <p className="text-muted-foreground text-sm mt-0.5">Official interment logs — Quezon City Public Cemeteries</p>
   </div>
-  <button 
-   onClick={exportToCSV}
-   className="btn-secondary flex items-center gap-2 self-start sm:self-auto"
-  >
-   <Download size={15} /> Export
-  </button>
+  
   </div>
 
   {/* Stats */}

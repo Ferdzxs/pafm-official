@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FileBarChart, Download, Calendar, Filter, Loader2, PieChart as PieChartIcon } from 'lucide-react'
+import { FileBarChart, Calendar, Filter, Loader2, PieChart as PieChartIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -55,29 +55,6 @@ export default function CemeteryReports() {
   }
  }
 
- function exportReport() {
-  const content = `
-Quezon City Cemetery Operational Report
-Period: ${dateRange.start} to ${dateRange.end}
-
-Niche Occupancy Distribution:
-${reportData.nicheStatus.map(s => `${s.name}: ${s.value}`).join('\n')}
-
-Application Status Summary:
-${reportData.applicationStatus.map(s => `${s.name}: ${s.value}`).join('\n')}
-
-Report Generated: ${new Date().toLocaleString()}
-  `.trim()
-
-  const blob = new Blob([content], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `cemetery_report_${dateRange.start}_to_${dateRange.end}.txt`
-  link.click()
-  toast.success('Report exported as TXT')
- }
-
  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
  return (
@@ -113,12 +90,7 @@ Report Generated: ${new Date().toLocaleString()}
        <Calendar size={15} /> {showDatePicker ? 'Close' : 'Date Range'}
       </button>
      </div>
-     <button 
-      onClick={exportReport}
-      className="gradient-primary px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"
-     >
-      <Download size={15} /> Export Report
-     </button>
+     
     </div>
    </div>
 

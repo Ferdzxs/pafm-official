@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
- Search, User, Eye, Loader2, Download, BookOpen,
+ Search, User, Eye, Loader2, BookOpen,
  Calendar, FileText, MapPin, X, ChevronsUpDown, AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -95,40 +95,6 @@ export default function DeceasedRegistry() {
  else { setSortField(field); setSortAsc(true) }
  }
 
- function exportToCSV() {
- if (deceasedList.length === 0) {
-  toast.error('No data to export')
-  return
- }
-
- const headers = ['Deceased ID', 'Full Name', 'Date of Death', 'Place of Death', 'Death Certificate No', 'Burial Date', 'Cemetery', 'Niche Number']
- const csvRows = deceasedList.map(d => {
-  const burial = d.burial_record?.[0]
-  return [
-  d.deceased_id,
-  `"${d.full_name}"`,
-  d.date_of_death,
-  `"${d.place_of_death ?? ''}"`,
-  `"${d.death_certificate_no ?? ''}"`,
-  burial?.burial_date ?? '',
-  `"${burial?.cemetery?.cemetery_name ?? ''}"`,
-  `"${burial?.niche_record?.niche_number ?? ''}"`
-  ].join(',')
- })
-
- const csvContent = [headers.join(','), ...csvRows].join('\n')
- const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
- const url = URL.createObjectURL(blob)
- const link = document.createElement('a')
- link.setAttribute('href', url)
- link.setAttribute('download', `deceased_registry_${new Date().toISOString().split('T')[0]}.csv`)
- link.style.visibility = 'hidden'
- document.body.appendChild(link)
- link.click()
- document.body.removeChild(link)
- toast.success('Registry exported to CSV')
- }
-
  return (
  <div className="px-4 py-4 sm:px-6 lg:px-8 animate-fade-in text-white">
   {/* Header */}
@@ -139,12 +105,7 @@ export default function DeceasedRegistry() {
    </h1>
    <p className="text-muted-foreground text-sm mt-0.5">Official record of interred individuals — Quezon City Cemetery Division</p>
   </div>
-  <button 
-   onClick={exportToCSV}
-   className="btn-secondary flex items-center gap-2 self-start sm:self-auto"
-  >
-   <Download size={15} /> Export CSV
-  </button>
+  
   </div>
 
   {/* Stats */}

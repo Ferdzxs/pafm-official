@@ -271,11 +271,11 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar, onCloseSidebar }: To
                   className="flex items-center gap-3 px-3.5 py-2.5 text-[11px] font-bold text-foreground/70 hover:text-primary hover:bg-primary/5 rounded-lg transition-all group"
                   onClick={() => setShowUser(false)}
                 >
-                  <User size={15} className="group-hover:scale-110 transition-transform text-muted-foreground group-hover:text-primary" /> 
+                  <User size={15} className="group-hover:scale-110 transition-transform text-muted-foreground group-hover:text-primary" />
                   <span className="tracking-wide">MY ACCOUNT</span>
                 </NavLink>
                 <div className="h-px bg-border/50 my-1 mx-2" />
-                
+
                 <button
                   onClick={() => {
                     logout();
@@ -283,7 +283,7 @@ export function TopBar({ sidebarCollapsed, onToggleSidebar, onCloseSidebar }: To
                   }}
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 text-[11px] font-bold text-red-500 hover:bg-red-500/5 rounded-lg transition-all group"
                 >
-                  <LogOut size={15} className="group-hover:translate-x-1 transition-transform" /> 
+                  <LogOut size={15} className="group-hover:translate-x-1 transition-transform" />
                   <span className="tracking-wide uppercase">Sign Out</span>
                 </button>
               </div>
@@ -466,7 +466,7 @@ export default function Sidebar({ collapsed, onCloseSidebar }: SidebarProps) {
               className="text-xs leading-snug"
               style={{ color: "var(--color-sidebar-sub)" }}
             >
-             
+
             </div>
           </div>
         )}

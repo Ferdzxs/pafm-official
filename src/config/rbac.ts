@@ -30,7 +30,6 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
         { id: 'burial-records', label: 'Burial Records', icon: BookOpen, path: '/burial/records' },
         { id: 'indigent', label: 'Indigent Assistance', icon: Heart, path: '/burial/indigent' },
         { id: 'payments', label: 'Payments & Permits', icon: CreditCard, path: '/payments' },
-        { id: 'reports', label: 'Reports', icon: BarChart3, path: '/reports' },
         { id: 'asset-requests', label: 'Asset Requests', icon: Package, path: '/burial/asset-requests' },
     ],
     ssdd: [

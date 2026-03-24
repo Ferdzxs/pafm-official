@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import {
  Search, Filter, User, MapPin, Phone, Loader2, ArrowRight,
  ShieldCheck, X, Users, CheckCircle, AlertCircle, Calendar,
- ChevronDown, CreditCard, Download
+ ChevronDown, CreditCard
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent } from '@/components/ui/card'
@@ -105,9 +105,7 @@ export default function CitizenRecords() {
    </h1>
    <p className="text-muted-foreground text-sm mt-0.5">SSDD centralized database of Quezon City residents</p>
   </div>
-  <button className="btn-secondary flex items-center gap-2 self-start sm:self-auto">
-   <Download size={15} /> Export
-  </button>
+  
   </div>
 
   {/* Stats */}

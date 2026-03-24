@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Search, Filter, Download, FileText, Calendar, Eye } from 'lucide-react'
+import { Search, Filter, FileText, Calendar, Eye } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/contexts/AuthContext'
@@ -86,11 +86,7 @@ export default function InventoryReportsPage() {
       title="Inventory reports"
       description="View and download finalized and pending asset inventory reports."
       wide
-      actions={
-        <Button variant="outline" size="sm" className="gap-2" type="button">
-          <Download size={16} /> Export all
-        </Button>
-      }
+      actions={null}
     >
       <Card className="mb-6 shadow-sm border-border">
         <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-card">

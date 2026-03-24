@@ -11,14 +11,14 @@ const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Fraunces:it
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const navigate  = useNavigate()
+  const navigate = useNavigate()
 
-  const [email,    setEmail]    = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPw,   setShowPw]   = useState(false)
-  const [error,    setError]    = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [ready,    setReady]    = useState(false)
+  const [showPw, setShowPw] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setReady(true))
@@ -47,15 +47,15 @@ export default function LoginPage() {
           {/* watermark seal */}
           <div className="h-seal">
             <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="60" cy="60" r="55" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3"/>
-              <circle cx="60" cy="60" r="42" stroke="currentColor" strokeWidth="1"/>
-              <circle cx="60" cy="60" r="3" fill="currentColor"/>
-              {Array.from({length:12}).map((_,i)=>{
-                const a=(i/12)*Math.PI*2
+              <circle cx="60" cy="60" r="55" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" />
+              <circle cx="60" cy="60" r="42" stroke="currentColor" strokeWidth="1" />
+              <circle cx="60" cy="60" r="3" fill="currentColor" />
+              {Array.from({ length: 12 }).map((_, i) => {
+                const a = (i / 12) * Math.PI * 2
                 return <line key={i}
-                  x1={60+Math.cos(a)*44} y1={60+Math.sin(a)*44}
-                  x2={60+Math.cos(a)*54} y2={60+Math.sin(a)*54}
-                  stroke="currentColor" strokeWidth="1.2"/>
+                  x1={60 + Math.cos(a) * 44} y1={60 + Math.sin(a) * 44}
+                  x2={60 + Math.cos(a) * 54} y2={60 + Math.sin(a) * 54}
+                  stroke="currentColor" strokeWidth="1.2" />
               })}
               <text x="60" y="57" textAnchor="middle" fontSize="9" fontWeight="700"
                 fill="currentColor" fontFamily="Plus Jakarta Sans,sans-serif" letterSpacing="2">PAFM</text>
@@ -67,7 +67,6 @@ export default function LoginPage() {
           {/* wordmark */}
           <div className="h-top">
             <div className="h-wm">
-              <span className="h-mono">BPM</span>
               <div>
                 <div className="h-wname">PAFM System</div>
                 <div className="h-wsub">Public Assets &amp; Facilities Management</div>
@@ -78,11 +77,11 @@ export default function LoginPage() {
           {/* hero body */}
           <div className="h-body">
             <div className="h-kicker">
-              <span className="h-dot"/>
+              <span className="h-dot" />
               Official Government Platform
             </div>
             <h1 className="h-hl">
-              Managing public<br/>assets <em>with precision.</em>
+              Managing public<br />assets <em>with precision.</em>
             </h1>
             <p className="h-para">
               A unified platform for government staff and barangay administrators
@@ -91,16 +90,16 @@ export default function LoginPage() {
             </p>
             <ul className="h-list">
               {[
-                ['Cemetery &amp; burial services','Secure processing of interment requests'],
-                ['Parks &amp; venue reservations','Streamlined booking for public facilities'],
-                ['Barangay administration','Document workflows and coordination'],
-                ['Utility service requests','Centralised tracking and assignment'],
-              ].map(([t,d])=>(
+                ['Cemetery &amp; burial services', 'Secure processing of interment requests'],
+                ['Parks &amp; venue reservations', 'Streamlined booking for public facilities'],
+                ['Barangay administration', 'Document workflows and coordination'],
+                ['Utility service requests', 'Centralised tracking and assignment'],
+              ].map(([t, d]) => (
                 <li key={t} className="h-item">
-                  <CheckCircle size={13} className="h-chk"/>
+                  <CheckCircle size={13} className="h-chk" />
                   <span>
-                    <strong dangerouslySetInnerHTML={{__html:t}}/>
-                    <span className="h-desc"> — <span dangerouslySetInnerHTML={{__html:d}}/></span>
+                    <strong dangerouslySetInnerHTML={{ __html: t }} />
+                    <span className="h-desc"> — <span dangerouslySetInnerHTML={{ __html: d }} /></span>
                   </span>
                 </li>
               ))}
@@ -109,12 +108,12 @@ export default function LoginPage() {
 
           {/* foot */}
           <div className="h-foot">
-            <Shield size={11}/>
+            <Shield size={11} />
             <span>Protected by end-to-end encryption · ISO/IEC 27001</span>
           </div>
 
           {/* right-edge separator */}
-          <div className="h-edge"/>
+          <div className="h-edge" />
         </aside>
 
         {/* ══════════ RIGHT / MAIN PANEL ══════════ */}
@@ -133,7 +132,7 @@ export default function LoginPage() {
           <div className="lp-card">
 
             <div className="c-head">
-              <div className="c-badge"><Shield size={10}/> Secure Sign-In</div>
+              <div className="c-badge"><Shield size={10} /> Secure Sign-In</div>
               <h2 className="c-title">Welcome back</h2>
               <p className="c-sub">
                 Enter your credentials to access your dashboard. Utility, treasury, and parks modules share one audit-friendly sign-in experience.
@@ -144,49 +143,49 @@ export default function LoginPage() {
 
               <div className="lp-field">
                 <label className="lp-lbl">
-                  <Mail size={12} className="lp-lbl-i"/> Email Address
+                  <Mail size={12} className="lp-lbl-i" /> Email Address
                 </label>
                 <input
                   type="email" className="lp-inp"
                   placeholder="you@bpm.gov.ph"
-                  value={email} onChange={e=>setEmail(e.target.value)}
+                  value={email} onChange={e => setEmail(e.target.value)}
                   required autoFocus autoComplete="email"
                 />
               </div>
 
               <div className="lp-field">
                 <label className="lp-lbl">
-                  <Lock size={12} className="lp-lbl-i"/> Password
+                  <Lock size={12} className="lp-lbl-i" /> Password
                 </label>
                 <div className="lp-iw">
                   <input
-                    type={showPw?'text':'password'} className="lp-inp lp-inp--pr"
+                    type={showPw ? 'text' : 'password'} className="lp-inp lp-inp--pr"
                     placeholder="Enter your password"
-                    value={password} onChange={e=>setPassword(e.target.value)}
+                    value={password} onChange={e => setPassword(e.target.value)}
                     required autoComplete="current-password"
                   />
                   <button type="button" className="lp-eye"
-                    onClick={()=>setShowPw(v=>!v)} aria-label="Toggle password">
-                    {showPw ? <EyeOff size={14}/> : <Eye size={14}/>}
+                    onClick={() => setShowPw(v => !v)} aria-label="Toggle password">
+                    {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
               </div>
 
               {error && (
                 <div className="lp-err" role="alert">
-                  <AlertCircle size={13}/><span>{error}</span>
+                  <AlertCircle size={13} /><span>{error}</span>
                 </div>
               )}
 
               <button type="submit" className="lp-submit" disabled={loading}>
                 {loading
-                  ? <><Loader2 size={14} className="lp-spin"/><span>Signing in…</span></>
+                  ? <><Loader2 size={14} className="lp-spin" /><span>Signing in…</span></>
                   : <span>Sign In to Dashboard</span>
                 }
               </button>
             </form>
 
-            <div className="lp-sep"><span/><small>or</small><span/></div>
+            <div className="lp-sep"><span /><small>or</small><span /></div>
 
             {/* Signup → external */}
             <a href="https://cies-bpm.netlify.app/auth"
@@ -196,7 +195,7 @@ export default function LoginPage() {
                 <span className="lp-cta-l">New citizen account</span>
                 <span className="lp-cta-s">Register at the Citizen Portal</span>
               </span>
-              <ArrowUpRight size={15} className="lp-cta-i"/>
+              <ArrowUpRight size={15} className="lp-cta-i" />
             </a>
 
           </div>{/* /lp-card */}

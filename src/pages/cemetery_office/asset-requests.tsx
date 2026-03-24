@@ -5,6 +5,14 @@ import { toast } from 'react-hot-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { AdminDeskPageShell } from '@/components/layout/AdminDeskPageShell'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '@/components/ui/dialog'
 
 type RequestRow = {
     id: string
@@ -294,23 +302,32 @@ export default function CemeteryAssetRequestsPage() {
         </AdminDeskPageShell>
 
         {/* NEW REQUEST MODAL */}
-        {showModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-2xl shadow-xl p-6 space-y-5 bg-card border border-border">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>New Asset Request</h2>
-                                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Submitting to FAMCD — Cemetery Office</p>
+        <Dialog open={showModal} onOpenChange={(open) => !open && setShowModal(false)}>
+            <DialogContent className="max-w-md p-0 overflow-hidden border-none bg-transparent shadow-none max-h-[92vh]">
+                <div className="card-premium mx-auto w-full animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto sidebar-scrollbar">
+                    <DialogHeader className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border border-border bg-muted/40 text-muted-foreground">Asset Request</span>
+                                <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/20">Cemetery Office</span>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
-                                <XCircle size={20} style={{ color: 'var(--color-text-muted)' }} />
+                            <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors" type="button">
+                                <XCircle size={18} className="text-muted-foreground" />
                             </button>
                         </div>
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <DialogTitle className="font-display text-2xl font-extrabold tracking-tight text-foreground leading-tight">
+                            New Asset Request
+                        </DialogTitle>
+                        <DialogDescription className="font-medium text-muted-foreground/80 mt-1">
+                            Submitting to FAMCD - Cemetery office workflow.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Item / Service Requested *</label>
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">Item / Service Requested *</label>
                                 <input
-                                    className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full px-3 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/50"
                                     style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
                                     placeholder="e.g. Lawnmower Parts, Grave Digging Equipment Maintenance"
                                     value={formItem}
@@ -319,9 +336,9 @@ export default function CemeteryAssetRequestsPage() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Priority</label>
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">Priority</label>
                                 <select
-                                    className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full px-3 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/50"
                                     style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
                                     value={formPriority}
                                     onChange={e => setFormPriority(e.target.value)}
@@ -332,9 +349,9 @@ export default function CemeteryAssetRequestsPage() {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-semibold block mb-1" style={{ color: 'var(--color-text-muted)' }}>Notes (optional)</label>
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">Notes (optional)</label>
                                 <textarea
-                                    className="w-full px-3 py-2 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                    className="w-full px-3 py-2.5 rounded-xl text-sm border border-border bg-background text-foreground outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                                     style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
                                     placeholder="Additional context for FAMCD..."
                                     rows={3}
@@ -343,8 +360,8 @@ export default function CemeteryAssetRequestsPage() {
                                 />
                             </div>
                             {/* DOCUMENT ATTACHMENTS */}
-                            <div>
-                                <label className="text-xs font-semibold block mb-2" style={{ color: 'var(--color-text-muted)' }}>Supporting Documents <span className="font-normal">(optional)</span></label>
+                            <div className="admin-box">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground block mb-2">Supporting Documents <span className="font-normal normal-case tracking-normal">(optional)</span></label>
                                 <div className="space-y-2">
                                     {[
                                         { key: 'letter', label: 'Request Letter', hint: 'QCG-GSD-FAIS-IRL' },
@@ -372,22 +389,22 @@ export default function CemeteryAssetRequestsPage() {
                                 </div>
                                 <p className="text-[10px] mt-1.5" style={{ color: 'var(--color-text-muted)' }}>Accepted: PDF, Word, JPG, PNG</p>
                             </div>
-                            <div className="flex justify-end gap-3 pt-2">
+                            <DialogFooter className="mt-8 pt-6 border-t border-border/10 flex items-center justify-end gap-3">
                                 <button type="button" onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 rounded-xl text-sm font-medium border hover:bg-muted transition-colors"
+                                    className="h-11 rounded-xl px-6 text-[11px] font-extrabold uppercase tracking-widest border border-border bg-background text-foreground hover:bg-muted transition-all"
                                     style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
                                     Cancel
                                 </button>
                                 <button type="submit" disabled={submitting}
-                                    className="px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-60"
+                                    className="h-11 rounded-xl px-6 text-[11px] font-extrabold uppercase tracking-widest text-white flex items-center gap-2 disabled:opacity-60 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transition-all"
                                     style={{ background: '#2563eb', color: '#fff' }}>
                                     <Send size={15} /> {submitting ? 'Submitting...' : 'Submit to FAMCD'}
                                 </button>
-                            </div>
+                            </DialogFooter>
                         </form>
                 </div>
-            </div>
-        )}
+            </DialogContent>
+        </Dialog>
         </>
     )
 }

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Filter, Eye, CheckCircle, XCircle, FileText, AlertTriangle, Printer } from 'lucide-react'
+import { Search, Filter, Eye, CheckCircle, XCircle, FileText, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
@@ -257,174 +257,6 @@ export default function ApprovalsPage() {
         fetchPendingReports()
     }
 
-    const handleGenerateCOAReport = (item: any) => {
-        const reportHtml = `
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>COA Property Inventory Form</title>
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                        font-size: 12px;
-                        line-height: 1.5;
-                        color: #000;
-                        margin: 0;
-                        padding: 20px;
-                    }
-                    .header {
-                        text-align: center;
-                        margin-bottom: 30px;
-                    }
-                    .header h1 {
-                        font-size: 16px;
-                        margin: 0 0 5px 0;
-                        font-weight: bold;
-                    }
-                    .header h2 {
-                        font-size: 14px;
-                        margin: 0 0 5px 0;
-                        font-weight: normal;
-                    }
-                    .header h3 {
-                        font-size: 14px;
-                        margin: 0;
-                        font-weight: bold;
-                    }
-                    .meta-info {
-                        display: flex;
-                        justify-content: space-between;
-                        margin-bottom: 20px;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 30px;
-                    }
-                    th, td {
-                        border: 1px solid #000;
-                        padding: 8px;
-                        text-align: left;
-                    }
-                    th {
-                        background-color: #f2f2f2;
-                        font-weight: bold;
-                        text-align: center;
-                    }
-                    .signatures {
-                        display: flex;
-                        justify-content: space-between;
-                        margin-top: 50px;
-                    }
-                    .signature-block {
-                        width: 45%;
-                        text-align: center;
-                    }
-                    .signature-line {
-                        border-top: 1px solid #000;
-                        margin-top: 40px;
-                        padding-top: 5px;
-                        font-weight: bold;
-                    }
-                    .footer {
-                        margin-top: 50px;
-                        font-size: 10px;
-                        text-align: left;
-                        font-style: italic;
-                    }
-                    @media print {
-                        body {
-                            padding: 0;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h2>Republic of the Philippines</h2>
-                    <h2>Quezon City Government</h2>
-                    <h3>CITY GENERAL SERVICES DEPARTMENT</h3>
-                    <br/>
-                    <h1>REPORT ON THE PHYSICAL COUNT OF INVENTORIES</h1>
-                </div>
-
-                <div class="meta-info">
-                    <div>
-                        <strong>Report ID:</strong> \${item.inventory_report_id}<br/>
-                        <strong>Scope:</strong> \${item.inventory_request?.inventory_scope || 'General Asset Inventory'}<br/>
-                        <strong>Prepared By (Office):</strong> \${item.government_office?.office_name || 'System'}
-                    </div>
-                    <div>
-                        <strong>Date Prepared:</strong> \${item.preparation_date || new Date().toLocaleDateString()}<br/>
-                        <strong>Approval Status:</strong> \${item.approval_status.toUpperCase()}
-                    </div>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Item No.</th>
-                            <th>Description</th>
-                            <th>Unit of Measure</th>
-                            <th>Unit Value</th>
-                            <th>Quantity per Property Card</th>
-                            <th>Quantity per Physical Count</th>
-                            <th>Shortage/Overage</th>
-                            <th>Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 20px; font-style: italic;">
-                                Detailed inventory items will be attached here based on the scope: \${item.inventory_request?.inventory_scope || 'General Asset Inventory'}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div>
-                    <p>I hereby certify to the correctness of the above information based on actual physical count.</p>
-                </div>
-
-                <div class="signatures">
-                    <div class="signature-block">
-                        <p>Certified Correct by:</p>
-                        <div class="signature-line">
-                            CGSD Inventory Committee Member<br/>
-                            <span style="font-weight: normal; font-size: 10px;">Signature over Printed Name</span>
-                        </div>
-                    </div>
-                    <div class="signature-block">
-                        <p>Approved by:</p>
-                        <div class="signature-line">
-                            Head of Agency / Authorized Representative<br/>
-                            <span style="font-weight: normal; font-size: 10px;">Signature over Printed Name</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="footer">
-                    * Reference: COA Circular No. 2018-002, Property Inventory Form (PIF)
-                </div>
-            </body>
-            </html>
-        `;
-
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.open();
-            printWindow.document.write(reportHtml);
-            printWindow.document.close();
-            setTimeout(() => {
-                printWindow.print();
-            }, 250);
-        } else {
-            toast.error('Could not open print window. Please allow popups.');
-        }
-    }
-
     if (!user) return null
     const meta = ROLE_META[user.role]
 
@@ -584,11 +416,7 @@ export default function ApprovalsPage() {
                                             <div className="text-teal-600/80 text-xs">RMCD has been notified and will handle the official document release to the requesting office.</div>
                                         </div>
                                     </div>
-                                    <div className="flex justify-end">
-                                        <Button onClick={() => handleGenerateCOAReport(selectedItem)} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                            <Printer size={16} className="mr-2" /> Generate COA Report (PDF)
-                                        </Button>
-                                    </div>
+                                    
                                 </div>
                             )}
                         </CardContent>

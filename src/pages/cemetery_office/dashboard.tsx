@@ -87,12 +87,6 @@ export default function CemeteryOfficeDashboard() {
       {user.office && ` · ${user.office}`}
      </p>
     </div>
-    <button 
-     onClick={() => window.location.href = '/burial/reports'}
-     className="gradient-primary px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg shadow-blue-500/40 hover:scale-[1.02] transition-all flex items-center gap-2 self-start sm:self-auto"
-    >
-     Generate Report <ArrowUpRight size={16} />
-    </button>
    </div>
 
    {/* KPI Grid */}

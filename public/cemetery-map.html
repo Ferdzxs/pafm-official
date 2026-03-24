@@ -15,6 +15,15 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        (function () {
+            var saved = localStorage.getItem('bpm_theme');
+            var mode = saved === 'light' || saved === 'dark'
+                ? saved
+                : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', mode);
+        })();
+    </script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -36,6 +45,23 @@
             --scrollbar-track: #020617;
             --scrollbar-thumb: #1e293b;
             --radius:          12px;
+        }
+
+        :root[data-theme="light"] {
+            --bg:              #f8fafc;
+            --bg-secondary:    #ffffff;
+            --card:            rgba(255, 255, 255, 0.92);
+            --border:          rgba(15, 23, 42, 0.10);
+            --border-strong:   rgba(15, 23, 42, 0.22);
+            --text-primary:    #0f172a;
+            --text-secondary:  #334155;
+            --text-muted:      #64748b;
+            --primary:         #2563eb;
+            --primary-hover:   #1d4ed8;
+            --input-bg:        #ffffff;
+            --input-border:    rgba(15, 23, 42, 0.18);
+            --scrollbar-track: #e2e8f0;
+            --scrollbar-thumb: #94a3b8;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1405,6 +1431,13 @@ function isWithinCemetery(layer) {
         window.searchNiches = searchNiches;
         window.searchVisitorNiches = searchVisitorNiches;
         window.selectNiche = selectNiche;
+
+        // Sync page theme with app theme changes
+        window.addEventListener('storage', function (event) {
+            if (event.key !== 'bpm_theme') return;
+            var next = event.newValue === 'dark' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+        });
 
         // Initialize map when page loads
         window.onload = function() {

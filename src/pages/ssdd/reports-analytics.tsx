@@ -90,7 +90,6 @@ export default function SsddReportsAnalytics() {
    <button className="btn-secondary py-2 text-xs flex items-center gap-1.5">
    <Calendar size={13} /> March 2026
    </button>
-   <button className="btn-primary py-2 text-xs">Export Report</button>
   </div>
   </div>
 
