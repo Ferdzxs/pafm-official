@@ -1,0 +1,136 @@
+[33mcommit a8308c84216cbb1fb10ae798af7f0eec1674e96c[m
+Author: zfer <ferdinandespena0@gmail.com>
+Date:   Sat Mar 7 14:25:03 2026 +0800
+
+    feat(citizen): merge leak and water requests into a unified utility requests form
+
+[1mdiff --git a/docs/bpmn_implementation_plan.md.resolved b/docs/bpmn_implementation_plan.md.resolved[m
+[1mindex 52d3b13..9852b1f 100644[m
+[1m--- a/docs/bpmn_implementation_plan.md.resolved[m
+[1m+++ b/docs/bpmn_implementation_plan.md.resolved[m
+[36m@@ -71,8 +71,7 @@[m [mHere is the exact action mapping for each page to guarantee they fulfill the pla[m
+ [m
+ ### Module 4: Water Supply & Drainage Requests[m
+ **Citizen Flow:**[m
+[31m-*   **`citizen/apply-water.tsx`:** Form requiring request classification (New Connection vs Drainage).[m
+[31m-*   **`citizen/report-leak.tsx`:** Dedicated, expedited form directly targeting Path B workflow.[m
+[32m+[m[32m*   **`citizen/apply-utility_request.tsx`:** Unified form combining New Water Connections (Path A), Drainage Requests, and Leak Reports (Path B). The form dynamically alters fields based on the selected utility service.[m
+ [m
+ **Utility Engineering & Helpdesk:**[m
+ *   **`utility_engineering/service-tickets.tsx`:** Utilized to log requests, generate ticket numbers (Step 2), and classify the utility request type.[m
+[1mdiff --git a/docs/roles_and_modules.md b/docs/roles_and_modules.md[m
+[1mnew file mode 100644[m
+[1mindex 0000000..e59829f[m
+[1m--- /dev/null[m
+[1m+++ b/docs/roles_and_modules.md[m
+[36m@@ -0,0 +1,160 @@[m
+[32m+[m[32m# Role and Module Responsibilities[m
+[32m+[m
+[32m+[m[32m## 1. Cemetery & Burial Management[m
+[32m+[m[32m*   **Cemetery Office** *(Manages burial applications, registries, graves, niches, and records)*[m
+[32m+[m[32m*   **SSDD** *(Coordinates indigent subsidies, citizen records, and burial aid)*[m
+[32m+[m[32m*   **Death Registration** *(Verifies death certificates and manages the processing of received burial documents)*[m
+[32m+[m[32m*   **Citizen** *(Submits burial applications, securely manages their documents via 'My Documents', and tracks their burial application status via 'My Applications')*[m
+[32m+[m
+[32m+[m[32m## 2. Facility Reservation System (Barangay)[m
+[32m+[m[32m*   **Reservation Officer** *(Reviews initial facility reservation records, permits, and payments)*[m
+[32m+[m[32m*   **Punong Barangay** *(Provides final approval for pending barangay requests and references ordinances)*[m
+[32m+[m[32m*   **Barangay Secretary** *(Handles constituent records, documents, filings, and manages barangay reports)*[m
+[32m+[m[32m*   **Citizen** *(Applies to reserve barangay facilities, manages required documents via 'My Documents', and tracks their reservation status via 'My Applications')*[m
+[32m+[m
+[32m+[m[32m## 3. Parks & Recreation Scheduling[m
+[32m+[m[32m*   **Parks Administrator** *(Oversees park venues, large-scale reservations, site usage logs, and manages the master booking calendar)*[m
+[32m+[m[32m*   **Citizen** *(Submits park reservation applications and tracks their booking status via 'My Applications')*[m
+[32m+[m
+[32m+[m[32m## 4. Water Supply & Drainage (Utility & Engineering)[m
+[32m+[m[32m*   **Utility Helpdesk** *(Triages incoming tickets for water connections, leaks, and drainage, and assigns them to field teams)*[m
+[32m+[m[32m*   **Utility Engineering** *(Executes physical fixes, tracks service tickets, leak reports, and completes installations for water supply and drainage)*[m
+[32m+[m[32m*   **Citizen** *(Requests water connections, reports leaks, submits drainage issues, and tracks the resolution status of those tickets via 'My Applications')*[m
+[32m+[m
+[32m+[m[32m## 5. Asset Inventory Tracker[m
+[32m+[m[32m*   **CGSD Management** *(Oversees overarching inventory, performs ocular inspections, and handles final approval records)*[m
+[32m+[m[32m*   **FAMCD** *(Directly logs inventory, requests inspections, and manages physical submission records for assets)*[m
+[32m+[m[32m*   **Cemetery Office** *(Acts as a Requesting Party to submit requests for cemetery supplies and maintenance)*[m
+[32m+[m[32m*   **Parks Administrator** *(Acts as a Requesting Party to submit requests for park supplies and maintenance)*[m
+[32m+[m[32m*   **Punong Barangay** *(Acts as a Requesting Party to submit requests for barangay hall supplies and maintenance)*[m
+[32m+[m
+[32m+[m[32m## 6. Finance & Treasury[m
+[32m+[m[32m*   **Treasurer Officer** *(Processes payment transactions, reconciles financial queues, generates revenue reports, issues official receipts, and reviews finance audits)*[m
+[32m+[m[32m*   **Citizen** *(Views their personal payment history, settles bills, and tracks official receipts for any paid services)*[m
+[32m+[m
+[32m+[m[32m## 7. System Administration[m
+[32m+[m[32m*   **System Administrator** *(Configures global settings, oversees user & role management, manages employee masters, views system audit logs, and controls legacy data migrations)*[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m# Role to Module Pages Mapping[m
+[32m+[m
+[32m+[m[32mHere is the full breakdown of each Role designated to each Module, explicitly listing the Pages (navigation items) assigned to them for that specific module's workflow.[m
+[32m+[m
+[32m+[m[32m## 1. Cemetery & Burial Management[m
+[32m+[m[32m*   **Cemetery Office**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Burial Applications[m
+[32m+[m[32m    *   Deceased Registry[m
+[32m+[m[32m    *   Niche Management[m
+[32m+[m[32m    *   Burial Records[m
+[32m+[m[32m    *   Indigent Assistance[m
+[32m+[m[32m    *   Payments & Permits[m
+[32m+[m[32m    *   Reports[m
+[32m+[m[32m*   **SSDD (Social Services Development Department)**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Indigent Assistance[m
+[32m+[m[32m    *   Citizen Records[m
+[32m+[m[32m    *   Death Registration Coordination[m
+[32m+[m[32m    *   Reports & Analytics[m
+[32m+[m[32m*   **Death Registration**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Certificate Verification[m
+[32m+[m[32m    *   Received Documents[m
+[32m+[m[32m    *   Approvals & Signing[m
+[32m+[m[32m*   **Citizen**[m
+[32m+[m[32m    *   Apply: Burial[m
+[32m+[m[32m    *   My Applications (Track status)[m
+[32m+[m[32m    *   My Documents (Manage requirements)[m
+[32m+[m
+[32m+[m[32m## 2. Facility Reservation System (Barangay)[m
+[32m+[m[32m*   **Reservation Officer**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Reservation Records[m
+[32m+[m[32m    *   Approvals[m
+[32m+[m[32m    *   Permits & Payments[m
+[32m+[m[32m*   **Punong Barangay**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Pending Approvals[m
+[32m+[m[32m    *   Ordinance References[m
+[32m+[m[32m*   **Barangay Secretary**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Pending Approvals[m
+[32m+[m[32m    *   Reservation Records[m
+[32m+[m[32m    *   Constituent Records[m
+[32m+[m[32m    *   Documents & Filing[m
+[32m+[m[32m    *   Ordinance References[m
+[32m+[m[32m    *   Reports[m
+[32m+[m[32m    *   Settings[m
+[32m+[m[32m*   **Citizen**[m
+[32m+[m[32m    *   Apply: Barangay Facility[m
+[32m+[m[32m    *   My Applications (Track status)[m
+[32m+[m[32m    *   My Documents (Manage requirements)[m
+[32m+[m
+[32m+[m[32m## 3. Parks & Recreation Scheduling[m
+[32m+[m[32m*   **Parks Administrator**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Park Venues[m
+[32m+[m[32m    *   Reservations[m
+[32m+[m[32m    *   Site Usage Logs[m
+[32m+[m[32m    *   Booking Calendar[m
+[32m+[m[32m*   **Citizen**[m
+[32m+[m[32m    *   Apply: Park Reservation[m
+[32m+[m[32m    *   My Applications (Track status)[m
+[32m+[m
+[32m+[m[32m## 4. Water Supply & Drainage (Utility & Engineering)[m
+[32m+[m[32m*   **Utility Helpdesk**[m
+[32m+[m[32m    *   Dashboard[m
+[32m+[m[32m    *   Ticket Triage[m
+[32m+[m[32m    *   Assign to Teams[m
+[32m+[m

@@ -1,0 +1,206 @@
+# System Roles and Workflow Architecture
+
+Here is an architectural visualization of the workflows based on the current system pages.
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1e293b', 'primaryTextColor': '#f8fafc', 'primaryBorderColor': '#475569', 'lineColor': '#cbd5e1', 'secondaryColor': '#0f172a', 'tertiaryColor': '#334155'}}}%%
+graph TD
+    %% Global Pages
+    Auth[Authentication] --> |Login/Signup| GlobalDash[Global Dashboard / Profile / Settings]
+    GlobalDash --> |Role Routing| SystemAccess
+
+    subgraph Service Requester
+        direction TB
+        SystemAccess -.-> CitizenDash[Citizen Dashboard]
+        
+        CitizenDash --> ApplyBarangay[Apply Barangay Docs]
+        CitizenDash --> ApplyBurial[Apply Burial]
+        CitizenDash --> ApplyPark[Apply Park/Venue]
+        CitizenDash --> ApplyWater[Apply Water/Leak]
+        
+        ApplyBarangay & ApplyBurial & ApplyPark & ApplyWater --> CitDocs[My Documents & Applications]
+        CitDocs --> CitPay[Payment History]
+    end
+
+    subgraph Operations & Clearances
+        direction TB
+        SystemAccess -.-> BrgySecDash[Brgy Secretary Dashboard]
+        SystemAccess -.-> CaptDash[Punong Barangay Dashboard]
+
+        BrgySecDash --> ConstituentRec[Constituent Records]
+        ConstituentRec --> DocFiling[Documents Filing]
+        DocFiling --> BrgySecApprov[Pending Approvals]
+        BrgySecDash --> OrdRef[Ordinance References]
+        
+        CaptDash --> CaptOrd[Ordinance References]
+        CaptDash --> CaptApprov[Pending Approvals / Signing]
+        
+        BrgySecApprov -.-> CaptApprov
+    end
+
+    subgraph Social Services & Death Registration
+        direction TB
+        SystemAccess -.-> SsddDash[SSDD Dashboard]
+        SystemAccess -.-> DeathRegDash[Death Registration Dashboard]
+        SystemAccess -.-> CemeteryDash[Cemetery Office Dashboard]
+
+        SsddDash --> SsddCitRec[Citizen Records]
+        SsddCitRec --> SsddInd[Indigent Assistance]
+        SsddCitRec --> SsddDeath[Death Registration Mgmt]
+
+        DeathRegDash --> DeathRecv[Received Documents]
+        DeathRecv --> DeathCert[Certificate Verification]
+        DeathCert --> DeathSign[Approvals & Signing]
+
+        CemeteryDash --> DeceasedReg[Deceased Registry / Niche Mgmt]
+        DeceasedReg --> BurialApp[Burial Applications]
+        BurialApp --> BurialPermit[Payments & Permits]
+        BurialPermit --> BurialRec[Burial Records]
+        
+        SsddInd -.-> BurialApp
+    end
+
+    subgraph Parks & Facilities
+        direction TB
+        SystemAccess -.-> ParksDash[Parks Admin Dashboard]
+        SystemAccess -.-> ResOfficerDash[Reservation Officer Dashboard]
+
+        ParksDash --> ParkVenues[Park Venues]
+        ParkVenues --> BookingCal[Booking Calendar]
+        BookingCal --> ParksRes[Reservations Tracking]
+        ParksRes --> ParkLogs[Usage Logs]
+
+        ResOfficerDash --> ResRec[Reservation Records]
+        ResRec --> ResApprov[Approvals]
+        ResApprov --> ResPermit[Permits & Payments]
+    end
+
+    subgraph System & Financial Admin
+        direction TB
+        SystemAccess -.-> SystemDash[System Admin Dashboard]
+        SystemAccess -.-> TreasDash[Treasurer Dashboard]
+
+        SystemDash --> SysRole[User Role Mgmt]
+        SystemDash --> SysEmp[Employee Master / Office]
+        SysEmp --> SysSet[System Settings / Legacy Migration]
+        SysSet --> SysAudit[Audit Logs]
+
+        TreasDash --> TreasTrans[Payment Transactions]
+        TreasTrans --> TreasRecpt[Official Receipts]
+        TreasRecpt --> TreasRecon[Reconciliation Queue]
+        TreasRecon --> TreasRev[Revenue Reports]
+    end
+
+    subgraph Asset Management & Utilities
+        direction TB
+        SystemAccess -.-> UtilitiesDash[Utility Helpdesk]
+        SystemAccess -.-> UtilsEngDash[Utility Engineering]
+        SystemAccess -.-> CgsdDash[CGSD Management]
+        SystemAccess -.-> FamcdDash[FAMCD]
+
+        UtilitiesDash --> ConnStat[Connection Status]
+        ConnStat --> Triage[Ticket Triage]
+        Triage --> Assign[Assign Teams]
+
+        Assign -.-> UtilsEngDash
+        UtilsEngDash --> Assigned[Assigned Jobs]
+        Assigned --> Install[Installations]
+        Assigned --> Leaks[Leak Reports / Service Tickets]
+
+        CgsdDash --> CgsdInv[Inventory Assets]
+        CgsdInv --> CgsdInsp[Ocular Inspections]
+        CgsdInsp --> CgsdApprov[Approval Records]
+
+        FamcdDash --> FamInv[Inventory Assets]
+        FamInv --> FamInsp[Ocular Inspections]
+        FamInsp --> FamSub[Submission Records]
+    end
+```
+
+### 📋 Detailed Workflow Breakdowns by Module
+
+Here is a step-by-step breakdown of how data and actions flow through each role across your current pages:
+
+#### 1. Citizen (Public User Persona)
+*Module Goal: Self-Service Request & Tracking*
+1. **Entry:** Lands on `dashboard.tsx` to view their personalized statistics and pending requests.
+2. **Action:** Initiates a request via `apply-barangay.tsx`, `apply-burial.tsx`, `apply-park.tsx`, `apply-water.tsx`, or `report-leak.tsx`.
+3. **Tracking:** Monitors status in `my-applications.tsx` and views official files in `my-documents.tsx`.
+4. **Resolution:** Completes eventual payments and views receipts in `payment-history.tsx`.
+
+#### 2. Operations & Clearances
+**Barangay Secretary**
+*Module Goal: Frontline Barangay Operations*
+1. **Intake:** Views active requests in `dashboard.tsx`.
+2. **Review:** Verifies individual details through `constituent-records.tsx` and references local laws in `ordinance-references.tsx` before processing.
+3. **Processing:** Manages paperwork via `documents-filing.tsx` and venue bookings via `reservation-records.tsx`.
+4. **Escalation:** Pushes cleared documents to `pending-approvals.tsx` for the Punong Barangay, and exports statuses via `reports.tsx`.
+
+**Punong Barangay (Captain)**
+*Module Goal: Executive Approval*
+1. **Entry:** Dashboard provides high-level barangay metrics.
+2. **Action:** Reviews documents waiting for signature in `pending-approvals.tsx` (escalated from the Secretary).
+3. **Reference:** Checks `ordinance-references.tsx` when required prior to final sign-off.
+
+#### 3. Health & Social Services
+**Cemetery Office**
+*Module Goal: Interments & Record Keeping*
+1. **Management:** Tracks plot/niche availability via `niche-management.tsx` and records profiles in `deceased-registry.tsx`.
+2. **Process:** Receives user applications in `burial-applications.tsx`. Accounts for `indigent-assistance.tsx` cross-references.
+3. **Closing:** Handles financial clearances in `payments-permits.tsx`, finalizing the file into `burial-records.tsx`.
+
+**Death Registration (Local Civil Registrar)**
+*Module Goal: Vital Statistics Processing*
+1. **Processing:** Intakes death certificates from hospitals via `received-documents.tsx`.
+2. **Validation:** Checks authenticity through `certificate-verification.tsx`.
+3. **Finalization:** Signs off and releases official certificates via `approvals-signing.tsx`.
+
+**SSDD (Social Services)**
+*Module Goal: Community Assistance*
+1. **Evaluation:** Uses `citizen-records.tsx` to verify standard of living.
+2. **Assistance:** Disburses or processes `indigent-assistance.tsx` or assists with `death-registration.tsx`.
+3. **Analytics:** Aggregates poverty and assistance data in `reports-analytics.tsx`.
+
+#### 4. Recreation & Venues
+**Parks Admin**
+*Module Goal: Facility Over-watch*
+1. **Setup:** Manages park locations and rules via `park-venues.tsx`.
+2. **Scheduling:** Views all physical events in `booking-calendar.tsx`.
+3. **Monitoring:** Actively tracks `reservations.tsx` and audits past activities in `usage-logs.tsx`.
+
+**Reservation Officer**
+*Module Goal: Transactional Booking*
+1. **Processing:** Handles Citizen application intake and evaluates it via `reservation-records.tsx` & `approvals.tsx`.
+2. **Collection:** Receives venue fees and issues permits in `permits-payments.tsx`.
+
+#### 5. Public Utilities & Engineering 
+**Utility Helpdesk**
+*Module Goal: Frontline Issue Triage*
+1. **Intake:** Receives citizen issues (e.g., from `report-leak.tsx`) and views `connection-status.tsx`.
+2. **Triage:** Categorizes tickets in `ticket-triage.tsx`.
+3. **Dispatch:** Forwards tasks to physical engineering teams via `assign-teams.tsx`.
+
+**Utility Engineering**
+*Module Goal: Field Work Execution*
+1. **Receiving:** Gets notified of field jobs in `assigned-jobs.tsx` or `service-tickets.tsx`.
+2. **Action:** Tracks physical execution of `installations.tsx` and resolves `leak-reports.tsx`.
+
+#### 6. Facilities & Assets
+**CGSD Management & FAMCD**
+*Module Goal: Property & Infrastructure Management*
+1. **Cataloging:** Both roles track physical properties in `inventory-assets.tsx`.
+2. **Physical Check:** Teams log field reviews via `ocular-inspections.tsx`.
+3. **Approval Flow:** FAMCD submits logs in `submission-records.tsx` and CGSD management finalizes them in `approval-records.tsx`.
+
+#### 7. Finance & Administration
+**Treasurer**
+*Module Goal: Fiscal Responsibility*
+1. **Intake:** Clears pending transactions via `TransactionsPage.tsx` and `payment-transactions.tsx`.
+2. **Issuance:** Generates proof via `official-receipts.tsx`.
+3. **Ledgering:** Settles accounts in `reconciliation-queue.tsx` and views holistic `revenue-reports.tsx`.
+
+**System Admin**
+*Module Goal: IT Health & Security*
+1. **Access:** Controls who can do what via `user-role-management.tsx` and `employee-master.tsx`.
+2. **System Config:** Modifies global constants in `system-settings.tsx` and supports `legacy-migration.tsx`.
+3. **Security:** Audits trailing actions of all modules in `audit-logs.tsx`.

@@ -1,0 +1,648 @@
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import type { UserRole } from "@/types";
+
+// ─── Layout ──────────────────────────────────────────────────────────────────
+import AppLayout from "@/components/layout/AppLayout";
+
+// ─── Auth Pages ──────────────────────────────────────────────────────────────
+import LoginPage from "@/pages/auth/LoginPage";
+import SignupPage from "@/pages/auth/SignupPage";
+
+// ─── Core Pages ──────────────────────────────────────────────────────────────
+import ProfilePage from "@/pages/ProfilePage";
+import PlaceholderPage from "@/pages/PlaceholderPage";
+
+// ─── Cemetery Office (Burial) ────────────────────────────────────────────────
+import BurialApplicationsPage from "@/pages/cemetery_office/burial-applications";
+import NicheManagementPage from "@/pages/cemetery_office/niche-management";
+import CemeteryAssetRequestsPage from "@/pages/cemetery_office/asset-requests";
+
+// ─── Barangay Secretary ──────────────────────────────────────────────────────
+import BarangaySecretaryDashboard from "@/pages/barangay_secretary/dashboard";
+import BarangayReservationsPage from "@/pages/barangay_secretary/reservation-records";
+import BarangaySecretaryIntake from "@/pages/barangay_secretary/pending-approvals";
+import BarangayBookingCalendar from "@/pages/barangay_secretary/booking-calendar";
+
+// ─── Punong Barangay ─────────────────────────────────────────────────────────
+import PunongBarangayPendingApprovals from "@/pages/punong_barangay/pending-approvals";
+import PunongBarangayFacilityManagement from "@/pages/punong_barangay/facility-management";
+import PunongBarangayAssetRequestsPage from "@/pages/punong_barangay/asset-requests";
+
+// ─── Role Dashboards ─────────────────────────────────────────────────────────
+import CemeteryOfficeDashboard from "@/pages/cemetery_office/dashboard";
+import CitizenDashboard from "@/pages/citizen/dashboard";
+import SsddDashboard from "@/pages/ssdd/dashboard";
+import DeathRegistrationDashboard from "@/pages/death_registration/dashboard";
+import ParksAdminDashboard from "@/pages/parks_admin/dashboard";
+import ParksAssetRequestsPage from "@/pages/parks_admin/asset-requests";
+import ReservationOfficerDashboard from "@/pages/reservation_officer/dashboard";
+import ReservationApprovalsPage from "@/pages/reservation_officer/approvals";
+import ReservationRecordsPage from "@/pages/reservation_officer/reservation-records";
+import PermitsPaymentsPage from "@/pages/reservation_officer/permits-payments";
+import PunongBarangayDashboard from "@/pages/punong_barangay/dashboard";
+import FamcdDashboard from "@/pages/famcd/dashboard";
+import CgsdManagementDashboard from "@/pages/cgsd_management/dashboard";
+import TreasurerDashboard from "@/pages/treasurer/dashboard";
+import SystemAdminDashboard from "@/pages/system_admin/dashboard";
+import UtilityEngineeringDashboard from "@/pages/utility_engineering/dashboard";
+import UtilityHelpdeskDashboard from "@/pages/utility_helpdesk/dashboard";
+
+// ─── Citizen Module ──────────────────────────────────────────────────────────
+import ApplyBurialCitizenPage from "@/pages/citizen/apply-burial";
+import ApplyWaterPage from "@/pages/citizen/apply-utility_request";
+import ApplyBarangayFacilityPage from "@/pages/citizen/apply-barangay";
+import MyApplicationsPage from "@/pages/citizen/my-applications";
+import ApplyPark from "@/pages/citizen/apply-park";
+import CitizenParkApplicationFormPage from "@/pages/citizen/park-application-form";
+
+// ─── Utility Engineering & Helpdesk ─────────────────────────────────────────
+import ServiceTicketsPage from "@/pages/utility_engineering/service-tickets";
+import AssignedJobsPage from "@/pages/utility_engineering/assigned-jobs";
+import InstallationsPage from "@/pages/utility_engineering/installations";
+import LeakReportsPage from "@/pages/utility_engineering/leak-reports";
+import AssignTeamsPage from "@/pages/utility_helpdesk/assign-teams";
+import ConnectionStatusPage from "@/pages/utility_helpdesk/connection-status";
+import TicketTriagePage from "@/pages/utility_helpdesk/ticket-triage";
+
+// ─── Treasurer Module ────────────────────────────────────────────────────────
+import CollectionsPage from "@/pages/treasurer/CollectionsPage";
+import TreasurerAuditLogsPage from "./pages/treasurer/audit-logs";
+import OfficialReceiptsPage from "./pages/treasurer/official-receipts";
+
+// ─── System Admin ────────────────────────────────────────────────────────────
+import UserManagementPage from "@/pages/system_admin/user-role-management";
+import LegacyMigrationPage from "@/pages/system_admin/legacy-migration";
+import SystemAdminAuditLogsPage from "@/pages/system_admin/audit-logs";
+import SystemAdminSettingsPage from "@/pages/system_admin/system-settings";
+import OfficeManagementPage from "@/pages/system_admin/office-management";
+import EmployeeMasterPage from "@/pages/system_admin/employee-master";
+import MyDocumentsPage from "./pages/citizen/my-documents";
+import PaymentHistoryPage from "./pages/citizen/payment-history";
+
+
+// ─── Parks Admin (detailed pages) ────────────────────────────────────────────
+import ParkVenues from "@/pages/parks_admin/park-venues";
+import Reservations from "@/pages/parks_admin/reservations";
+import SiteUsageLogs from "@/pages/parks_admin/usage-logs";
+import BookingCalendar from "@/pages/parks_admin/booking-calendar";
+
+// ─── Assets / Inventory (CGSD, FAMCD, cross-office) ─────────────────────────
+import AssetsRequestsPage from "@/pages/assets/requests";
+import FamcdInventoryAssets from "@/pages/famcd/inventory-assets";
+import FamcdInventoryReports from "@/pages/famcd/inventory-reports";
+import FamcdOcularInspectionsPage from "@/pages/famcd/ocular-inspections";
+import FamcdSubmissionRecords from "@/pages/famcd/submission-records";
+import CgsdInventoryAssetsPage from "@/pages/cgsd_management/inventory-assets";
+import CgsdInventoryReportsPage from "@/pages/cgsd_management/inventory-reports";
+import CgsdApprovalRecordsPage from "@/pages/cgsd_management/approval-records";
+import CgsdApprovalsPage from "@/pages/cgsd_management/approvals";
+import CgsdOcularInspectionsPage from "@/pages/cgsd_management/ocular-inspections";
+import RmcdDashboardPage from "@/pages/rmcd/dashboard";
+import RmcdRoutingPage from "@/pages/rmcd/routing";
+import RmcdReleasesPage from "@/pages/rmcd/releases";
+
+// ─── Cemetery Office detailed pages ─────────────────────────────────────────
+import DeceasedRegistryPage from "@/pages/cemetery_office/deceased-registry";
+import BurialRecordsPage from "@/pages/cemetery_office/burial-records";
+import IndigentAssistancePage from "@/pages/cemetery_office/indigent-assistance";
+
+// ─── SSDD detailed pages ─────────────────────────────────────────────────────
+import SsddIndigentPage from "@/pages/ssdd/indigent-assistance";
+import SsddCitizenRecordsPage from "@/pages/ssdd/citizen-records";
+import SsddDeathRegistrationPage from "@/pages/ssdd/death-registration";
+
+// ─── Death Registration detailed pages ───────────────────────────────────────
+import DeathCertificateVerificationPage from "@/pages/death_registration/certificate-verification";
+import DeathReceivedDocumentsPage from "@/pages/death_registration/received-documents";
+import DeathApprovalsSigningPage from "@/pages/death_registration/approvals-signing";
+
+// ─── Protected Route ─────────────────────────────────────────────────────────
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading)
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--color-bg)" }}
+      >
+        <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function RoleRoute({
+  allow,
+  children,
+}: {
+  allow: UserRole[];
+  children: React.ReactNode;
+}) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!allow.includes(user.role)) return <Navigate to={`/${user.role}/dashboard`} replace />;
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "system_admin") {
+    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  }
+  return <>{children}</>;
+}
+
+function DashboardRedirect() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return <Navigate to={`/${user.role}/dashboard`} replace />;
+}
+
+// ─── Role-aware Assets routes (CGSD / FAMCD) ─────────────────────────────────
+function AssetsInventoryRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  if (user.role === "cgsd_management") return <CgsdInventoryAssetsPage />;
+  if (user.role === "famcd") return <FamcdInventoryAssets />;
+  return (
+    <PlaceholderPage
+      title="Inventory & Assets"
+      description="Central inventory view for city assets."
+    />
+  );
+}
+
+function AssetsInspectionsRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  if (user.role === "famcd") return <FamcdOcularInspectionsPage />;
+  if (user.role === "cgsd_management") return <CgsdOcularInspectionsPage />;
+  return (
+    <PlaceholderPage
+      title="Ocular Inspections"
+      description="Ocular inspection queue for asset validation."
+    />
+  );
+}
+
+function AssetsReportsRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  if (user.role === "cgsd_management") return <CgsdInventoryReportsPage />;
+  if (user.role === "famcd") return <FamcdInventoryReports />;
+  return (
+    <PlaceholderPage
+      title="Inventory Reports"
+      description="Inventory reporting workspace."
+    />
+  );
+}
+
+function AssetsApprovalsRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  if (user.role === "cgsd_management") return <CgsdApprovalRecordsPage />;
+  return (
+    <PlaceholderPage
+      title="Approval Records"
+      description="Records of approvals for land and building inventory."
+    />
+  );
+}
+
+function AssetsSubmissionsRoute() {
+  const { user } = useAuth();
+  if (!user) return null;
+  if (user.role === "famcd") return <FamcdSubmissionRecords />;
+  return (
+    <PlaceholderPage
+      title="Submission Records"
+      description="Submission tracking for finalized inventory reports."
+    />
+  );
+}
+
+/** Old shared URL — send each role to the correct BPMN queue. */
+function BarangayLegacyPendingRedirect() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === "punong_barangay") return <Navigate to="/barangay/pb/pending" replace />;
+  if (user.role === "barangay_secretary") return <Navigate to="/barangay/secretary/intake" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      {/* Public */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+
+      {/* Protected — wrapped in AppLayout */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardRedirect />} />
+        <Route path="profile" element={<ProfilePage />} />
+
+        {/* ── Role Dashboards ── */}
+        <Route
+          path="cemetery_office/dashboard"
+          element={<CemeteryOfficeDashboard />}
+        />
+        <Route path="citizen/dashboard" element={<CitizenDashboard />} />
+        <Route path="ssdd/dashboard" element={<SsddDashboard />} />
+        <Route
+          path="death_registration/dashboard"
+          element={<DeathRegistrationDashboard />}
+        />
+        <Route path="parks_admin/dashboard" element={<ParksAdminDashboard />} />
+        <Route
+          path="reservation_officer/dashboard"
+          element={<ReservationOfficerDashboard />}
+        />
+        <Route
+          path="punong_barangay/dashboard"
+          element={<PunongBarangayDashboard />}
+        />
+        <Route
+          path="barangay_secretary/dashboard"
+          element={<BarangaySecretaryDashboard />}
+        />
+        <Route path="famcd/dashboard" element={<FamcdDashboard />} />
+        <Route
+          path="cgsd_management/dashboard"
+          element={<CgsdManagementDashboard />}
+        />
+        <Route path="rmcd/dashboard" element={<RmcdDashboardPage />} />
+        <Route path="treasurer/dashboard" element={<TreasurerDashboard />} />
+        <Route
+          path="system_admin/dashboard"
+          element={<SystemAdminDashboard />}
+        />
+        <Route
+          path="utility_engineering/dashboard"
+          element={<UtilityEngineeringDashboard />}
+        />
+        <Route
+          path="utility_helpdesk/dashboard"
+          element={<UtilityHelpdeskDashboard />}
+        />
+
+        {/* ── Cemetery & Burial ── */}
+        <Route
+          path="burial/applications"
+          element={<BurialApplicationsPage />}
+        />
+        <Route path="burial/deceased" element={<DeceasedRegistryPage />} />
+        <Route path="burial/niches" element={<NicheManagementPage />} />
+        <Route path="burial/records" element={<BurialRecordsPage />} />
+        <Route path="burial/indigent" element={<IndigentAssistancePage />} />
+        <Route
+          path="burial/asset-requests"
+          element={<CemeteryAssetRequestsPage />}
+        />
+
+        {/* ── SSDD ── */}
+        <Route path="ssdd/indigent" element={<SsddIndigentPage />} />
+        <Route
+          path="ssdd/citizens"
+          element={<SsddCitizenRecordsPage />}
+        />
+        <Route
+          path="ssdd/coordination"
+          element={<SsddDeathRegistrationPage />}
+        />
+
+        {/* ── Death Registration ── */}
+        <Route path="death/verify" element={<DeathCertificateVerificationPage />} />
+        <Route path="death/documents" element={<DeathReceivedDocumentsPage />} />
+        <Route path="death/approvals" element={<DeathApprovalsSigningPage />} />
+
+        {/* ── Citizen ── */}
+        <Route
+          path="citizen/applications"
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <MyApplicationsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="citizen/apply/burial"
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <ApplyBurialCitizenPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="citizen/apply/park"
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <ApplyPark />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="citizen/parks/:reservationId/application"
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <CitizenParkApplicationFormPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="citizen/apply/barangay"
+          element={<ApplyBarangayFacilityPage />}
+        />
+        <Route path="citizen/apply/water" element={<ApplyWaterPage />} />
+        <Route
+          path="citizen/apply/leak"
+          element={<Navigate to="/citizen/apply/water" replace />}
+        />
+        <Route
+          path="citizen/payments"
+          element={
+            <RoleRoute allow={["citizen"]}>
+              <PaymentHistoryPage />
+            </RoleRoute>
+          }
+        />
+        <Route path="citizen/documents" element={<MyDocumentsPage />} />
+
+        {/* ── Parks ── */}
+        <Route
+          path="parks/venues"
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <ParkVenues />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="parks/reservations"
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <Reservations />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="parks/usage-logs"
+          element={
+            <RoleRoute allow={["parks_admin", "reservation_officer"]}>
+              <SiteUsageLogs />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="parks/calendar"
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <BookingCalendar />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="parks/asset-requests"
+          element={
+            <RoleRoute allow={["parks_admin"]}>
+              <ParksAssetRequestsPage />
+            </RoleRoute>
+          }
+        />
+
+        {/* ── Parks (Reservation Desk) ── */}
+        <Route
+          path="parks/desk-reservations"
+          element={
+            <RoleRoute allow={["reservation_officer"]}>
+              <ReservationRecordsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="parks/desk-approvals"
+          element={
+            <RoleRoute allow={["reservation_officer"]}>
+              <ReservationApprovalsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="parks/desk-permits"
+          element={
+            <RoleRoute allow={["reservation_officer"]}>
+              <PermitsPaymentsPage />
+            </RoleRoute>
+          }
+        />
+
+        {/* ── Barangay ── */}
+        <Route path="barangay/pb/pending" element={<PunongBarangayPendingApprovals />} />
+        <Route
+          path="barangay/pb/facilities"
+          element={
+            <RoleRoute allow={["punong_barangay"]}>
+              <PunongBarangayFacilityManagement />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="barangay/pb/asset-requests"
+          element={
+            <RoleRoute allow={["punong_barangay"]}>
+              <PunongBarangayAssetRequestsPage />
+            </RoleRoute>
+          }
+        />
+        <Route path="barangay/secretary/intake" element={<BarangaySecretaryIntake />} />
+        <Route path="barangay/secretary/calendar" element={<BarangayBookingCalendar />} />
+        <Route path="barangay/pending" element={<BarangayLegacyPendingRedirect />} />
+        <Route path="barangay/ordinances" element={<Navigate to="/barangay/pb/pending" replace />} />
+        <Route path="barangay/asset-requests" element={<Navigate to="/barangay/pb/asset-requests" replace />} />
+
+        {/* ── Barangay Secretary ── */}
+        <Route
+          path="barangay/secretary/reservations"
+          element={<BarangayReservationsPage />}
+        />
+        <Route path="barangay/secretary/records" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/secretary/documents" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/secretary/ordinances" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/secretary/reports" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/records" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/documents" element={<Navigate to="/barangay/secretary/intake" replace />} />
+        <Route path="barangay/reports" element={<Navigate to="/barangay/secretary/intake" replace />} />
+
+        {/* ── Utility ── */}
+        <Route path="utility/tickets" element={<ServiceTicketsPage />} />
+        <Route path="utility/triage" element={<TicketTriagePage />} />
+        <Route path="utility/leaks" element={<LeakReportsPage />} />
+        <Route path="utility/jobs" element={<AssignedJobsPage />} />
+        <Route path="utility/installations" element={<InstallationsPage />} />
+        <Route path="utility/assign" element={<AssignTeamsPage />} />
+        <Route path="utility/connections" element={<ConnectionStatusPage />} />
+
+        {/* ── Assets ── */}
+        <Route
+          path="assets/requests"
+          element={
+            <RoleRoute allow={["cgsd_management", "famcd"]}>
+              <AssetsRequestsPage />
+            </RoleRoute>
+          }
+        />
+        <Route path="assets/inventory" element={<AssetsInventoryRoute />} />
+        <Route path="assets/inspections" element={<AssetsInspectionsRoute />} />
+        <Route path="assets/reports" element={<AssetsReportsRoute />} />
+        <Route
+          path="assets/approvals"
+          element={
+            <RoleRoute allow={["cgsd_management"]}>
+              <CgsdApprovalsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="assets/approval-records"
+          element={
+            <RoleRoute allow={["cgsd_management"]}>
+              <CgsdApprovalRecordsPage />
+            </RoleRoute>
+          }
+        />
+        <Route path="assets/submissions" element={<AssetsSubmissionsRoute />} />
+
+        {/* ── RMCD ── */}
+        <Route
+          path="rmcd/routing"
+          element={
+            <RoleRoute allow={["rmcd"]}>
+              <RmcdRoutingPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="rmcd/releases"
+          element={
+            <RoleRoute allow={["rmcd"]}>
+              <RmcdReleasesPage />
+            </RoleRoute>
+          }
+        />
+
+        {/* ── Payments / Treasurer ── */}
+        <Route path="payments" element={<Navigate to="/treasurer/collections" replace />} />
+        <Route path="treasurer/collections" element={<CollectionsPage />} />
+        <Route path="treasurer/receipts" element={<OfficialReceiptsPage />} />
+        <Route path="treasurer/audit" element={<TreasurerAuditLogsPage />} />
+
+        {/* ── Reports ── */}
+        <Route
+          path="reports"
+          element={
+            <PlaceholderPage
+              title="Reports & Analytics"
+              description="Aggregate reporting across all modules."
+            />
+          }
+        />
+
+        {/* ── Admin (System Admin only) ── */}
+        <Route
+          path="admin/users"
+          element={
+            <AdminRoute>
+              <UserManagementPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="admin/audit"
+          element={
+            <AdminRoute>
+              <SystemAdminAuditLogsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="admin/settings"
+          element={
+            <AdminRoute>
+              <SystemAdminSettingsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="admin/offices"
+          element={
+            <AdminRoute>
+              <OfficeManagementPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="admin/employees"
+          element={
+            <AdminRoute>
+              <EmployeeMasterPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="admin/migration"
+          element={
+            <AdminRoute>
+              <LegacyMigrationPage />
+            </AdminRoute>
+          }
+        />
+
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+
+      {/* Root redirect */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: "var(--color-card)",
+                color: "var(--color-text-primary)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "12px",
+              },
+            }}
+          />
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  );
+}

@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Babag Cemetery - Complete Niche Navigation System</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        (function () {
+            var saved = localStorage.getItem('bpm_theme');
+            var mode = saved === 'light' || saved === 'dark'
+                ? saved
+                : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', mode);
+        })();
+    </script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        /* ── Variables (mirrors index.css dark tokens) ─────────────── */
+        :root {
+            --bg:              #0a0f1e;
+            --bg-secondary:    #0f172a;
+            --card:            rgba(30, 41, 59, 0.75);
+            --border:          rgba(148, 163, 184, 0.12);
+            --border-strong:   rgba(148, 163, 184, 0.28);
+            --text-primary:    #f1f5f9;
+            --text-secondary:  #cbd5e1;
+            --text-muted:      #64748b;
+            --primary:         #3b82f6;
+            --primary-hover:   #2563eb;
+            --input-bg:        rgba(15, 23, 42, 0.95);
+            --input-border:    rgba(148, 163, 184, 0.28);
+            --scrollbar-track: #020617;
+            --scrollbar-thumb: #1e293b;
+            --radius:          12px;
+        }
+
+        :root[data-theme="light"] {
+            --bg:              #f8fafc;
+            --bg-secondary:    #ffffff;
+            --card:            rgba(255, 255, 255, 0.92);
+            --border:          rgba(15, 23, 42, 0.10);
+            --border-strong:   rgba(15, 23, 42, 0.22);
+            --text-primary:    #0f172a;
+            --text-secondary:  #334155;
+            --text-muted:      #64748b;
+            --primary:         #2563eb;
+            --primary-hover:   #1d4ed8;
+            --input-bg:        #ffffff;
+            --input-border:    rgba(15, 23, 42, 0.18);
+            --scrollbar-track: #e2e8f0;
+            --scrollbar-thumb: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* ── Navbar ─────────────────────────────────────────────────── */
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 1.5rem;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .navbar-brand {
+            color: var(--text-primary) !important;
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+
+        .navbar-brand i {
+            color: var(--primary);
+            margin-right: 8px;
+        }
+
+        /* ── Main Layout ─────────────────────────────────────────────── */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 52px);
+            padding: 10px;
+            gap: 10px;
+        }
+
+        /* ── Map Container ───────────────────────────────────────────── */
+        .map-container {
+            flex: 2.5;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            position: relative;
+        }
+
+        #map { height: 100%; width: 100%; }
+
+        /* ── Side Panel ──────────────────────────────────────────────── */
+        .side-panel {
+            width: 240px;
+            background: var(--card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .section-title i { color: var(--primary); font-size: 0.8rem; }
+
+        /* ── Chips / Filter buttons ──────────────────────────────────── */
+        .chip {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border-strong);
+            background: transparent;
+            color: var(--text-muted);
+            transition: all 0.18s;
+        }
+
+        .chip:hover {
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--text-primary);
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+
+        .chip.active {
+            background: rgba(59, 130, 246, 0.18);
+            color: #93c5fd;
+            border-color: rgba(59, 130, 246, 0.45);
+        }
+
+        /* ── Draw button (floating on map) ──────────────────────────── */
+        #drawNicheBtn {
+            background: var(--bg-secondary) !important;
+            border: 1px solid var(--border-strong) !important;
+            border-radius: 10px !important;
+            color: var(--text-primary) !important;
+            padding: 9px 16px !important;
+            font-weight: 600 !important;
+            font-size: 0.82rem !important;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.45) !important;
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        #drawNicheBtn:hover { border-color: var(--primary) !important; }
+
+        #drawHint {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text-secondary) !important;
+            font-size: 0.75rem;
+            backdrop-filter: blur(8px);
+        }
+
+        /* ── Toast ───────────────────────────────────────────────────── */
+        .toast-message {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            z-index: 9999;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            min-width: 260px;
+            max-width: 360px;
+            color: var(--text-primary);
+        }
+
+        #toastTitle { font-size: 0.87rem; font-weight: 700; color: var(--text-primary); }
+        #toastText  { font-size: 0.78rem; color: var(--text-muted); margin: 3px 0 0; }
+
+        /* ── Leaflet popup override ───────────────────────────────────── */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: var(--radius) !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+        }
+
+        .leaflet-popup-tip { background: var(--bg-secondary) !important; }
+
+        .leaflet-control-zoom a {
+            background: var(--card) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border) !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background: var(--bg-secondary) !important;
+        }
+
+        .leaflet-routing-container {
+            background: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: var(--radius) !important;
+        }
+
+        /* ── Landmark marker ─────────────────────────────────────────── */
+        .landmark-marker {
+            width: 30px;
+            height: 30px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255,255,255,0.3);
+            box-shadow: 0 2px 8px rgba(59,130,246,0.5);
+        }
+    </style>
+
+
+
+</head>
+<body>
+    <nav class="navbar">
+        <span class="navbar-brand">
+            <i class="fas fa-map-marked-alt"></i> Bagbag Cemetery — Interactive Map
+        </span>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+
+            <!-- Draw Niche floating button -->
+            <div id="drawBtn" style="position:absolute;top:15px;left:15px;z-index:1000;">
+                <button id="drawNicheBtn" onclick="toggleDraw()" style="cursor:pointer;">
+                    <i class="fas fa-draw-polygon"></i>
+                    <span id="drawBtnText">Draw Niche</span>
+                </button>
+                <div id="drawHint" style="display:none;padding:6px 14px;margin-top:8px;text-align:center;">
+                    Click &amp; drag to draw a rectangle
+                </div>
+            </div>
+            <!-- map only -->
+        </div>
+
+        <!-- Side Panel -->
+
+    </div>
+
+    <!-- Toast Message -->
+    <div id="toastMessage" class="toast-message" style="display: none;">
+        <i class="fas fa-info-circle fa-2x" style="color: #3498db;"></i>
+        <div>
+            <strong id="toastTitle">Message</strong>
+            <p id="toastText" class="small text-muted mb-0"></p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <script>
+        // ==================== CONFIGURATION ====================
+        const cemeteryGeoJSON = {
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [121.02986488832637, 14.697882706554674],
+                        [121.02997275598973, 14.698222143467449],
+                        [121.03000984360492, 14.698747294849069],
+                        [121.03004616407166, 14.699005044712681],
+                        [121.02931139764122, 14.699159557503753],
+                        [121.02896828704559, 14.698998802540695],
+                        [121.02879673174778, 14.698635807027634],
+                        [121.02821237151457, 14.698070569956204],
+                        [121.02804528717972, 14.697680788114988],
+                        [121.02807477265057, 14.697348046968497],
+                        [121.0281368774192, 14.696582309735312],
+                        [121.0290985365522, 14.696518680654757],
+                        [121.0299098385569, 14.696591399602456],
+                        [121.02994429539879, 14.696606549380178],
+                        [121.02984092487313, 14.69726101877471],
+                        [121.02942431033014, 14.697397366318441],
+                        [121.02950262133446, 14.697597342561963],
+                        [121.02991074464533, 14.697487536622805],
+                        [121.03001079479574, 14.69780609203191],
+                        [121.02986488832637, 14.697882706554674]
+                    ]]
+                },
+                "properties": null
+            }]
+        };
+
+        // Starting points with corrected coordinates
+        const startingPoints = {
+            entrance: { lat: 14.6979, lng: 121.0298, name: "Main Entrance" },
+            parking: { lat: 14.6985, lng: 121.0300, name: "Parking Area" },
+            office: { lat: 14.6988, lng: 121.0295, name: "Cemetery Office" }
+        };
+
+        // ==================== STATE ====================
+        let map;
+        let cemeteryLayer;
+        let nichesLayer;
+        let landmarksLayer;
+        let startingPointsLayer;
+        let userLocation = null;
+        let userMarker = null;
+        let routingControl = null;
+        let currentRoute = null;
+        let selectedNiche = null;
+        let tempDrawingLayer = null;
+        let drawingPoints = [];
+        let isDrawing = false;
+        let currentStatus = 'available';
+        let niches = [];
+        let currentRole = 'visitor';
+        let currentFilter = 'all';
+        let currentStartingPoint = 'entrance';
+        let drawingActive = false;
+        let drawnPoints = [];
+        let drawnMarkers = [];
+        let drawnPolygon = null;
+        let dbNichesLayer = null;
+        let allDbNiches = [];
+
+        // ==================== INITIALIZATION ====================
+        function initMap() {
+            map = L.map('map').setView([14.6978, 121.0299], 19);
+
+            // Base map
+            L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+                maxZoom: 22,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+            }).addTo(map);
+
+            // Cemetery boundary with better visibility
+            cemeteryLayer = L.geoJSON(cemeteryGeoJSON, {
+                style: {
+                    color: '#e74c3c',
+                    weight: 4,
+                    opacity: 0.9,
+                    fillColor: '#3498db',
+                    fillOpacity: 0.1,
+                    dashArray: null
+                }
+            }).addTo(map);
+
+            map.fitBounds(cemeteryLayer.getBounds());
+
+            // Initialize layers
+            nichesLayer = L.layerGroup().addTo(map);
+            landmarksLayer = L.layerGroup().addTo(map);
+            startingPointsLayer = L.layerGroup().addTo(map);
+
+
+            // Load saved niches
+            loadNiches();
+
+            // Map draw interaction handled by toggleDraw() / onMapClickDraw()
+
+            // Start in visitor mode
+            switchRole('visitor');
+
+            // Listen for messages from parent React app
+            window.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'RENDER_NICHES') {
+                    renderDbNiches(e.data.niches || []);
+                } else if (e.data && e.data.type === 'NICHE_SAVED') {
+                    // Niche was confirmed saved — flash green then fade
+                    showToast('Niche Saved', e.data.nicheNumber + ' added to map!', 'success');
+                }
+            });
+
+            // Ask parent to send niches after map init
+            window.parent.postMessage({ type: 'MAP_READY' }, '*');
+        }
+
+        // ==================== DRAW NICHE (Rectangle / Square) ====================
+        let rectStart = null;
+        let rectPreview = null;
+
+        function toggleDraw() {
+            if (drawingActive) { cancelDraw(); } else { startDraw(); }
+        }
+
+        function startDraw() {
+            drawingActive = true;
+            rectStart = null;
+            if (rectPreview) { map.removeLayer(rectPreview); rectPreview = null; }
+            document.getElementById('drawBtnText').textContent = 'Cancel Drawing';
+            document.getElementById('drawNicheBtn').style.background = '#e74c3c';
+            document.getElementById('drawHint').textContent = 'Click & drag to draw a rectangle — release to finish';
+            document.getElementById('drawHint').style.display = 'block';
+            map.getContainer().style.cursor = 'crosshair';
+
+            // Disable map drag so our rectangle draw takes priority
+            map.dragging.disable();
+
+            map.getContainer().addEventListener('mousedown', onRectMouseDown, { passive: false });
+        }
+
+        function onRectMouseDown(e) {
+            e.preventDefault();
+            const start = map.mouseEventToLatLng(e);
+            rectStart = start;
+
+            function onMouseMove(ev) {
+                const current = map.mouseEventToLatLng(ev);
+                const bounds = L.latLngBounds(rectStart, current);
+                if (rectPreview) map.removeLayer(rectPreview);
+                rectPreview = L.rectangle(bounds, {
+                    color: '#3498db', fillColor: '#3498db', fillOpacity: 0.25, dashArray: '6,4', weight: 2
+                }).addTo(map);
+            }
+
+            function onMouseUp(ev) {
+                map.getContainer().removeEventListener('mousemove', onMouseMove);
+                map.getContainer().removeEventListener('mouseup', onMouseUp);
+
+                const end = map.mouseEventToLatLng(ev);
+                const bounds = L.latLngBounds(rectStart, end);
+
+                // Must have meaningful size (not just a click)
+                const sw = bounds.getSouthWest();
+                const ne = bounds.getNorthEast();
+                if (Math.abs(ne.lat - sw.lat) < 0.000005 || Math.abs(ne.lng - sw.lng) < 0.000005) {
+                    showMapToast('Too small', 'Drag to draw a larger rectangle.', 'warning');
+                    cancelDraw();
+                    return;
+                }
+
+                // Build 4-corner latlngs
+                const latlngs = [
+                    { lat: ne.lat, lng: sw.lng },
+                    { lat: ne.lat, lng: ne.lng },
+                    { lat: sw.lat, lng: ne.lng },
+                    { lat: sw.lat, lng: sw.lng }
+                ];
+
+                let area = 0;
+                if (typeof turf !== 'undefined') {
+                    const coords = latlngs.map(p => [p.lng, p.lat]);
+                    coords.push(coords[0]);
+                    const poly = turf.polygon([coords]);
+                    area = Math.round(turf.area(poly) * 100) / 100;
+                }
+
+                window.parent.postMessage({ type: 'NICHE_DRAWN', latlngs: latlngs, area: area }, '*');
+                cancelDraw();
+                showMapToast('Rectangle Drawn!', 'Fill in the niche details in the panel to save.', 'info');
+            }
+
+            map.getContainer().addEventListener('mousemove', onMouseMove);
+            map.getContainer().addEventListener('mouseup', onMouseUp);
+        }
+
+        function cancelDraw() {
+            drawingActive = false;
+            rectStart = null;
+            if (rectPreview) { map.removeLayer(rectPreview); rectPreview = null; }
+            map.dragging.enable();
+            map.getContainer().removeEventListener('mousedown', onRectMouseDown);
+            document.getElementById('drawBtnText').textContent = 'Draw Niche';
+            document.getElementById('drawNicheBtn').style.background = '#2c3e50';
+            document.getElementById('drawHint').style.display = 'none';
+            map.getContainer().style.cursor = '';
+        }
+
+
+        // Render DB niches from parent
+        function renderDbNiches(nichesArr) {
+            if (dbNichesLayer) map.removeLayer(dbNichesLayer);
+            dbNichesLayer = L.layerGroup().addTo(map);
+            allDbNiches = nichesArr; // store for filtering
+            const COLOR_MAP = { available: '#34d399', occupied: '#f87171', reserved: '#fbbf24', maintenance: '#94a3b8' };
+            nichesArr.forEach(function(n) {
+                if (!n.coordinates || !n.coordinates.length) return;
+                const latlngs = n.coordinates.map(function(c) { return [c.lat, c.lng]; });
+                const color = COLOR_MAP[n.status] || '#3498db';
+                const poly = L.polygon(latlngs, { color: color, fillColor: color, fillOpacity: 0.35, weight: 2 });
+                poly.bindTooltip('<b>' + n.niche_number + '</b><br>' + (n.status || ''), { permanent: false, direction: 'top' });
+                poly.on('click', function() {
+                    window.parent.postMessage({ type: 'NICHE_CLICKED', nicheId: n.niche_id }, '*');
+                });
+                poly.addTo(dbNichesLayer);
+            });
+        }
+
+        function filterBySection(section) {
+            // Toggle chip active state
+            document.querySelectorAll('[id^="sec-"]').forEach(function(el) { el.classList.remove('active'); });
+            const btn = document.getElementById('sec-' + section);
+            if (btn) btn.classList.add('active');
+
+            if (!allDbNiches) return;
+            if (dbNichesLayer) map.removeLayer(dbNichesLayer);
+            dbNichesLayer = L.layerGroup().addTo(map);
+            const COLOR_MAP = { available: '#34d399', occupied: '#f87171', reserved: '#fbbf24', maintenance: '#94a3b8' };
+            const filtered = section === 'all' ? allDbNiches : allDbNiches.filter(function(n) {
+                return n.niche_number && n.niche_number.startsWith(section);
+            });
+            filtered.forEach(function(n) {
+                if (!n.coordinates || !n.coordinates.length) return;
+                const latlngs = n.coordinates.map(function(c) { return [c.lat, c.lng]; });
+                const color = COLOR_MAP[n.status] || '#3498db';
+                const poly = L.polygon(latlngs, { color: color, fillColor: color, fillOpacity: 0.35, weight: 2 });
+                poly.bindTooltip('<b>' + n.niche_number + '</b><br>' + (n.status || ''), { permanent: false, direction: 'top' });
+                poly.on('click', function() {
+                    window.parent.postMessage({ type: 'NICHE_CLICKED', nicheId: n.niche_id }, '*');
+                });
+                poly.addTo(dbNichesLayer);
+            });
+        }
+
+
+        function showMapToast(title, text, type) {
+            const el = document.getElementById('toastMessage');
+            if (!el) return;
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastText').textContent = text;
+            el.style.display = 'flex';
+            el.style.borderLeftColor = type === 'success' ? '#27ae60' : type === 'warning' ? '#f39c12' : '#3498db';
+            setTimeout(() => { el.style.display = 'none'; }, 4000);
+        }
+
+
+        // Highlight cemetery boundary
+        function highlightCemeteryBoundary() {
+            if (window.cemeteryHighlight) {
+                map.removeLayer(window.cemeteryHighlight);
+            }
+            
+            window.cemeteryHighlight = L.geoJSON(cemeteryGeoJSON, {
+                style: {
+                    color: '#e74c3c',
+                    weight: 6,
+                    opacity: 1,
+                    fillColor: '#3498db',
+                    fillOpacity: 0.2,
+                    dashArray: null
+                }
+            }).addTo(map);
+            
+            showToast('Cemetery Boundary', 'Boundary highlighted in red');
+        }
+
+        // ==================== IMPROVED BOUNDARY CHECKING ====================
+// ==================== FIXED BOUNDARY CHECKING ====================
+function isWithinCemetery(layer) {
+    try {
+        // Get the niche geometry
+        const nicheGeo = layer.toGeoJSON(); // Feature
+
+        // Get cemetery geometry: cemeteryLayer.toGeoJSON() returns a FeatureCollection
+        let cemeteryCollection = cemeteryLayer.toGeoJSON();
+        let cemeteryFeature;
+        if (cemeteryCollection.type === 'FeatureCollection') {
+            cemeteryFeature = cemeteryCollection.features[0]; // take the first feature
+        } else {
+            cemeteryFeature = cemeteryCollection; // already a feature
+        }
+        // Ensure correct orientation (counter-clockwise for exterior ring)
+        cemeteryFeature = turf.rewind(cemeteryFeature, { reverse: true });
+
+        // --- Method 1: All points inside (strict) ---
+        const coords = nicheGeo.geometry.coordinates[0];
+        let allInside = true;
+        for (let i = 0; i < coords.length; i++) {
+            const pt = turf.point(coords[i]); // [lng, lat]
+            if (!turf.booleanPointInPolygon(pt, cemeteryFeature)) {
+                allInside = false;
+                break;
+            }
+        }
+        if (allInside) {
+            console.log("Boundary check: all points inside cemetery");
+            return true;
+        }
+
+        // --- Method 2: Centroid inside (forgives minor edge protrusions) ---
+        const centroid = turf.centroid(nicheGeo);
+        if (turf.booleanPointInPolygon(centroid, cemeteryFeature)) {
+            console.log("Boundary check: centroid inside cemetery");
+            return true;
+        }
+
+        // --- Method 3: Intersection area > 95% ---
+        try {
+            const intersection = turf.intersect(nicheGeo, cemeteryFeature);
+            if (intersection) {
+                const nicheArea = turf.area(nicheGeo);
+                const intersectArea = turf.area(intersection);
+                const percentInside = (intersectArea / nicheArea) * 100;
+                console.log(`Boundary check: intersection area = ${percentInside.toFixed(1)}%`);
+                if (percentInside > 95) {
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.log("Intersection calculation failed:", e);
+        }
+
+        // --- Method 4: Within a 2‑meter buffer of the cemetery (drawing tolerance) ---
+        const buffered = turf.buffer(cemeteryFeature, 0.002, { units: 'kilometers' }); // 2 meters
+        if (buffered) {
+            const withinBuffer = turf.booleanWithin(nicheGeo, buffered);
+            if (withinBuffer) {
+                console.log("Boundary check: within 2m buffer");
+                return true;
+            }
+        }
+
+        console.log("Boundary check: niche is outside cemetery");
+        return false;
+
+    } catch (e) {
+        console.error("Error in boundary check:", e);
+        return false;
+    }
+}
+
+        // Test function for debugging
+        function testPointInCemetery() {
+            // Get center of map as test point
+            const center = map.getCenter();
+            const testPoint = [center.lng, center.lat]; // [lng, lat] for Turf
+            
+            let cemeteryGeo = cemeteryLayer.toGeoJSON();
+            cemeteryGeo = turf.rewind(cemeteryGeo, { reverse: true });
+            const turfPoint = turf.point(testPoint);
+            
+            const isInside = turf.booleanPointInPolygon(turfPoint, cemeteryGeo);
+            
+            console.log('Test point (lng, lat):', testPoint);
+            console.log('Is inside:', isInside);
+            
+            // Add marker at test point
+            L.circleMarker([center.lat, center.lng], {
+                radius: 10,
+                color: isInside ? '#27ae60' : '#e74c3c',
+                fillColor: isInside ? '#27ae60' : '#e74c3c',
+                fillOpacity: 0.8
+            }).bindPopup(`
+                <strong>Test Point</strong><br>
+                Lat: ${center.lat.toFixed(6)}<br>
+                Lng: ${center.lng.toFixed(6)}<br>
+                Inside: ${isInside ? 'Yes ✅' : 'No ❌'}
+            `).addTo(map);
+            
+            showToast('Test Result', `Point is ${isInside ? 'inside' : 'outside'} cemetery`, isInside ? 'success' : 'error');
+        }
+
+        // ==================== NICHE CREATION ====================
+        function startDrawingNiche() {
+            isDrawing = true;
+            drawingPoints = [];
+            
+            if (tempDrawingLayer) {
+                map.removeLayer(tempDrawingLayer);
+            }
+            
+            document.getElementById('nicheFormContainer').classList.add('active');
+            document.getElementById('drawingInstructions').classList.add('active');
+            showToast('Drawing Mode', 'Click on the map to create your niche shape. Click first point to finish.');
+        }
+
+        function addDrawingPoint(latlng) {
+            if (!isDrawing) return;
+            
+            drawingPoints.push(latlng);
+            
+            // Draw temporary polygon
+            if (tempDrawingLayer) {
+                map.removeLayer(tempDrawingLayer);
+            }
+            
+            if (drawingPoints.length >= 2) {
+                tempDrawingLayer = L.polygon(drawingPoints, {
+                    color: '#3498db',
+                    weight: 2,
+                    fillColor: '#3498db',
+                    fillOpacity: 0.3
+                }).addTo(map);
+                
+                // Calculate area
+                if (drawingPoints.length >= 3) {
+                    const area = calculatePolygonArea(drawingPoints);
+                    document.getElementById('nicheArea').textContent = area.toFixed(2);
+                    
+                    // Check if within cemetery using the improved function
+                    const withinBoundary = isWithinCemetery(tempDrawingLayer);
+                    
+                    if (!withinBoundary) {
+                        showToast('Warning', 'Some points are outside cemetery boundary!', 'warning');
+                        tempDrawingLayer.setStyle({ color: '#e74c3c', fillColor: '#e74c3c' });
+                        
+                        // Show which points are outside
+                        checkPointsInCemetery(tempDrawingLayer);
+                    } else {
+                        tempDrawingLayer.setStyle({ color: '#3498db', fillColor: '#3498db' });
+                    }
+                }
+                
+                // Check if closing the polygon (click near first point)
+                if (drawingPoints.length > 2) {
+                    const firstPoint = drawingPoints[0];
+                    const distance = map.distance(latlng, firstPoint);
+                    
+                    if (distance < 10) { // Within 10 meters
+                        finishDrawing();
+                    }
+                }
+            }
+        }
+
+        function checkPointsInCemetery(layer) {
+            const points = drawingPoints;
+            const cemeteryGeo = cemeteryLayer.toGeoJSON();
+            
+            points.forEach((point, index) => {
+                // Turf expects [lng, lat]
+                const turfPoint = turf.point([point.lng, point.lat]);
+                const isInside = turf.booleanPointInPolygon(turfPoint, cemeteryGeo);
+                
+                if (!isInside) {
+                    // Add a red marker at the outside point
+                    L.circleMarker([point.lat, point.lng], {
+                        radius: 6,
+                        color: '#e74c3c',
+                        fillColor: '#e74c3c',
+                        fillOpacity: 0.8
+                    }).bindPopup(`Point ${index + 1} is outside`).addTo(map);
+                }
+            });
+        }
+
+        function finishDrawing() {
+            if (drawingPoints.length < 3) {
+                showToast('Error', 'Need at least 3 points to create a niche', 'error');
+                return;
+            }
+            
+            isDrawing = false;
+            document.getElementById('drawingInstructions').classList.remove('active');
+            showToast('Drawing Complete', 'Now fill in the niche details', 'success');
+        }
+
+        function cancelNicheCreation() {
+            isDrawing = false;
+            drawingPoints = [];
+            
+            if (tempDrawingLayer) {
+                map.removeLayer(tempDrawingLayer);
+                tempDrawingLayer = null;
+            }
+            
+            document.getElementById('nicheFormContainer').classList.remove('active');
+            document.getElementById('drawingInstructions').classList.remove('active');
+        }
+
+        function setStatus(status) {
+            currentStatus = status;
+            
+            document.querySelectorAll('.status-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.status-btn.${status}`).classList.add('active');
+        }
+
+        function saveNiche() {
+            const label = document.getElementById('nicheLabel').value;
+            
+            if (!label) {
+                showToast('Error', 'Please enter a niche label', 'error');
+                return;
+            }
+            
+            if (!tempDrawingLayer || drawingPoints.length < 3) {
+                showToast('Error', 'No valid niche drawn', 'error');
+                return;
+            }
+            
+            // Final boundary check using improved function
+            if (!isWithinCemetery(tempDrawingLayer)) {
+                showToast('Error', 'Niche must be completely within cemetery boundary', 'error');
+                return;
+            }
+            
+            finishDrawing();
+            
+            const nicheData = {
+                id: 'niche_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                label: label,
+                section: document.getElementById('nicheSection').value,
+                row: document.getElementById('nicheRow').value,
+                number: document.getElementById('nicheNumber').value,
+                status: currentStatus,
+                price: document.getElementById('nichePrice').value || null,
+                notes: document.getElementById('nicheNotes').value,
+                area: parseFloat(document.getElementById('nicheArea').textContent) || 0,
+                geometry: tempDrawingLayer.toGeoJSON(),
+                createdAt: new Date().toISOString()
+            };
+            
+            niches.push(nicheData);
+            addNicheToMap(nicheData);
+            saveToStorage();
+            updateStats();
+            displayNiches();
+            updateVisitorView();
+            
+            cancelNicheCreation();
+            showToast('Success', 'Niche saved successfully!', 'success');
+            
+            // Clear form
+            document.getElementById('nicheLabel').value = '';
+            document.getElementById('nicheSection').value = '';
+            document.getElementById('nicheRow').value = '';
+            document.getElementById('nicheNumber').value = '';
+            document.getElementById('nichePrice').value = '';
+            document.getElementById('nicheNotes').value = '';
+            document.getElementById('nicheArea').textContent = '0';
+        }
+
+        function addNicheToMap(nicheData) {
+            const layer = L.geoJSON(nicheData.geometry, {
+                style: getNicheStyle(nicheData.status)
+            }).addTo(nichesLayer);
+            
+            layer.bindPopup(createNichePopup(nicheData));
+            layer.on('click', function() {
+                selectNiche(nicheData.id);
+            });
+            layer.nicheId = nicheData.id;
+            layer.nicheData = nicheData;
+        }
+
+        function getNicheStyle(status) {
+            const colors = {
+                available: { color: '#27ae60', fill: '#27ae60' },
+                reserved: { color: '#f39c12', fill: '#f39c12' },
+                taken: { color: '#e74c3c', fill: '#e74c3c' }
+            };
+            
+            return {
+                color: colors[status]?.color || '#27ae60',
+                weight: 2,
+                fillColor: colors[status]?.fill || '#27ae60',
+                fillOpacity: 0.3
+            };
+        }
+
+        function createNichePopup(niche) {
+            return `
+                <div style="min-width: 200px;">
+                    <h6><strong>${niche.label}</strong></h6>
+                    <hr class="my-1">
+                    <p class="mb-1 small">
+                        ${niche.section ? '📍 ' + niche.section + '<br>' : ''}
+                        ${niche.row ? '📏 Row: ' + niche.row + '<br>' : ''}
+                        ${niche.number ? '🔢 #' + niche.number + '<br>' : ''}
+                        📐 Area: ${niche.area.toFixed(2)} m²<br>
+                        Status: <span class="badge bg-${niche.status === 'available' ? 'success' : niche.status === 'reserved' ? 'warning' : 'danger'}">${niche.status}</span>
+                    </p>
+                    <button class="btn btn-sm btn-primary w-100 mt-2" onclick="selectNicheAndNavigate('${niche.id}')">
+                        <i class="fas fa-directions"></i> Get Directions
+                    </button>
+                </div>
+            `;
+        }
+
+        // ==================== NAVIGATION FUNCTIONS ====================
+        function setStartingPoint(point) {
+            currentStartingPoint = point;
+            
+            document.querySelectorAll('.starting-point-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+            
+            let pointName = point === 'current' ? 'My Location' : startingPoints[point].name;
+            showToast('Starting Point Set', `Starting from: ${pointName}`);
+            
+            if (selectedNiche) {
+                getDirectionsToSelected();
+            }
+        }
+
+        function setAdminStartingPoint(point) {
+            currentStartingPoint = point;
+            showToast('Default Starting Point', `Set to: ${startingPoints[point].name}`);
+        }
+
+        function setVisitorStartingPoint(point) {
+            if (point === 'current') {
+                getUserLocation();
+            } else {
+                currentStartingPoint = point;
+                showToast('Starting Point Set', `Starting from: ${startingPoints[point].name}`);
+                if (selectedNiche) {
+                    getDirectionsToSelected();
+                }
+            }
+        }
+
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                showToast('Getting Location', 'Please wait...');
+                
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        
+                        if (userMarker) {
+                            userMarker.setLatLng(userLocation);
+                        } else {
+                            userMarker = L.marker(userLocation, {
+                                icon: L.divIcon({
+                                    className: 'user-location-marker',
+                                    html: '<i class="fas fa-circle-user" style="color: #3498db; font-size: 30px;"></i>',
+                                    iconSize: [30, 30]
+                                })
+                            }).addTo(map).bindPopup('You are here');
+                        }
+                        
+                        map.setView(userLocation, 19);
+                        currentStartingPoint = 'current';
+                        
+                        showToast('Location Found', 'You can now get directions');
+                        
+                        if (selectedNiche) {
+                            getDirectionsToSelected();
+                        }
+                    },
+                    function(error) {
+                        showToast('Location Error', 'Please enable location services', 'error');
+                    }
+                );
+            }
+        }
+
+        function getDirectionsToSelected() {
+            if (!selectedNiche) {
+                showToast('Error', 'Please select a niche first', 'error');
+                return;
+            }
+            
+            let startPoint;
+            
+            if (currentStartingPoint === 'current' && userLocation) {
+                startPoint = userLocation;
+            } else if (startingPoints[currentStartingPoint]) {
+                startPoint = startingPoints[currentStartingPoint];
+            } else {
+                startPoint = startingPoints.entrance;
+            }
+            
+            // Get niche center
+            const nicheGeoJSON = selectedNiche.geometry;
+            const center = turf.centerOfMass(nicheGeoJSON);
+            const endPoint = {
+                lat: center.geometry.coordinates[1],
+                lng: center.geometry.coordinates[0]
+            };
+            
+            createRoute(startPoint, endPoint);
+            showNavigationPanel();
+        }
+
+        function createRoute(start, end) {
+            if (routingControl) {
+                map.removeControl(routingControl);
+            }
+            
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(start.lat, start.lng),
+                    L.latLng(end.lat, end.lng)
+                ],
+                routeWhileDragging: false,
+                showAlternatives: true,
+                fitSelectedRoutes: true,
+                lineOptions: {
+                    styles: [
+                        { color: '#3498db', opacity: 0.8, weight: 6 }
+                    ]
+                },
+                createMarker: function() { return null; }
+            }).addTo(map);
+            
+            routingControl.on('routesfound', function(e) {
+                const route = e.routes[0];
+                currentRoute = route;
+                updateNavigationPanel(route);
+            });
+        }
+
+        function updateNavigationPanel(route) {
+            const summary = route.summary;
+            
+            document.getElementById('destinationInfo').innerHTML = `
+                <h6 class="mb-1"><i class="fas fa-flag-checkered"></i> Destination: ${selectedNiche.label}</h6>
+                <small class="text-muted">${selectedNiche.section || ''} ${selectedNiche.row ? 'Row ' + selectedNiche.row : ''} ${selectedNiche.number ? '#' + selectedNiche.number : ''}</small>
+            `;
+            
+            document.getElementById('routeSummary').innerHTML = `
+                <div class="d-flex justify-content-between small">
+                    <span>Distance:</span>
+                    <strong>${formatDistance(summary.totalDistance)}</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span>Walking Time:</span>
+                    <strong>${formatTime(summary.totalTime)}</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span>Steps:</span>
+                    <strong>~${Math.round(summary.totalDistance * 1.3)}</strong>
+                </div>
+            `;
+            
+            let instructionsHtml = '';
+            route.instructions.forEach((inst, index) => {
+                instructionsHtml += `
+                    <div class="d-flex gap-2 mb-2 small">
+                        <span class="badge bg-primary" style="width: 22px;">${index + 1}</span>
+                        <div>
+                            <div>${inst.text}</div>
+                            <small class="text-muted">${formatDistance(inst.distance)}</small>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('turnByTurn').innerHTML = instructionsHtml;
+        }
+
+        function startMobileNavigation() {
+            if (!selectedNiche || !currentRoute) return;
+            
+            let startCoords;
+            if (currentStartingPoint === 'current' && userLocation) {
+                startCoords = `${userLocation.lat},${userLocation.lng}`;
+            } else {
+                startCoords = `${startingPoints[currentStartingPoint].lat},${startingPoints[currentStartingPoint].lng}`;
+            }
+            
+            const nicheGeoJSON = selectedNiche.geometry;
+            const center = turf.centerOfMass(nicheGeoJSON);
+            const endCoords = `${center.geometry.coordinates[1]},${center.geometry.coordinates[0]}`;
+            
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${startCoords}&destination=${endCoords}&travelmode=walking`;
+            window.open(url, '_blank');
+        }
+
+        function shareDirections() {
+            if (!selectedNiche || !currentRoute) return;
+            
+            let startName = currentStartingPoint === 'current' ? 'My Location' : startingPoints[currentStartingPoint].name;
+            
+            const text = `Directions to ${selectedNiche.label} at Babag Cemetery\n\n` +
+                        `From: ${startName}\n` +
+                        `Distance: ${formatDistance(currentRoute.summary.totalDistance)}\n` +
+                        `Walking Time: ${formatTime(currentRoute.summary.totalTime)}\n` +
+                        `Steps: ~${Math.round(currentRoute.summary.totalDistance * 1.3)}`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Niche Directions',
+                    text: text
+                });
+            } else {
+                navigator.clipboard.writeText(text);
+                showToast('Copied!', 'Directions copied to clipboard');
+            }
+        }
+
+        // ==================== NICHE SELECTION ====================
+        function selectNiche(nicheId) {
+            selectedNiche = niches.find(n => n.id === nicheId);
+            
+            if (!selectedNiche) return;
+            
+            document.getElementById('selectedNicheDetails').innerHTML = `
+                <p class="mb-1">
+                    <strong>${selectedNiche.label}</strong><br>
+                    ${selectedNiche.section ? '📍 ' + selectedNiche.section + '<br>' : ''}
+                    ${selectedNiche.row ? '📏 Row: ' + selectedNiche.row + '<br>' : ''}
+                    ${selectedNiche.number ? '🔢 #' + selectedNiche.number + '<br>' : ''}
+                    📐 Area: ${selectedNiche.area.toFixed(2)} m²<br>
+                    <span class="badge bg-${selectedNiche.status === 'available' ? 'success' : selectedNiche.status === 'reserved' ? 'warning' : 'danger'}">
+                        ${selectedNiche.status}
+                    </span>
+                </p>
+            `;
+            
+            document.getElementById('selectedNicheCard').style.display = 'block';
+            
+            nichesLayer.eachLayer(layer => {
+                if (layer.nicheId === nicheId) {
+                    layer.setStyle({ weight: 4, color: '#3498db' });
+                    map.fitBounds(layer.getBounds());
+                } else {
+                    layer.setStyle(getNicheStyle(layer.nicheData.status));
+                }
+            });
+            
+            displayNiches();
+            updateVisitorView();
+        }
+
+        function selectNicheAndNavigate(nicheId) {
+            selectNiche(nicheId);
+            getDirectionsToSelected();
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function calculatePolygonArea(points) {
+            if (points.length < 3) return 0;
+            
+            try {
+                // Convert points to [lng, lat] format for Turf
+                const turfPoints = points.map(p => [p.lng, p.lat]);
+                const geojson = {
+                    type: 'Polygon',
+                    coordinates: [turfPoints]
+                };
+                return turf.area(geojson);
+            } catch (e) {
+                console.error('Area calculation error:', e);
+                return 0;
+            }
+        }
+
+        function formatDistance(meters) {
+            if (meters < 1000) {
+                return `${Math.round(meters)} m`;
+            }
+            return `${(meters / 1000).toFixed(1)} km`;
+        }
+
+        function formatTime(seconds) {
+            if (seconds < 60) {
+                return `${Math.round(seconds)} sec`;
+            } else if (seconds < 3600) {
+                return `${Math.round(seconds / 60)} min`;
+            }
+            return `${Math.round(seconds / 3600)} hr`;
+        }
+
+        function showToast(title, message, type = 'info') {
+            const toast = document.getElementById('toastMessage');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastText').textContent = message;
+            
+            if (type === 'error') {
+                toast.style.borderLeftColor = '#e74c3c';
+            } else if (type === 'success') {
+                toast.style.borderLeftColor = '#27ae60';
+            } else {
+                toast.style.borderLeftColor = '#3498db';
+            }
+            
+            toast.style.display = 'flex';
+            
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        function showNavigationPanel() {
+            document.getElementById('navigationPanel').classList.add('active');
+        }
+
+        function closeNavigation() {
+            document.getElementById('navigationPanel').classList.remove('active');
+        }
+
+        function addStartingPoint() {
+            showToast('Info', 'Click on the map to add a starting point');
+        }
+
+        function addLandmark() {
+            showToast('Info', 'Click on the map to add a landmark');
+        }
+
+        function clearAllNiches() {
+            if (confirm('Are you sure you want to clear all niches?')) {
+                niches = [];
+                nichesLayer.clearLayers();
+                saveToStorage();
+                updateStats();
+                displayNiches();
+                updateVisitorView();
+                showToast('Cleared', 'All niches have been removed');
+            }
+        }
+
+        // ==================== UI FUNCTIONS ====================
+        function switchRole(role) {
+            currentRole = role;
+            
+            document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('adminPanel').style.display = role === 'admin' ? 'block' : 'none';
+            document.getElementById('visitorPanel').style.display = role === 'client' ? 'block' : 'none';
+            document.getElementById('adminControlPanel').style.display = role === 'admin' ? 'block' : 'none';
+            
+            if (role === 'client') {
+                updateVisitorView();
+            }
+        }
+
+        function updateStats() {
+            const total = niches.length;
+            const available = niches.filter(n => n.status === 'available').length;
+            const taken = niches.filter(n => n.status === 'taken').length;
+            const reserved = niches.filter(n => n.status === 'reserved').length;
+            
+            document.getElementById('totalNiches').textContent = total;
+            document.getElementById('availableNiches').textContent = available;
+            document.getElementById('takenNiches').textContent = taken;
+            
+            document.getElementById('visitorAvailable').textContent = available;
+            document.getElementById('visitorReserved').textContent = reserved;
+        }
+
+        function displayNiches() {
+            const grid = document.getElementById('adminNichesGrid');
+            let filtered = niches;
+            
+            if (currentFilter !== 'all') {
+                filtered = niches.filter(n => n.status === currentFilter);
+            }
+            
+            const searchTerm = document.getElementById('adminSearch')?.value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(n => 
+                    n.label.toLowerCase().includes(searchTerm) ||
+                    (n.section && n.section.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            grid.innerHTML = filtered.map(niche => `
+                <div class="niche-card ${selectedNiche?.id === niche.id ? 'selected' : ''}" onclick="selectNiche('${niche.id}')">
+                    <div class="niche-status-dot dot-${niche.status}"></div>
+                    <div class="niche-label">${niche.label}</div>
+                    <div class="niche-details">
+                        ${niche.section ? niche.section.substring(0, 10) + '...' : ''}
+                    </div>
+                    <span class="badge-status badge-${niche.status}">
+                        ${niche.status}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        function updateVisitorView() {
+            const grid = document.getElementById('visitorNichesGrid');
+            let filtered = niches.filter(n => n.status !== 'taken');
+            
+            const filter = document.querySelector('#visitorPanel .filter-chips .chip.active')?.textContent.toLowerCase() || 'all';
+            if (filter !== 'all') {
+                filtered = filtered.filter(n => n.status === filter);
+            }
+            
+            const searchTerm = document.getElementById('visitorSearch')?.value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(n => 
+                    n.label.toLowerCase().includes(searchTerm) ||
+                    (n.section && n.section.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            grid.innerHTML = filtered.map(niche => `
+                <div class="niche-card ${selectedNiche?.id === niche.id ? 'selected' : ''}" onclick="selectNiche('${niche.id}')">
+                    <div class="niche-status-dot dot-${niche.status}"></div>
+                    <div class="niche-label">${niche.label}</div>
+                    <div class="niche-details">
+                        ${niche.area.toFixed(1)} m²
+                    </div>
+                    <span class="badge-status badge-${niche.status}">
+                        ${niche.status}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        function filterNiches(filter) {
+            currentFilter = filter;
+            
+            document.querySelectorAll('#adminPanel .filter-chips .chip').forEach(chip => {
+                chip.classList.remove('active');
+                if (chip.textContent.toLowerCase() === filter) {
+                    chip.classList.add('active');
+                }
+            });
+            
+            displayNiches();
+        }
+
+        function visitorFilter(filter) {
+            document.querySelectorAll('#visitorPanel .filter-chips .chip').forEach(chip => {
+                chip.classList.remove('active');
+                if (chip.textContent.toLowerCase() === filter) {
+                    chip.classList.add('active');
+                }
+            });
+            
+            updateVisitorView();
+        }
+
+        function searchNiches() {
+            displayNiches();
+        }
+
+        function searchVisitorNiches() {
+            updateVisitorView();
+        }
+
+        // ==================== STORAGE ====================
+        function saveToStorage() {
+            localStorage.setItem('babag_niches', JSON.stringify(niches));
+            updateStats();
+        }
+
+        function loadNiches() {
+            const saved = localStorage.getItem('babag_niches');
+            if (saved) {
+                niches = JSON.parse(saved);
+                niches.forEach(niche => addNicheToMap(niche));
+                updateStats();
+                displayNiches();
+                updateVisitorView();
+            }
+        }
+
+        // Make functions global for onclick handlers
+        window.testPointInCemetery = testPointInCemetery;
+        window.highlightCemeteryBoundary = highlightCemeteryBoundary;
+        window.setStartingPoint = setStartingPoint;
+        window.setVisitorStartingPoint = setVisitorStartingPoint;
+        window.setAdminStartingPoint = setAdminStartingPoint;
+        window.getDirectionsToSelected = getDirectionsToSelected;
+        window.selectNicheAndNavigate = selectNicheAndNavigate;
+        window.closeNavigation = closeNavigation;
+        window.startMobileNavigation = startMobileNavigation;
+        window.shareDirections = shareDirections;
+        window.switchRole = switchRole;
+        window.startDrawingNiche = startDrawingNiche;
+        window.addStartingPoint = addStartingPoint;
+        window.addLandmark = addLandmark;
+        window.clearAllNiches = clearAllNiches;
+        window.cancelNicheCreation = cancelNicheCreation;
+        window.setStatus = setStatus;
+        window.saveNiche = saveNiche;
+        window.filterNiches = filterNiches;
+        window.visitorFilter = visitorFilter;
+        window.searchNiches = searchNiches;
+        window.searchVisitorNiches = searchVisitorNiches;
+        window.selectNiche = selectNiche;
+
+        // Sync page theme with app theme changes
+        window.addEventListener('storage', function (event) {
+            if (event.key !== 'bpm_theme') return;
+            var next = event.newValue === 'dark' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+        });
+
+        // Initialize map when page loads
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>

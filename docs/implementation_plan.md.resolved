@@ -1,0 +1,145 @@
+# Government Service Management System - Architecture & Implementation Plan
+
+This document provides the finalized, corrected system architecture and implementation structure aligned strictly with the TO-BE BPMN processes. It outlines the modules, roles, pages, actions, access permissions, and structural refactoring required to enforce BPMN responsibilities.
+
+## 1. Corrected Architecture: Modules, Roles, Pages, and Actions
+
+### 1.1. Cemetery & Burial Management
+**Roles in module:** `citizen`, `death_registration`, `ssdd`, `cemetery_office` (and `treasurer` via Finance).
+
+*   **`citizen`**
+    *   **Pages:** `citizen/apply-burial.tsx`, `citizen/BurialApplicationPage.tsx`, `citizen/my-applications.tsx`
+    *   **Actions:** Submit burial application, upload docs, view status of applications, download burial permit once issued.
+*   **`death_registration` (CCRD)**
+    *   **Pages:** `death_registration/received-documents.tsx`, `death_registration/certificate-verification.tsx`, `death_registration/approvals-signing.tsx`
+    *   **Actions:** Review & verify completeness of burial permit requirements, mark COMPLETE/INCOMPLETE, route to indigent vs. regular path, register certificate of death, generate digital Order of Payment (OOP), validate Official Receipt (OR), issue burial permit (regular & indigent).
+*   **`ssdd`**
+    *   **Pages:** `ssdd/indigent-assistance.tsx`, `ssdd/citizen-records.tsx`
+    *   **Actions:** Receive indigent referrals, assess eligibility, issue Certificate of Guarantee.
+*   **`cemetery_office`**
+    *   **Pages:** `cemetery_office/niche-management.tsx`, `cemetery_office/burial-applications.tsx`, `cemetery_office/burial-records.tsx`, `cemetery_office/deceased-registry.tsx`, `cemetery_office/payments-permits.tsx`
+    *   **Actions:** Verify plot availability, assign plot/niche, schedule burial, perform burial, record completion, update registry. View **read-only** payment/permit status.
+
+### 1.2. Parks & Recreation Scheduling
+**Roles in module:** `citizen`, `reservation_officer` (Parks desk only), `parks_admin` (and `treasurer`).
+
+*   **`citizen`**
+    *   **Pages:** `citizen/apply-park.tsx`, `citizen/my-applications.tsx`
+    *   **Actions:** Submit digital letter of intent and full event application, see availability/approval status, pay park fees.
+*   **`reservation_officer` (Parks Reservation Desk Officer)**
+    *   **Pages:** `reservation_officer/reservation-records.tsx`, `reservation_officer/approvals.tsx`, `reservation_officer/permits-payments.tsx`
+    *   **Actions:** Log request, check venue availability, mark available/unavailable, endorse request to `parks_admin`, validate application completeness, issue digital event permit (only **after** admin approval and payment confirmation).
+*   **`parks_admin`**
+    *   **Pages:** `parks_admin/dashboard.tsx`, `parks_admin/booking-calendar.tsx`, `parks_admin/park-venues.tsx`, `parks_admin/reservations.tsx`, `parks_admin/usage-logs.tsx`
+    *   **Actions:** Review endorsed requests and approve/deny, maintain venue definitions / booking rules, monitor actual events and log compliance (Event Monitoring).
+
+### 1.3. Barangay Facility Reservation
+**Roles in module:** `citizen`, `barangay_secretary`, `punong_barangay` (and `treasurer`).
+
+*   **`citizen`**
+    *   **Pages:** `citizen/apply-barangay.tsx`, `citizen/my-applications.tsx`
+    *   **Actions:** Submit digital barangay facility reservation request, pay rental fees (if required), view approval and permit.
+*   **`barangay_secretary`**
+    *   **Pages:** `barangay_secretary/reservation-records.tsx`, `barangay_secretary/pending-approvals.tsx`
+    *   **Actions:** Log & validate requests completeness, check facility availability, decide fee requirement, issue Digital Facility Reservation Permit, and lock schedule.
+*   **`punong_barangay`**
+    *   **Pages:** `punong_barangay/pending-approvals.tsx`
+    *   **Actions:** Final review and approval of the reservation request.
+
+### 1.4. Water Supply & Drainage Requests
+**Roles in module:** `citizen`, `utility_helpdesk`, `utility_engineering` (and `treasurer`).
+
+*   **`citizen`**
+    *   **Pages:** `citizen/apply-water.tsx`, `citizen/report-leak.tsx`, `citizen/my-applications.tsx`
+    *   **Actions:** Submit digital service request (new connection/leak/drainage), upload docs/photos, pay connection fees.
+*   **`utility_helpdesk`**
+    *   **Pages:** `utility_helpdesk/ticket-triage.tsx`, `utility_helpdesk/assign-teams.tsx`, `utility_helpdesk/connection-status.tsx`
+    *   **Actions:** Log request, classify utility request type, validate application docs, review leak/drainage details, confirm service activation, and close tickets.
+*   **`utility_engineering`**
+    *   **Pages:** `utility_engineering/service-tickets.tsx`, `utility_engineering/installations.tsx`, `utility_engineering/leak-reports.tsx`, `utility_engineering/assigned-jobs.tsx`
+    *   **Actions:** Conduct site inspection and feasibility assessment, install water meter/pipe, inspect and repair leaks, inspect and perform drainage works.
+
+### 1.5. Asset Inventory Tracker (Land & Buildings)
+**Roles in module:** `famcd`, `cgsd_management`, and requesting roles (`punong_barangay`, `cemetery_office`, `parks_admin`).
+
+*   **`famcd` (RMCD + Inventory/Ops)**
+    *   **Pages:** `famcd/dashboard.tsx`, `famcd/ocular-inspections.tsx`, `famcd/inventory-assets.tsx`, `famcd/inventory-reports.tsx`, `famcd/submission-records.tsx`
+    *   **Actions:** Trigger inventory cycle, set scope, schedule physical inspections, conduct inspections, prepare reports, record submissions to oversight bodies.
+*   **`cgsd_management` (Management)**
+    *   **Pages:** `cgsd_management/inventory-reports.tsx`, `cgsd_management/approval-records.tsx`
+    *   **Actions:** Review and approve inventory reports, oversee inspections.
+*   **Requesting Offices (`punong_barangay`, `cemetery_office`, `parks_admin`)**
+    *   **Pages:** New UI sub-views "My Inventory Requests" and "My Inventory Reports" inside each role's existing `dashboard.tsx`.
+    *   **Actions:** Submit inventory request for their facilities, view final inventory report.
+
+### 1.6. Cross-Cutting Modules
+*   **Finance (`treasurer`)**: Full administration of payments and reconciliation (`treasurer/*`). Other roles have read-only or application-specific self-payment access.
+*   **System Admin (`system_admin`)**: Full configuration over RBAC, offices, and setups (`system_admin/*`). No business actions.
+
+---
+
+## 2. Role × Module Access Matrix
+
+| Role | Cemetery | Parks | Barangay Facility | Water | Assets | Finance | Admin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`citizen`** | Apply | Apply | Apply | Apply/Report | None | Own | None |
+| **`cemetery_office`** | Full | None | None | None | Partial (requests/reports for cemetery land) | Read-only (burial payments/permits status) | None |
+| **`death_registration`** | Partial (requirements, registration, permits) | None | None | None | None | None | None |
+| **`ssdd`** | Partial (indigent assistance only) | None | None | None | None | None | None |
+| **`parks_admin`** | None | Full | None | None | Partial (park land inventory) | None | None |
+| **`reservation_officer`** | None | Partial (parks desk: logging, availability, endorsements, permit release) | None | None | None | None | None |
+| **`barangay_secretary`** | None | None | Full | None | Optional partial (if barangay inventory requests) | None | None |
+| **`punong_barangay`** | None | None | Partial (approve) | None | Partial (inventory requests/reports) | None | None |
+| **`utility_helpdesk`** | None | None | None | Full | None | None | None |
+| **`utility_engineering`** | None | None | None | Full | None | None | None |
+| **`famcd`** | None | None | None | None | Full | None | None |
+| **`cgsd_management`**| None | None | None | None | Full | None | None |
+| **`treasurer`** | None | None | None | None | None | Full | None |
+| **`system_admin`** | None | None | None | None | None | None | Full |
+
+*(Rules: "Apply" = user-focused requests; "Partial" = scoped specific tasks).*
+
+---
+
+## 3. Structural Problems to Fix (Refactoring Checklist)
+
+1.  [ ] **`reservation_officer` Duplicate Tasks:** Restrict `reservation_officer` to Parks Module exclusively. Move **all** Barangay reservation handling (intake, permits, locking) to `barangay_secretary` and final approvals to `punong_barangay`.
+2.  [ ] **SSDD vs Death Registration Scope:** Restrict `ssdd` purely to indigent eligibility assesssment and Certificate of Guarantee. Move all death registry duties (requirements checking, actual civil registration, permit processing) exclusively to `death_registration`.
+3.  [ ] **Cemetery Office Financial Oversight:** Modify `cemetery_office/payments-permits.tsx` to be strictly a **read-only status dashboard**. Remove any functionality causing them to post actual payments or issue official permits (handled by Treasurer and Death Registration).
+4.  [ ] **Missing Asset Inventory Request UI:** Build "My Inventory Requests" and "My Inventory Reports" components inside the dashboards of `punong_barangay`, `cemetery_office`, and `parks_admin`, giving these End-User operational branches partial module access.
+5.  [ ] **Define Event Monitoring Explicitly:** Ensure `parks_admin/usage-logs.tsx` operates explicitly as the Event Monitoring Team interface for `parks_admin` without spinning up a brand new system role.
+6.  [ ] **Payments Consolidation:** Any finance/payment-like logic living inside non-finance pages (like `reservation_officer/permits-payments.tsx` and `cemetery_office`) must offload processing actions fully into the `treasurer/*` views.
+
+---
+
+## 4. Default RBAC JSON Structure Reference
+
+```json
+{
+  "modules": [
+    { "id": "cemetery", "name": "Cemetery & Burial Management" },
+    { "id": "parks", "name": "Parks & Recreation Scheduling" },
+    { "id": "barangay_facility", "name": "Barangay Facility Reservation" },
+    { "id": "water", "name": "Water Supply & Drainage Requests" },
+    { "id": "assets", "name": "Asset Inventory Tracker (Land & Buildings)" },
+    { "id": "finance", "name": "Finance / Payments" },
+    { "id": "admin", "name": "System Administration" }
+  ],
+  "roles": [
+    { "id": "citizen", "name": "Citizen", "modules": ["cemetery", "parks", "barangay_facility", "water", "finance"] },
+    { "id": "cemetery_office", "name": "Cemetery Office", "modules": ["cemetery", "assets", "finance"] },
+    { "id": "death_registration", "name": "Death Registration Division (CCRD)", "modules": ["cemetery"] },
+    { "id": "ssdd", "name": "SSDD", "modules": ["cemetery"] },
+    { "id": "parks_admin", "name": "Parks Administrator", "modules": ["parks", "assets"] },
+    { "id": "reservation_officer", "name": "Reservation Desk Officer (Parks)", "modules": ["parks"] },
+    { "id": "barangay_secretary", "name": "Barangay Secretary", "modules": ["barangay_facility"] },
+    { "id": "punong_barangay", "name": "Punong Barangay", "modules": ["barangay_facility", "assets"] },
+    { "id": "utility_helpdesk", "name": "Utility Helpdesk", "modules": ["water"] },
+    { "id": "utility_engineering", "name": "Utility Engineering", "modules": ["water"] },
+    { "id": "famcd", "name": "FAMCD", "modules": ["assets"] },
+    { "id": "cgsd_management", "name": "CGSD Management", "modules": ["assets"] },
+    { "id": "treasurer", "name": "Treasurer", "modules": ["finance"] },
+    { "id": "system_admin", "name": "System Administrator", "modules": ["admin"] }
+  ]
+}
+```
