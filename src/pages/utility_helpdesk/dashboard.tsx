@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import {
@@ -91,15 +91,17 @@ export default function UtilityHelpdeskDashboard() {
   const meta = ROLE_META[user.role]
 
   const KPI_DATA = [
-    { label: 'Open Tickets', value: openTickets, change: 0, icon: Clock, variant: 'warning' as const },
-    { label: 'Triaged Today', value: triagedToday, change: 0, icon: CheckCircle, variant: 'success' as const },
-    { label: 'Pending Assign', value: pendingAssign, change: 0, icon: AlertTriangle, variant: 'warning' as const },
+    { label: 'Open Tickets', sub: 'All open queue', value: openTickets, change: 0, icon: Clock, variant: 'warning' as const, to: '/utility/tickets' },
+    { label: 'Triaged Today', sub: 'Processed today', value: triagedToday, change: 0, icon: CheckCircle, variant: 'success' as const, to: '/utility/triage' },
+    { label: 'Pending Assign', sub: 'Awaiting team', value: pendingAssign, change: 0, icon: AlertTriangle, variant: 'warning' as const, to: '/utility/assign' },
     {
       label: 'Desk Load',
+      sub: 'Combined volume',
       value: openTickets + triagedToday + pendingAssign,
       change: 0,
       icon: Package,
       variant: 'info' as const,
+      to: '/utility/triage',
     },
   ]
 
@@ -143,7 +145,8 @@ export default function UtilityHelpdeskDashboard() {
           const isPositive = kpi.change >= 0
           const variant = kpi.variant
           return (
-            <Card key={i} className="group overflow-hidden border-border shadow-xs hover:shadow-md transition-all duration-300 bg-card">
+            <Link key={i} to={kpi.to} className="group block min-h-[120px]">
+            <Card className="h-full overflow-hidden border-border shadow-xs transition-all duration-200 hover:border-primary hover:shadow-md hover:-translate-y-0.5 bg-card">
               <CardContent className="p-6 relative">
                 <div className="absolute -top-2 -right-2 p-4 opacity-10 h-full flex items-center group-hover:scale-110 group-hover:opacity-20 transition-all duration-500 pointer-events-none">
                   <Icon size={80} />
@@ -164,20 +167,25 @@ export default function UtilityHelpdeskDashboard() {
                     >
                       <Icon size={20} />
                     </span>
+                    <div className="flex items-center gap-1">
                     {kpi.change !== 0 && (
                       <div className={cn('flex items-center gap-1 text-xs font-semibold', isPositive ? 'text-emerald-500' : 'text-red-500')}>
                         {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                         {Math.abs(kpi.change)}
                       </div>
                     )}
+                    <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-3xl font-bold tracking-tighter">{kpi.value}</p>
+                    <p className="text-3xl font-bold tracking-tighter">{loading ? '—' : kpi.value}</p>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+                    <p className="text-[11px] text-muted-foreground leading-snug pt-0.5">{kpi.sub}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+            </Link>
           )
         })}
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate, NavLink } from 'react-router-dom'
+import { Link, useNavigate, NavLink } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { ROLE_META } from '@/config/rbac'
 import { supabase } from '@/lib/supabase'
@@ -17,7 +17,15 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type KPI = { label: string; value: string | number; change: number; icon: React.FC<{ size?: number; style?: React.CSSProperties }>; color: string }
+type KPI = {
+  label: string
+  sub: string
+  value: string | number
+  change: number
+  icon: React.FC<{ size?: number; style?: React.CSSProperties }>
+  color: string
+  to: string
+}
 type Activity = { payment_id: string; action: string; subject: string; time: string; status: string }
 type ChartPoint = { date: string; amount: number }
 
@@ -89,10 +97,10 @@ export default function TreasurerDashboard() {
       const settledCount = settledRes.count ?? 0
 
       setKpis([
-        { label: 'Total Collections Today', value: fmtPeso(todayTotal), change: collectionChange, icon: CreditCard, color: '#fcd34d' },
-        { label: 'Pending Reconciliation', value: pendingCount, change: 0, icon: Clock, color: '#fbbf24' },
-        { label: 'Failed Transactions', value: failedCount, change: 0, icon: AlertTriangle, color: '#f87171' },
-        { label: 'Settled Today', value: settledCount, change: 0, icon: CheckCircle, color: '#34d399' },
+        { label: 'Total Collections Today', sub: 'Settled payments this date', value: fmtPeso(todayTotal), change: collectionChange, icon: CreditCard, color: '#fcd34d', to: '/treasurer/collections' },
+        { label: 'Pending Reconciliation', sub: 'OR pending linkage', value: pendingCount, change: 0, icon: Clock, color: '#fbbf24', to: '/treasurer/collections' },
+        { label: 'Failed Transactions', value: failedCount, sub: 'Review in collections', change: 0, icon: AlertTriangle, color: '#f87171', to: '/treasurer/collections' },
+        { label: 'Settled Today', value: settledCount, sub: 'Receipts posted today', change: 0, icon: CheckCircle, color: '#34d399', to: '/treasurer/collections' },
       ])
 
       // ── Activity ──────────────────────────────────────────────────────────
@@ -191,7 +199,8 @@ export default function TreasurerDashboard() {
               const isPositive = kpi.change >= 0
               const variant = kpiVariants[i] ?? 'default'
               return (
-                <Card key={i} className="group overflow-hidden border-border shadow-xs hover:shadow-md transition-all duration-300 bg-card">
+                <Link key={i} to={kpi.to} className="group block min-h-[120px]">
+                <Card className="h-full overflow-hidden border-border shadow-xs transition-all duration-200 hover:border-primary hover:shadow-md hover:-translate-y-0.5 bg-card">
                   <CardContent className="p-6 relative">
                     <div className="absolute -top-2 -right-2 p-4 opacity-10 h-full flex items-center group-hover:scale-110 group-hover:opacity-20 transition-all duration-500 pointer-events-none">
                       <Icon size={80} />
@@ -212,20 +221,25 @@ export default function TreasurerDashboard() {
                         >
                           <Icon size={20} />
                         </span>
+                        <div className="flex items-center gap-1">
                         {kpi.change !== 0 && (
                           <div className={`flex items-center gap-1 text-xs font-semibold ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
                             {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                             {Math.abs(kpi.change)}%
                           </div>
                         )}
+                        <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        </div>
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-3xl font-bold tracking-tighter">{kpi.value}</p>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug pt-0.5">{kpi.sub}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+                </Link>
               )
             })}
       </div>

@@ -32,6 +32,7 @@ const INITIAL_BADGE_COUNTS: Record<string, number> = {
   open_tickets: 12,
   pending_reconciliation: 6,
   pending_payments: 0,
+  pending_routes: 0,
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

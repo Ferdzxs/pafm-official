@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -6,8 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Search, Filter, Camera, CheckSquare, UploadCloud, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { ROLE_META } from '@/config/rbac'
-import { AdminDeskPageShell } from '@/components/layout/AdminDeskPageShell'
 import { toast } from 'react-hot-toast'
 
 export default function OcularInspectionsPage() {
@@ -16,11 +14,21 @@ export default function OcularInspectionsPage() {
     const [selectedItem, setSelectedItem] = useState<any | null>(null)
     const [inspections, setInspections] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [selectedImages, setSelectedImages] = useState<File[]>([])
+    const [isUploadingPhotos, setIsUploadingPhotos] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement | null>(null)
     
     // Form State for the Inspector
     const [newCondition, setNewCondition] = useState('Excellent')
     const [findings, setFindings] = useState('')
     const [recommendation, setRecommendation] = useState('Approve Request')
+
+    const parseScopeFields = (scope: string) => {
+        const lastCondition = scope.match(/Last Condition:\s*([^|\]]+)/i)?.[1]?.trim() || ''
+        const acquiredOn = scope.match(/Acquired On:\s*([^|\]]+)/i)?.[1]?.trim() || ''
+        const registeredArea = scope.match(/Registered Area:\s*([^|\]]+)/i)?.[1]?.trim() || ''
+        return { lastCondition, acquiredOn, registeredArea }
+    }
 
     async function fetchPendingInspections() {
         setIsLoading(true)
@@ -35,10 +43,11 @@ export default function OcularInspectionsPage() {
                     property_name,
                     location,
                     asset_condition,
-                    acquisition_date
+                    acquisition_date,
+                    area_size
                 )
             `)
-            .eq('status', 'pending')
+            .in('status', ['pending', 'in_progress'])
             .order('date_requested', { ascending: false })
 
         if (error) {
@@ -66,11 +75,71 @@ export default function OcularInspectionsPage() {
         a.property?.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
+    const openFilePicker = () => fileInputRef.current?.click()
+    const handleImagesSelected = (files: FileList | null) => {
+        if (!files) {
+            setSelectedImages([])
+            return
+        }
+        setSelectedImages(Array.from(files).slice(0, 8))
+    }
+
+    const uploadImagesForInspection = async (inspectionId: string): Promise<string | null> => {
+        if (!selectedImages.length || !user) return null
+
+        let firstPublicUrl: string | null = null
+
+        for (const file of selectedImages) {
+            const ext = file.name.split('.').pop() || 'jpg'
+            const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+            const filePath = `inspection-evidence/${inspectionId}/${fileName}`
+
+            const { error: uploadError } = await supabase.storage
+                .from('inspection-evidence')
+                .upload(filePath, file)
+
+            if (uploadError) {
+                throw uploadError
+            }
+
+            const { data: urlData } = await supabase.storage
+                .from('inspection-evidence')
+                .getPublicUrl(filePath)
+
+            if (!urlData?.publicUrl) {
+                throw new Error('Unable to get public URL for uploaded photo.')
+            }
+
+            if (!firstPublicUrl) {
+                firstPublicUrl = urlData.publicUrl
+            }
+
+            const evidenceId = `EVID-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+            const employeeId = user.id?.startsWith('EMP-') ? user.id : null
+
+            const { error: insertError } = await supabase
+                .from('inspection_photo_evidence')
+                .insert({
+                    evidence_id: evidenceId,
+                    inspection_id: inspectionId,
+                    photo_url: urlData.publicUrl,
+                    description: `Uploaded by ${user.email || user.id}`,
+                    uploaded_by_employee: employeeId
+                })
+
+            if (insertError) {
+                throw insertError
+            }
+        }
+
+        return firstPublicUrl
+    }
+
     const handleSubmitReport = async () => {
         if (!selectedItem || !user) return
         
-        if (!findings.trim()) {
-            toast.error('Please enter inspection notes before submitting.')
+        if (!findings.trim() && !selectedImages.length) {
+            toast.error('Please enter inspection notes or attach at least one photo before submitting.')
             return
         }
 
@@ -78,6 +147,12 @@ export default function OcularInspectionsPage() {
         
         // 1. Create an ocular_inspection record
         const inspectionId = `INSP-${Date.now()}`
+        const scopeData = parseScopeFields(selectedItem.inventory_scope || '')
+        const registryCondition = selectedItem.property?.asset_condition || scopeData.lastCondition || 'Unknown'
+        const registryAcquiredOn = selectedItem.property?.acquisition_date || scopeData.acquiredOn || 'Unknown'
+        const registryArea = selectedItem.property?.area_size || scopeData.registeredArea || 'Unknown'
+        const physicalConditionNotes = `Registry Last Condition: ${registryCondition} | Acquired On: ${registryAcquiredOn} | Registered Area: ${registryArea} | Inspector Condition: ${newCondition} | Recommendation: ${recommendation} | Notes: ${findings}`
+
         const { error: inspError } = await supabase
             .from('ocular_inspection')
             .insert({
@@ -87,8 +162,25 @@ export default function OcularInspectionsPage() {
                 inspection_date: new Date().toISOString().split('T')[0],
                 conducted_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 conducted_by_employee: user.id || 'EMP-004',
-                asset_condition_notes: `Condition: ${newCondition} | Recs: ${recommendation} | Notes: ${findings}`
+                new_condition: newCondition,
+                physical_condition_notes: physicalConditionNotes
             })
+
+        // 1.5 Upload photo evidence (optional)
+        let digitalReportUrl: string | null = null
+
+        if (!inspError && selectedImages.length) {
+            setIsUploadingPhotos(true)
+            try {
+                digitalReportUrl = await uploadImagesForInspection(inspectionId)
+                toast.success('Photos uploaded successfully.')
+            } catch (err: any) {
+                console.error('Photo upload error:', err)
+                toast.error(`Photo upload failed: ${err?.message || 'Unknown error'}`)
+            } finally {
+                setIsUploadingPhotos(false)
+            }
+        }
 
         // 2. Generate the draft inventory report for CGSD
         const reportId = `IRP-${Date.now()}`
@@ -100,7 +192,8 @@ export default function OcularInspectionsPage() {
                 preparation_date: new Date().toISOString().split('T')[0],
                 prepared_by_office: user.role === 'famcd' ? 'OFF-004' : null,
                 prepared_by_employee: user.id || 'EMP-004',
-                approval_status: 'pending' // pending CGSD
+                approval_status: 'pending', // pending CGSD
+                digital_report_url: digitalReportUrl
             })
 
         // 3. Mark the inventory request as completed/forwarded
@@ -118,6 +211,7 @@ export default function OcularInspectionsPage() {
         toast.success(`Inspection Report for ${selectedItem.request_id} submitted to CGSD Approvals queue!`, { id: toastId })
         setSelectedItem(null)
         setFindings('')
+        setSelectedImages([])
         fetchPendingInspections()
     }
 
@@ -163,24 +257,22 @@ export default function OcularInspectionsPage() {
                                     {selectedItem.property?.location || '-'}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Condition</label>
-                                    <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm capitalize">
-                                        <Badge variant="secondary">{selectedItem.property?.asset_condition || 'Unknown'}</Badge>
-                                    </div>
+                            <div>
+                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Known Condition</label>
+                                <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
+                                    {selectedItem.property?.asset_condition || parseScopeFields(selectedItem.inventory_scope || '').lastCondition || '-'}
                                 </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acquired On</label>
-                                    <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
-                                        {selectedItem.property?.acquisition_date || 'Unknown'}
-                                    </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Acquired On</label>
+                                <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
+                                    {selectedItem.property?.acquisition_date || parseScopeFields(selectedItem.inventory_scope || '').acquiredOn || '-'}
                                 </div>
                             </div>
                             <div>
                                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registered Area</label>
                                 <div className="p-3 bg-background border border-border rounded-lg mt-1 text-sm">
-                                    {selectedItem.property?.area_sqm || 0} sq.m
+                                    {selectedItem.property?.area_size || parseScopeFields(selectedItem.inventory_scope || '').registeredArea || '-'}
                                 </div>
                             </div>
                         </CardContent>
@@ -223,11 +315,30 @@ export default function OcularInspectionsPage() {
 
                             <div>
                                 <label className="text-xs font-semibold text-foreground mb-1.5 block">Photographic Evidence</label>
-                                <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
+                                <div onClick={openFilePicker} className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer">
                                     <Camera size={28} className="text-muted-foreground mb-2" />
                                     <div className="text-sm font-medium">Click to upload photos</div>
                                     <div className="text-xs text-muted-foreground mt-1">Supports JPG, PNG (Max 5MB)</div>
                                 </div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={e => handleImagesSelected(e.target.files)}
+                                />
+                                {selectedImages.length > 0 && (
+                                    <div className="mt-3">
+                                        <span className="text-xs text-foreground">{selectedImages.length} file{selectedImages.length > 1 ? 's' : ''} selected</span>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {selectedImages.slice(0, 4).map((file, idx) => (
+                                                <span key={idx} className="px-2 py-1 text-[10px] bg-muted/40 rounded text-muted-foreground">{file.name}</span>
+                                            ))}
+                                            {selectedImages.length > 4 && <span className="text-[10px] text-muted-foreground">+{selectedImages.length - 4} more</span>}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div>
@@ -257,24 +368,17 @@ export default function OcularInspectionsPage() {
         )
     }
 
-    if (!user) return null
-    const meta = ROLE_META[user.role]
-
     return (
-        <AdminDeskPageShell
-            roleLabel={meta.label}
-            roleColor={meta.color}
-            roleBgColor={meta.bgColor}
-            title="Ocular inspections queue"
-            description="Pending asset requests routed from departments requiring physical validation by FAMCD."
-            wide
-            actions={
-                <Button variant="outline" size="sm" className="gap-2" type="button" onClick={fetchPendingInspections}>
-                    <Filter size={16} />
-                    Refresh
-                </Button>
-            }
-        >
+        <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                <div>
+                    <h1 className="font-display text-2xl font-bold text-foreground">Ocular Inspections Queue</h1>
+                    <p className="text-muted-foreground text-sm mt-1">
+                        Pending asset requests routed from departments requiring physical validation by FAMCD.
+                    </p>
+                </div>
+            </div>
+
             <Card className="mb-6 shadow-sm border-border">
                 <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-card">
                     <div className="relative w-full sm:w-96">
@@ -286,6 +390,10 @@ export default function OcularInspectionsPage() {
                             className="pl-9 h-10 w-full bg-background relative z-10"
                         />
                     </div>
+                    <Button variant="outline" className="w-full sm:w-auto gap-2" onClick={fetchPendingInspections}>
+                        <Filter size={16} />
+                        Refresh
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -346,6 +454,6 @@ export default function OcularInspectionsPage() {
                     </table>
                 </div>
             </Card>
-        </AdminDeskPageShell>
+        </div>
     )
 }

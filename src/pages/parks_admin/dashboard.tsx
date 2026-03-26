@@ -3,6 +3,7 @@
  */
 
 import React, { useEffect, useState } from "react"
+import { Link } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
 import { ROLE_META } from "@/config/rbac"
 import { supabase } from "@/lib/supabase"
@@ -76,10 +77,10 @@ export default function ParksAdminDashboard() {
       ])
 
       setKpis([
-        { label: "Awaiting Approval", value: pendingCount ?? 0, icon: Timer, trend: "Requires Attention", variant: "warning" },
-        { label: "Active Bookings", value: approvedCount ?? 0, icon: CheckCircle, trend: "Verified Records", variant: "success" },
-        { label: "Municipal Venues", value: venueCount ?? 0, icon: MapPin, trend: "Asset Registry", variant: "info" },
-        { label: "Monitoring Logs", value: usageCount ?? 0, icon: Activity, trend: "Compliance Tracking", variant: "default" }
+        { label: "Awaiting Approval", sub: "Review reservation queue", value: pendingCount ?? 0, icon: Timer, trend: "Requires Attention", variant: "warning", to: "/parks/reservations" },
+        { label: "Active Bookings", sub: "Approved reservations", value: approvedCount ?? 0, icon: CheckCircle, trend: "Verified Records", variant: "success", to: "/parks/calendar" },
+        { label: "Municipal Venues", sub: "Park venues registry", value: venueCount ?? 0, icon: MapPin, trend: "Asset Registry", variant: "info", to: "/parks/venues" },
+        { label: "Monitoring Logs", sub: "Site usage & compliance", value: usageCount ?? 0, icon: Activity, trend: "Compliance Tracking", variant: "default", to: "/parks/usage-logs" }
       ])
 
       /* Recent Activity */
@@ -196,7 +197,8 @@ export default function ParksAdminDashboard() {
         {kpis.map((kpi, i) => {
           const Icon = kpi.icon
           return (
-            <Card key={i} className="group overflow-hidden border-border shadow-xs hover:shadow-md transition-all duration-300 bg-card">
+            <Link key={i} to={kpi.to} className="group block min-h-[120px]">
+            <Card className="h-full overflow-hidden border-border shadow-xs transition-all duration-200 hover:border-primary hover:shadow-md hover:-translate-y-0.5 bg-card">
               <CardContent className="p-6 relative">
                  <div className="absolute top-0 right-0 p-4 opacity-5 h-full flex items-center group-hover:scale-110 group-hover:opacity-10 transition-all duration-500 pointer-events-none">
                     <Icon size={80} />
@@ -209,17 +211,22 @@ export default function ParksAdminDashboard() {
                         kpi.variant === 'info' ? 'bg-blue-100 text-blue-600' : 'bg-primary/30 text-primary')}>
                           <Icon size={18} />
                        </span>
+                       <div className="flex items-center gap-1">
                        <Badge variant={kpi.variant} className="text-[9px] font-bold uppercase tracking-tighter px-1.5 h-4 border-none shadow-none">
                           {kpi.trend}
                        </Badge>
+                       <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                       </div>
                     </div>
                     <div className="space-y-0.5">
-                       <p className="text-3xl font-bold tracking-tighter">{kpi.value}</p>
+                       <p className="text-3xl font-bold tracking-tighter">{loading ? "—" : kpi.value}</p>
                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+                       {kpi.sub ? <p className="text-[11px] text-muted-foreground leading-snug pt-0.5">{kpi.sub}</p> : null}
                     </div>
                  </div>
               </CardContent>
             </Card>
+            </Link>
           )
         })}
       </div>
@@ -419,7 +426,7 @@ export default function ParksAdminDashboard() {
           <div className="px-6 py-3 border-t bg-muted">
              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-tight text-muted-foreground">
                 <span className="flex items-center gap-1"><CheckCircle size={10} className="text-emerald-500" /> 98% Compliance Rate</span>
-                <span className="flex items-center gap-1 text-primary cursor-pointer hover:underline">View All Logs</span>
+                <Link to="/parks/usage-logs" className="flex items-center gap-1 text-primary hover:underline">View All Logs</Link>
              </div>
           </div>
         </Card>

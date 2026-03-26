@@ -6,6 +6,7 @@ import {
  CheckSquare,
  ClipboardList,
  Clock,
+ ChevronRight,
  TrendingDown,
  TrendingUp,
 } from "lucide-react";
@@ -63,6 +64,7 @@ export default function PunongBarangayDashboardPage() {
  const [KPI_DATA, setKpiData] = useState([
  {
   label: "Pending Approvals",
+  sub: "Awaiting your signature",
   value: 0,
   change: 0,
   icon: Clock,
@@ -71,14 +73,16 @@ export default function PunongBarangayDashboardPage() {
  },
  {
   label: "Permits issued (month)",
+  sub: "Completed this month",
   value: 0,
   change: 0,
   icon: CheckSquare,
   color: "#34d399",
-  path: "/barangay/secretary/reservations",
+  path: "/barangay/pb/pending",
  },
  {
   label: "Facilities",
+  sub: "Managed facilities",
   value: 0,
   change: 0,
   icon: Building2,
@@ -87,11 +91,12 @@ export default function PunongBarangayDashboardPage() {
  },
  {
   label: "Requests (month)",
+  sub: "Asset & facility requests",
   value: 0,
   change: 0,
   icon: ClipboardList,
   color: "#fb923c",
-  path: "/barangay/secretary/calendar",
+  path: "/barangay/pb/asset-requests",
  },
  ]);
 
@@ -287,19 +292,19 @@ export default function PunongBarangayDashboardPage() {
    <Link
     key={i}
     to={kpi.path}
-    className="rounded-2xl p-5 card-hover block transition-all"
+    className="group block min-h-[120px] rounded-2xl p-5 card-hover transition-all duration-200 hover:border-primary hover:shadow-md hover:-translate-y-0.5 border border-[var(--color-border)]"
     style={{
     background: "var(--color-card)",
-    border: "1px solid var(--color-border)",
     }}
    >
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex items-start justify-between mb-3">
     <div
      className="w-10 h-10 rounded-xl flex items-center justify-center"
      style={{ background: `${kpi.color}18` }}
     >
      <Icon size={18} style={{ color: kpi.color }} />
     </div>
+    <div className="flex items-center gap-1">
     {kpi.change !== 0 && (
      <div
      className={`flex items-center gap-1 text-xs font-semibold ${isUp ? "text-emerald-400" : "text-red-400"}`}
@@ -312,19 +317,22 @@ export default function PunongBarangayDashboardPage() {
      {Math.abs(kpi.change)}
      </div>
     )}
+    <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+    </div>
     </div>
     <div
-    className="text-2xl font-bold mb-1"
+    className="text-2xl font-bold mb-1 tabular-nums"
     style={{ color: "var(--color-text-primary)" }}
     >
     {kpi.value}
     </div>
     <div
-    className="text-xs"
-    style={{ color: "var(--color-text-muted)" }}
+    className="text-xs font-medium"
+    style={{ color: "var(--color-text-primary)" }}
     >
     {kpi.label}
     </div>
+    <div className="text-[11px] mt-1 leading-snug" style={{ color: "var(--color-text-muted)" }}>{kpi.sub}</div>
    </Link>
    );
   })}

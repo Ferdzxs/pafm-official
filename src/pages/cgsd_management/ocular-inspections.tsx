@@ -6,8 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Search, Filter, Eye, CheckCircle, X, Calendar, ClipboardCheck, AlertTriangle, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { ROLE_META } from '@/config/rbac'
-import { AdminDeskPageShell } from '@/components/layout/AdminDeskPageShell'
 import { toast } from 'react-hot-toast'
 
 export default function CgsdOcularInspectionsPage() {
@@ -252,6 +250,8 @@ export default function CgsdOcularInspectionsPage() {
                                 { label: 'Property / Item', value: selectedReport.property?.property_name || 'N/A: General Assessment' },
                                 { label: 'Location', value: selectedReport.property?.location || '—' },
                                 { label: 'Previous Condition', value: selectedReport.property?.asset_condition || '—' },
+                                { label: 'Acquired On', value: selectedReport.property?.acquisition_date || '—' },
+                                { label: 'Registered Area', value: selectedReport.property?.area_size || '—' },
                                 { label: 'Inspection Date', value: selectedReport.inspection_date || '—' },
                             ].map(f => (
                                 <div key={f.label} className="p-3 rounded-lg bg-muted/30 border border-border">
@@ -313,6 +313,8 @@ export default function CgsdOcularInspectionsPage() {
                                         ))}
                                     </div>
                                 )}
+
+
                             </div>
                         </CardContent>
                     </Card>
@@ -320,12 +322,9 @@ export default function CgsdOcularInspectionsPage() {
 
                 {/* Action Buttons */}
                 {report && report.approval_status === 'pending' && (
-                    <div className="flex justify-end gap-3 mt-6">
+                    <div className="flex justify-end mt-6">
                         <Button variant="outline" onClick={() => { setIsReturnModalOpen(true) }} className="gap-2 border-destructive text-destructive hover:bg-destructive/10">
                             <AlertTriangle size={15} /> Return for Revision
-                        </Button>
-                        <Button onClick={handleApprove} disabled={isActing} className="gap-2">
-                            <CheckCircle size={15} /> Approve Report
                         </Button>
                     </div>
                 )}
@@ -372,23 +371,20 @@ export default function CgsdOcularInspectionsPage() {
     }
 
     // ── Main List ─────────────────────────────────────────────────────────────
-    if (!user) return null
-    const meta = ROLE_META[user.role]
-
     return (
-        <AdminDeskPageShell
-            roleLabel={meta.label}
-            roleColor={meta.color}
-            roleBgColor={meta.bgColor}
-            title="Ocular inspection findings"
-            description="Review and approve ocular inspection reports submitted by FAMCD."
-            wide
-            actions={
-                <Button variant="outline" size="sm" className="gap-2" type="button" onClick={fetchInspections}>
+        <div className="px-4 py-6 sm:px-6 lg:px-8 max-w-7xl mx-auto animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                <div>
+                    <h1 className="font-display text-2xl font-bold text-foreground">Inspection Findings</h1>
+                    <p className="text-muted-foreground text-sm mt-1">
+                        Review and approve ocular inspection reports submitted by FAMCD.
+                    </p>
+                </div>
+                <Button variant="outline" className="gap-2" onClick={fetchInspections}>
                     <Filter size={16} /> Refresh
                 </Button>
-            }
-        >
+            </div>
+
             <Card className="mb-6 shadow-sm border-border">
                 <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-card">
                     <div className="relative w-full sm:w-96">
@@ -458,7 +454,7 @@ export default function CgsdOcularInspectionsPage() {
                                         </td>
                                         <td className="p-4">{getReportStatusBadge(item.linkedReport?.approval_status)}</td>
                                         <td className="p-4 text-right">
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedReport(item)}>
+                                            <Button variant="ghost" size="sm" onClick={() => openReview(item)}>
                                                 <Eye size={16} className="mr-2" /> Review
                                             </Button>
                                         </td>
@@ -469,6 +465,6 @@ export default function CgsdOcularInspectionsPage() {
                     </div>
                 </div>
             </Card>
-        </AdminDeskPageShell>
+        </div>
     )
 }

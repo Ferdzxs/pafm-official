@@ -4,7 +4,7 @@ import { ROLE_META } from '@/config/rbac'
 import { supabase } from '@/lib/supabase'
 import {
  ClipboardList, CheckSquare, Calendar,
- TrendingUp, TrendingDown, Clock, AlertTriangle
+ TrendingUp, TrendingDown, Clock, AlertTriangle, ChevronRight
 } from 'lucide-react'
 import {
  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -49,10 +49,10 @@ export default function BarangaySecretaryDashboardPage() {
  const { user } = useAuth()
  
  const [KPI_DATA, setKpiData] = useState([
-  { label: 'Intake queue', value: 0, change: 0, icon: Clock, color: '#fbbf24', path: '/barangay/secretary/intake' },
-  { label: 'Permits issued (month)', value: 0, change: 0, icon: CheckSquare, color: '#34d399', path: '/barangay/secretary/reservations' },
-  { label: 'Awaiting Punong Barangay', value: 0, change: 0, icon: ClipboardList, color: '#e879f9', path: '/barangay/secretary/reservations' },
-  { label: 'Reservations (month)', value: 0, change: 0, icon: Calendar, color: '#60a5fa', path: '/barangay/secretary/calendar' },
+  { label: 'Intake queue', sub: 'Submitted for screening', value: 0, change: 0, icon: Clock, color: '#fbbf24', path: '/barangay/secretary/intake' },
+  { label: 'Permits issued (month)', sub: 'Completed this month', value: 0, change: 0, icon: CheckSquare, color: '#34d399', path: '/barangay/secretary/reservations' },
+  { label: 'Awaiting Punong Barangay', sub: 'PB approval stage', value: 0, change: 0, icon: ClipboardList, color: '#e879f9', path: '/barangay/secretary/reservations' },
+  { label: 'Reservations (month)', sub: 'Calendar & bookings', value: 0, change: 0, icon: Calendar, color: '#60a5fa', path: '/barangay/secretary/calendar' },
  ])
 
  const [MONTHLY_DATA, setMonthlyData] = useState<MonthlyData[]>([])
@@ -82,10 +82,10 @@ export default function BarangaySecretaryDashboardPage() {
     ])
 
     setKpiData(prev => [
-     { ...prev[0], value: pendingRes.count || 0 },
-     { ...prev[1], value: approvedThisMonth.count || 0 },
-     { ...prev[2], value: pendingPb.count || 0 },
-     { ...prev[3], value: requestsThisMonth.count || 0 },
+     { ...prev[0], value: pendingRes.count ?? 0 },
+     { ...prev[1], value: approvedThisMonth.count ?? 0 },
+     { ...prev[2], value: pendingPb.count ?? 0 },
+     { ...prev[3], value: requestsThisMonth.count ?? 0 },
     ])
 
     // 2. Fetch Monthly Data
@@ -175,22 +175,26 @@ export default function BarangaySecretaryDashboardPage() {
       <Link
        key={i}
        to={kpi.path}
-       className="rounded-2xl p-5 card-hover block transition-all"
-       style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}
+       className="group block min-h-[120px] rounded-2xl p-5 card-hover transition-all duration-200 hover:border-primary hover:shadow-md hover:-translate-y-0.5 border border-[var(--color-border)]"
+       style={{ background: 'var(--color-card)' }}
       >
-       <div className="flex items-start justify-between mb-4">
+       <div className="flex items-start justify-between mb-3">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${kpi.color}18` }}>
          <Icon size={18} style={{ color: kpi.color }} />
         </div>
+        <div className="flex items-center gap-1">
         {kpi.change !== 0 && (
          <div className={`flex items-center gap-1 text-xs font-semibold ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
           {isUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
           {Math.abs(kpi.change)}
          </div>
         )}
+        <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+        </div>
        </div>
-       <div className="text-2xl font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>{loading ? '...' : kpi.value}</div>
-       <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{kpi.label}</div>
+       <div className="text-2xl font-bold mb-1 tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{loading ? '...' : kpi.value}</div>
+       <div className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{kpi.label}</div>
+       <div className="text-[11px] mt-1 leading-snug" style={{ color: 'var(--color-text-muted)' }}>{kpi.sub}</div>
       </Link>
      )
     })}

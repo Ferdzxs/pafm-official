@@ -97,23 +97,19 @@ export const ROLE_NAV: Record<UserRole, NavItem[]> = {
     ],
     cgsd_management: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'asset-requests', label: 'Asset Requests', icon: ClipboardList, path: '/assets/requests' },
-        { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
-        { id: 'inspections', label: 'Ocular Inspections', icon: Microscope, path: '/assets/inspections' },
-        { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
-        { id: 'approvals', label: 'Approval Records', icon: CheckSquare, path: '/assets/approvals' },
+        { id: 'inspections', label: 'Inspection Findings', icon: Microscope, path: '/assets/inspections' },
+        { id: 'approvals', label: 'Approvals', icon: CheckSquare, path: '/assets/approvals' },
     ],
     famcd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'asset-requests', label: 'Asset Requests', icon: ClipboardList, path: '/assets/requests' },
         { id: 'assets', label: 'Inventory & Assets', icon: Package, path: '/assets/inventory' },
-        { id: 'inspections', label: 'Ocular Inspections', icon: Microscope, path: '/assets/inspections' },
+        { id: 'inspections', label: 'Inspection Findings', icon: Microscope, path: '/assets/inspections' },
         { id: 'reports', label: 'Inventory Reports', icon: BarChart3, path: '/assets/reports' },
-        { id: 'submissions', label: 'Submission Records', icon: Send, path: '/assets/submissions' },
+        { id: 'submissions', label: 'Submissions', icon: Send, path: '/assets/submissions' },
     ],
     rmcd: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-        { id: 'routing', label: 'Request Routing', icon: Send, path: '/rmcd/routing' },
+        { id: 'routing', label: 'Request Routing', icon: Send, path: '/rmcd/routing', badgeKey: 'pending_routes' },
         { id: 'releases', label: 'Document Releases', icon: FileCheck, path: '/rmcd/releases' },
     ],
     treasurer: [
@@ -146,7 +142,7 @@ export const ROLE_META: Record<UserRole, { label: string; color: string; bgColor
     utility_helpdesk: { label: 'Utility Helpdesk', color: '#38bdf8', bgColor: 'rgba(56,189,248,0.12)' },
     cgsd_management: { label: 'CGSD Management', color: '#f472b6', bgColor: 'rgba(244,114,182,0.12)' },
     famcd: { label: 'FAMCD', color: '#a3e635', bgColor: 'rgba(163,230,53,0.12)' },
-    rmcd: { label: 'RMCD', color: '#22c55e', bgColor: 'rgba(34,197,94,0.12)' },
+    rmcd: { label: 'RMCD', color: '#14b8a6', bgColor: 'rgba(20,184,166,0.12)' },
     treasurer: { label: 'Treasurer Officer', color: '#fcd34d', bgColor: 'rgba(252,211,77,0.12)' },
     system_admin: { label: 'System Administrator', color: '#94a3b8', bgColor: 'rgba(148,163,184,0.12)' },
 }

@@ -31,10 +31,18 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { NavLink } from "react-router-dom"
+import { Link, NavLink } from "react-router-dom"
 import { cn } from "@/lib/utils"
 
-type Kpi = { label: string; value: number; icon: any; color: string; variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info" }
+type Kpi = {
+  label: string
+  sub: string
+  value: number
+  icon: any
+  color: string
+  variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"
+  to: string
+}
 
 const QUICK_ACTIONS = [
   { label: "Validate Requests", emoji: "✅", path: "/parks/desk-reservations" },
@@ -88,10 +96,10 @@ export default function ReservationOfficerDashboard() {
       if (e5) throw new Error(e5.message)
 
       setKpis([
-        { label: "Incoming Requests", value: incoming ?? 0, icon: Timer, color: "#fbbf24", variant: "warning" },
-        { label: "Admin Approved", value: approved ?? 0, icon: ShieldCheck, color: "#34d399", variant: "success" },
-        { label: "Permits Released", value: permits ?? 0, icon: FileText, color: "#60a5fa", variant: "info" },
-        { label: "Venue Catalog", value: venues ?? 0, icon: Building2, color: "#fbbf24", variant: "default" },
+        { label: "Incoming Requests", sub: "Desk & LOI queue", value: incoming ?? 0, icon: Timer, color: "#fbbf24", variant: "warning", to: "/parks/desk-reservations" },
+        { label: "Admin Approved", sub: "Ready for permit steps", value: approved ?? 0, icon: ShieldCheck, color: "#34d399", variant: "success", to: "/parks/desk-approvals" },
+        { label: "Permits Released", sub: "Released to citizens", value: permits ?? 0, icon: FileText, color: "#60a5fa", variant: "info", to: "/parks/desk-permits" },
+        { label: "Venue Catalog", sub: "Municipal venues", value: venues ?? 0, icon: Building2, color: "#fbbf24", variant: "default", to: "/parks/venues" },
       ])
       setRecent(recentRows ?? [])
     } catch (e: unknown) {
@@ -138,7 +146,8 @@ export default function ReservationOfficerDashboard() {
         {kpis.map((kpi, i) => {
           const Icon = kpi.icon
           return (
-            <Card key={i} className="group overflow-hidden border-border shadow-xs hover:shadow-md transition-all duration-300 bg-card">
+            <Link key={i} to={kpi.to} className="group block min-h-[120px]">
+            <Card className="h-full overflow-hidden border-border shadow-xs transition-all duration-200 hover:border-primary hover:shadow-md hover:-translate-y-0.5 bg-card">
               <CardContent className="p-6 relative">
                  <div className="absolute -top-2 -right-2 p-4 opacity-10 h-full flex items-center group-hover:scale-110 group-hover:opacity-20 transition-all duration-500 pointer-events-none">
                     <Icon size={80} />
@@ -151,14 +160,17 @@ export default function ReservationOfficerDashboard() {
                         kpi.variant === 'info' ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' : 'bg-primary/20 text-primary group-hover:bg-primary/30')}>
                           <Icon size={20} />
                        </span>
+                       <ChevronRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                     </div>
                     <div className="space-y-0.5">
-                       <p className="text-3xl font-bold tracking-tighter">{kpi.value}</p>
+                       <p className="text-3xl font-bold tracking-tighter">{loading ? "—" : kpi.value}</p>
                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{kpi.label}</p>
+                       {kpi.sub ? <p className="text-[11px] text-muted-foreground leading-snug pt-0.5">{kpi.sub}</p> : null}
                     </div>
                  </div>
               </CardContent>
             </Card>
+            </Link>
           )
         })}
       </div>
